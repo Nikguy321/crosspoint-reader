@@ -45,6 +45,9 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // Base URL the template is relative to: the OpenSearch description URL, or
   // empty when the template came from the feed itself (resolve against feed).
   std::string searchTemplateBase;
+  // OAuth access token obtained via the OPDS authentication document's
+  // password-grant flow; sent as "Authorization: Bearer" when non-empty.
+  std::string bearerToken;
   int selectorIndex = 0;
   std::string errorMessage;
   std::string statusMessage;
@@ -85,6 +88,7 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void downloadBook(const OpdsEntry& book);
   bool hasSearch() const { return !searchTemplate.empty() || !searchDescriptionUrl.empty(); }
   bool ensureSearchTemplate();
+  bool authenticateWithServer(const std::string& resourceUrl);
   void launchSearch();
   void performSearch(const std::string& query);
   bool preventAutoSleep() override;

@@ -7,6 +7,7 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <OpdsAuthDoc.h>
 #include <OpdsFeedParser.h>
 #include <OpdsSearchTemplate.h>
 #include <OpenSearchDescParser.h>
@@ -35,6 +36,24 @@ constexpr fui::ActionId ACTION_SEARCH = 2;
 constexpr fui::ActionId ACTION_CANCEL = 3;
 constexpr int DOWNLOAD_PROGRESS_STEP_PERCENT = 5;
 constexpr unsigned long DOWNLOAD_PROGRESS_MIN_UPDATE_MS = 5000;
+// OPDS authentication documents are small; cap the 401-body capture.
+constexpr size_t MAX_AUTH_DOC_BYTES = 8192;
+
+// Percent-encode a value for a query string or form-urlencoded body.
+std::string percentEncode(const std::string& s) {
+  std::string out;
+  out.reserve(s.size() * 3);
+  for (const unsigned char c : s) {
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      out += static_cast<char>(c);
+    } else {
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%%%02X", c);
+      out += buf;
+    }
+  }
+  return out;
+}
 
 }  // namespace
 
@@ -54,6 +73,7 @@ void OpdsBookBrowserActivity::onEnter() {
   searchTemplate = "";
   searchDescriptionUrl = "";
   searchTemplateBase = "";
+  bearerToken = "";
   currentPath = "";
   selectorIndex = 0;
   errorMessage.clear();
@@ -371,26 +391,49 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   std::string url = UrlUtils::buildUrl(server.url, path);
   LOG_DBG("OPDS", "Fetching: %s", url.c_str());
   OpdsFeedParser parser;
-  const bool fetched = HttpDownloader::fetchUrl(
-      url,
-      [&parser](const uint8_t* data, const size_t len) {
-        parser.write(data, len);
-        return !parser.error();  // abort the transfer on a parse error
-      },
-      server.username, server.password);
-  parser.flush();
+  for (int authAttempt = 0;; ++authAttempt) {
+    int status = 0;
+    HttpDownloader::FetchOptions options;
+    options.username = server.username;
+    options.password = server.password;
+    options.bearer = bearerToken;
+    // Prefer OPDS 2.0 JSON from servers that content-negotiate (e.g.
+    // Mayberry); Atom-only servers ignore this and serve their usual feed.
+    options.accept = "application/opds+json,application/atom+xml;q=0.9,*/*;q=0.8";
+    options.statusOut = &status;
+    const bool fetched = HttpDownloader::fetchUrl(
+        url,
+        [&parser](const uint8_t* data, const size_t len) {
+          parser.write(data, len);
+          return !parser.error();  // abort the transfer on a parse error
+        },
+        options);
+    parser.flush();
 
-  if (parser.error()) {
-    state = BrowserState::ERROR;
-    errorMessage = tr(STR_PARSE_FEED_FAILED);
-    requestUpdate();
-    return;
-  }
-  if (!fetched) {
-    state = BrowserState::ERROR;
-    errorMessage = tr(STR_FETCH_FEED_FAILED);
-    requestUpdate();
-    return;
+    if (!fetched && status == 401) {
+      // Authentication for OPDS: the 401 body is an authentication document
+      // describing the server's flows. One re-auth attempt (covers both a
+      // missing and an expired token), then give up.
+      bearerToken.clear();
+      if (authAttempt == 0 && authenticateWithServer(url)) continue;
+      state = BrowserState::ERROR;
+      errorMessage = tr(STR_OPDS_AUTH_FAILED);
+      requestUpdate();
+      return;
+    }
+    if (parser.error()) {
+      state = BrowserState::ERROR;
+      errorMessage = tr(STR_PARSE_FEED_FAILED);
+      requestUpdate();
+      return;
+    }
+    if (!fetched) {
+      state = BrowserState::ERROR;
+      errorMessage = tr(STR_FETCH_FEED_FAILED);
+      requestUpdate();
+      return;
+    }
+    break;
   }
 
   searchTemplate = parser.getSearchTemplate();
@@ -559,7 +602,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
           requestUpdate(true);
         }
       },
-      &cancelDownload, server.username, server.password);
+      &cancelDownload, server.username, server.password, false, bearerToken);
 
   if (result == HttpDownloader::OK) {
     clearBookCache(filename);
@@ -602,6 +645,61 @@ void OpdsBookBrowserActivity::launchSearch() {
   });
 }
 
+// Authentication for OPDS 1.0: re-request the resource capturing the 401 body
+// (the authentication document), pick a flow the device can drive, and obtain
+// credentials for retrying.
+//  - basic: already sent preemptively when credentials are stored, so landing
+//    here means they are missing or wrong.
+//  - oauth/password: POST the stored credentials to the "authenticate" link
+//    and keep the returned access token as a Bearer header.
+//  - oauth/implicit: needs a browser; cannot be driven from the device.
+bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resourceUrl) {
+  std::string body;
+  body.reserve(1024);
+  int status = 0;
+  HttpDownloader::FetchOptions options;
+  options.statusOut = &status;
+  options.captureErrorBody = true;
+  HttpDownloader::fetchUrl(
+      resourceUrl,
+      [&body](const uint8_t* data, const size_t len) {
+        const size_t room = MAX_AUTH_DOC_BYTES - body.size();
+        body.append(reinterpret_cast<const char*>(data), len < room ? len : room);
+        return true;
+      },
+      options);
+  if (status != 401 || body.empty()) return false;
+
+  OpdsAuthDoc doc;
+  if (!parseOpdsAuthDocument(body.data(), body.size(), doc)) {
+    LOG_ERR("OPDS", "401 without a usable authentication document");
+    return false;
+  }
+
+  if (doc.hasOauthPassword && !doc.tokenUrl.empty() && !server.username.empty() && !server.password.empty()) {
+    const std::string tokenUrl = UrlUtils::buildUrl(resourceUrl, doc.tokenUrl);
+    const std::string form = "grant_type=password&username=" + percentEncode(server.username) +
+                             "&password=" + percentEncode(server.password);
+    std::string response;
+    int tokenStatus = 0;
+    if (HttpDownloader::postForm(tokenUrl, form, response, &tokenStatus)) {
+      std::string token;
+      if (extractJsonStringField(response.data(), response.size(), "access_token", token) && !token.empty()) {
+        bearerToken = std::move(token);
+        LOG_INF("OPDS", "OAuth password grant succeeded");
+        return true;
+      }
+    }
+    LOG_ERR("OPDS", "OAuth token request failed (status %d)", tokenStatus);
+    return false;
+  }
+
+  if (doc.hasOauthImplicit && !doc.hasBasic && !doc.hasOauthPassword) {
+    LOG_ERR("OPDS", "Server only offers browser-based OAuth (implicit)");
+  }
+  return false;
+}
+
 // Resolves the search template lazily: OPDS 1.x servers such as calibre-web,
 // COPS and Kavita publish it in a separate OpenSearch description document
 // instead of inlining it in the feed.
@@ -613,13 +711,17 @@ bool OpdsBookBrowserActivity::ensureSearchTemplate() {
   const std::string descUrl = UrlUtils::buildUrl(feedUrl, searchDescriptionUrl);
   LOG_DBG("OPDS", "Fetching OpenSearch description: %s", descUrl.c_str());
   OpenSearchDescParser parser;
+  HttpDownloader::FetchOptions options;
+  options.username = server.username;
+  options.password = server.password;
+  options.bearer = bearerToken;
   const bool fetched = HttpDownloader::fetchUrl(
       descUrl,
       [&parser](const uint8_t* data, const size_t len) {
         parser.write(data, len);
         return !parser.error();
       },
-      server.username, server.password);
+      options);
   parser.flush();
   if (!fetched || parser.error() || parser.getTemplate().empty()) {
     LOG_ERR("OPDS", "OpenSearch description unusable");
@@ -648,24 +750,9 @@ void OpdsBookBrowserActivity::performSearch(const std::string& query) {
     return;
   }
 
-  auto urlEncode = [](const std::string& s) {
-    std::string out;
-    out.reserve(s.size() * 3);
-    for (unsigned char c : s) {
-      if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
-        out += static_cast<char>(c);
-      else {
-        char buf[4];
-        snprintf(buf, sizeof(buf), "%%%02X", c);
-        out += buf;
-      }
-    }
-    return out;
-  };
-
   // Expand the template first: buildUrl percent-encodes braces, so a raw
   // template must never pass through URL resolution.
-  const std::string expanded = expandOpdsSearchTemplate(searchTemplate, urlEncode(query));
+  const std::string expanded = expandOpdsSearchTemplate(searchTemplate, percentEncode(query));
   const std::string base =
       searchTemplateBase.empty() ? UrlUtils::buildUrl(server.url, currentPath) : searchTemplateBase;
   const std::string url = UrlUtils::buildUrl(base, expanded);
