@@ -36,6 +36,20 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void rebuildRowItems();
   std::vector<std::string> navigationHistory;
   std::string currentPath;
+  // The active search query. While browsing its results the header shows it
+  // (quoted, library-view convention) instead of the server name, and
+  // reopening search pre-fills the keyboard with it.
+  std::string searchQuery;
+  // Quoted form of searchQuery for the header; derived by setSearchQuery().
+  std::string headerSearchTitle;
+  // searchQuery per navigationHistory entry, pushed/popped in lockstep, so
+  // Back restores the search term (or its absence) of the feed it returns to.
+  std::vector<std::string> searchQueryHistory;
+  // Raw pagination hrefs of the current feed: following them keeps the
+  // search-term header (page 2 of results is still the same search).
+  std::string pageNextHref;
+  std::string pagePrevHref;
+  void setSearchQuery(const std::string& query);
   // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
   // either inlined in the feed or fetched from an OpenSearch description.
   std::string searchTemplate;

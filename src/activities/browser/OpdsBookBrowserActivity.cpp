@@ -75,6 +75,11 @@ void OpdsBookBrowserActivity::onEnter() {
   searchTemplateBase = "";
   bearerToken = "";
   currentPath = "";
+  searchQuery.clear();
+  headerSearchTitle.clear();
+  searchQueryHistory.clear();
+  pageNextHref.clear();
+  pagePrevHref.clear();
   selectorIndex = 0;
   errorMessage.clear();
   statusMessage = tr(STR_CHECKING_WIFI);
@@ -131,6 +136,11 @@ void OpdsBookBrowserActivity::onCancelEvent(const fui::ActionEvent&, void* user)
   if (self->state != BrowserState::DOWNLOADING) return;
   self->app.clearTapFlash();
   self->cancelDownload = true;
+}
+
+void OpdsBookBrowserActivity::setSearchQuery(const std::string& query) {
+  searchQuery = query;
+  headerSearchTitle = query.empty() ? std::string() : "\u201c" + query + "\u201d";
 }
 
 void OpdsBookBrowserActivity::loop() {
@@ -255,7 +265,10 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
   // the rest of the firmware's screens.
   screen.spacer(static_cast<int16_t>(UITheme::getInstance().getMetrics().topPadding));
   fui::HeaderProps header;
-  header.title = server.name.empty() ? tr(STR_OPDS_BROWSER) : server.name.c_str();
+  // An active search replaces the server name with the quoted query, like the
+  // library view, so the reader can see what produced the current list.
+  header.title = !headerSearchTitle.empty() ? headerSearchTitle.c_str()
+                                            : (server.name.empty() ? tr(STR_OPDS_BROWSER) : server.name.c_str());
   header.borderEdges = fui::EdgeBottom;
   if (withSearch && hasSearch()) {
     header.trailingIcon = fui::bitmapFromIcon(icon_search_32);
@@ -441,6 +454,8 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   searchTemplateBase = "";  // feed-inline template resolves against the feed URL
   const auto& nextUrl = parser.getNextPageUrl();
   const auto& prevUrl = parser.getPrevPageUrl();
+  pageNextHref = nextUrl;
+  pagePrevHref = prevUrl;
   const bool feedTruncated = parser.truncated();
   // Reset the selection before the swap: the render task reads
   // entries[selectorIndex] under only an empty() guard, and the new feed can
@@ -492,6 +507,10 @@ void OpdsBookBrowserActivity::releaseEntries() {
 
 void OpdsBookBrowserActivity::navigateToEntry(const OpdsEntry& entry) {
   navigationHistory.push_back(currentPath);
+  searchQueryHistory.push_back(searchQuery);
+  // Following a results page (next/previous) stays within the same search;
+  // any other navigation leaves it.
+  if (entry.href != pageNextHref && entry.href != pagePrevHref) setSearchQuery("");
   // Resolve to a full URL so sub-sub-navigation retains parent path context
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   currentPath = UrlUtils::buildUrl(feedUrl, entry.href);
@@ -510,6 +529,10 @@ void OpdsBookBrowserActivity::navigateBack() {
   } else {
     currentPath = navigationHistory.back();
     navigationHistory.pop_back();
+    if (!searchQueryHistory.empty()) {
+      setSearchQuery(searchQueryHistory.back());
+      searchQueryHistory.pop_back();
+    }
     state = BrowserState::LOADING;
     statusMessage = tr(STR_LOADING);
     releaseEntries();
@@ -634,7 +657,7 @@ void OpdsBookBrowserActivity::launchSearch() {
   state = BrowserState::SEARCH_INPUT;
   requestUpdate();
 
-  auto keyboard = std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SEARCH));
+  auto keyboard = std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_SEARCH), searchQuery);
   startActivityForResult(std::move(keyboard), [this](const ActivityResult& result) {
     state = BrowserState::BROWSING;
     if (!result.isCancelled) {
@@ -758,6 +781,8 @@ void OpdsBookBrowserActivity::performSearch(const std::string& query) {
   const std::string url = UrlUtils::buildUrl(base, expanded);
 
   navigationHistory.push_back(currentPath);
+  searchQueryHistory.push_back(searchQuery);
+  setSearchQuery(query);
   currentPath = url;
 
   state = BrowserState::LOADING;
