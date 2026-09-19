@@ -159,6 +159,10 @@ class Opds2Parser final : public Print {
   int pubAcqRank = -1;
   bool pubHasPlainEpub = false;
 
+  // Indices of top-level (non-group) navigation entries, for deduplication
+  // against groups at flush().
+  std::vector<uint16_t> topNavIndices;
+  bool sawGroups = false;
   // Current group accumulation (groups don't nest).
   std::string groupTitle;
   std::string groupSelfHref;

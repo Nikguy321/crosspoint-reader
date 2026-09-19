@@ -33,7 +33,36 @@ void Opds2Parser::flush() {
   if (!sawRoot || depth != 0) {
     LOG_DBG("OPDS2", "Incomplete JSON document");
     errorOccured = true;
+    return;
   }
+  // Servers often expose the same categories twice: a bare top-level
+  // `navigation` list plus `groups` that showcase each category with preview
+  // publications. Drop a top-level navigation entry when a group covers it
+  // (its title matches a group heading, or its href matches a group's "see
+  // all" self link). Unrelated navigation stays, but moves below the groups:
+  // the richer preview sections lead the screen.
+  if (!sawGroups || topNavIndices.empty()) return;
+  std::vector<OpdsEntry> keptNav;
+  keptNav.reserve(topNavIndices.size());
+  for (const uint16_t index : topNavIndices) {
+    const OpdsEntry& nav = entries[index];
+    bool duplicate = false;
+    for (const auto& entry : entries) {
+      if ((!entry.heading.empty() && entry.heading == nav.title) ||
+          (entry.id == OPDS_SEE_ALL_ID && entry.href == nav.href)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) keptNav.push_back(entries[index]);
+  }
+  for (auto it = topNavIndices.rbegin(); it != topNavIndices.rend(); ++it) {
+    entries.erase(entries.begin() + *it);
+  }
+  for (auto& nav : keptNav) {
+    entries.push_back(std::move(nav));
+  }
+  topNavIndices.clear();
 }
 
 bool Opds2Parser::error() const { return errorOccured || parser.hasError(); }
@@ -134,6 +163,7 @@ Opds2Parser::Scope Opds2Parser::scopeForChild(const Scope parent, const bool isO
 
 void Opds2Parser::beginGroup() {
   inGroup = true;
+  sawGroups = true;
   groupTitle.clear();
   groupSelfHref.clear();
   groupStartIndex = entries.size();
@@ -333,6 +363,11 @@ void Opds2Parser::commitNavLink() {
   if (entries.size() >= MAX_ENTRIES) {
     feedTruncated = true;
     return;
+  }
+  // The stack still holds ... FEED/GROUP > NAV at this point (NAV_LINK was
+  // just popped); only top-level navigation participates in group dedup.
+  if (depth >= 2 && stack[depth - 2] == Scope::FEED) {
+    topNavIndices.push_back(static_cast<uint16_t>(entries.size()));
   }
   OpdsEntry entry;
   entry.type = OpdsEntryType::NAVIGATION;
