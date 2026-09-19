@@ -5,9 +5,12 @@
 #include <Memory.h>
 #include <base64.h>
 #include <esp_wifi.h>
+#include <strings.h>
 
 #include <functional>
 #include <string>
+
+#include "util/UrlUtils.h"
 
 #if defined(FREEINK_NET_WOLFSSL)
 #include <SecureHttpClient.h>
@@ -93,6 +96,9 @@ struct WifiPowerSaveGuard {
 HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink, bool downgradeRedirectsToHttp) {
   WifiPowerSaveGuard psGuard;
   std::string url = startUrl;
+  // Credentials belong to the configured server only: a redirect to another
+  // origin (a CDN, or an http-downgraded target) must not receive them.
+  const std::string startOrigin = UrlUtils::extractHost(UrlUtils::ensureProtocol(startUrl));
 
   for (int hop = 0; hop <= MAX_REDIRECTS; ++hop) {
     freeink::SecureHttpClient http;
@@ -106,7 +112,8 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink
     // append a second User-Agent header, which strict servers reject (aiohttp
     // answers 400 "Duplicate 'User-Agent' header found").
     http.setUserAgent("CrossPoint-ESP32-" CROSSPOINT_VERSION);
-    if (!sink.authorization.empty()) {
+    if (!sink.authorization.empty() &&
+        strcasecmp(UrlUtils::extractHost(UrlUtils::ensureProtocol(url)).c_str(), startOrigin.c_str()) == 0) {
       http.addHeader("Authorization", sink.authorization);
     }
     if (!sink.accept.empty()) {

@@ -26,6 +26,16 @@ size_t Opds2Parser::write(const uint8_t* data, const size_t length) {
   return length;
 }
 
+void Opds2Parser::flush() {
+  // End of input: a body that ends before the root object closes is a
+  // truncated feed, not a shorter one — reject it rather than presenting the
+  // partial catalog as complete.
+  if (!sawRoot || depth != 0) {
+    LOG_DBG("OPDS2", "Incomplete JSON document");
+    errorOccured = true;
+  }
+}
+
 bool Opds2Parser::error() const { return errorOccured || parser.hasError(); }
 
 void Opds2Parser::assignBounded(std::string& target, const char* value, const size_t len, const size_t maxLen) {

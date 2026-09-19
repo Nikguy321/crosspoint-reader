@@ -36,6 +36,7 @@ void OpenSearchDescParser::flush() {
   if (errorOccured || !parser) return;
   if (XML_Parse(parser, nullptr, 0, XML_TRUE) != XML_STATUS_OK) {
     errorOccured = true;
+    LOG_DBG("OPDS", "OpenSearch finalization error: %s", XML_ErrorString(XML_GetErrorCode(parser)));
     destroyXmlParser(parser);
   }
 }

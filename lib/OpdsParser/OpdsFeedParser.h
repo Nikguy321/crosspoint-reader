@@ -20,6 +20,10 @@ class OpdsFeedParser final : public Print {
   OpdsFeedParser(const OpdsFeedParser&) = delete;
   OpdsFeedParser& operator=(const OpdsFeedParser&) = delete;
 
+  // Discard all state so the instance can parse a fresh response (e.g. the
+  // authenticated retry after a 401).
+  void reset();
+
   size_t write(uint8_t c) override;
   size_t write(const uint8_t* data, size_t length) override;
   void flush() override;

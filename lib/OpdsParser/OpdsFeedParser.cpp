@@ -31,6 +31,13 @@ bool OpdsFeedParser::selectBackend(const uint8_t firstByte) {
   return true;
 }
 
+void OpdsFeedParser::reset() {
+  xmlParser.reset();
+  jsonParser.reset();
+  bomBytesSkipped = 0;
+  allocFailed = false;
+}
+
 size_t OpdsFeedParser::write(const uint8_t c) { return write(&c, 1); }
 
 size_t OpdsFeedParser::write(const uint8_t* data, size_t length) {

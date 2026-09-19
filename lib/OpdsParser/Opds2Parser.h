@@ -38,7 +38,7 @@ class Opds2Parser final : public Print {
 
   size_t write(uint8_t c) override;
   size_t write(const uint8_t* data, size_t length) override;
-  void flush() override {}
+  void flush() override;
 
   bool error() const;
   bool truncated() const { return feedTruncated; }

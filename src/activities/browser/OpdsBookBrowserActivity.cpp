@@ -436,7 +436,10 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
       // describing the server's flows. One re-auth attempt (covers both a
       // missing and an expired token), then give up.
       bearerToken.clear();
-      if (authAttempt == 0 && authenticateWithServer(url)) continue;
+      if (authAttempt == 0 && authenticateWithServer(url)) {
+        parser.reset();  // drop any finalized backend before the retry
+        continue;
+      }
       state = BrowserState::ERROR;
       errorMessage = tr(STR_OPDS_AUTH_FAILED);
       requestUpdate();
