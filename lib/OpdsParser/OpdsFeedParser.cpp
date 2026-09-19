@@ -6,7 +6,7 @@
 #include <cctype>
 
 namespace {
-const std::string emptyString;
+const std::string kNoValue;
 constexpr uint8_t UTF8_BOM[3] = {0xEF, 0xBB, 0xBF};
 }  // namespace
 
@@ -92,22 +92,22 @@ std::vector<OpdsEntry> OpdsFeedParser::takeEntries() {
 const std::string& OpdsFeedParser::getSearchTemplate() const {
   if (jsonParser) return jsonParser->getSearchTemplate();
   if (xmlParser) return xmlParser->getSearchTemplate();
-  return emptyString;
+  return kNoValue;
 }
 
 const std::string& OpdsFeedParser::getSearchDescriptionUrl() const {
   if (xmlParser) return xmlParser->getSearchDescriptionUrl();
-  return emptyString;  // OPDS 2.0 search is always an inline URI template
+  return kNoValue;  // OPDS 2.0 search is always an inline URI template
 }
 
 const std::string& OpdsFeedParser::getNextPageUrl() const {
   if (jsonParser) return jsonParser->getNextPageUrl();
   if (xmlParser) return xmlParser->getNextPageUrl();
-  return emptyString;
+  return kNoValue;
 }
 
 const std::string& OpdsFeedParser::getPrevPageUrl() const {
   if (jsonParser) return jsonParser->getPrevPageUrl();
   if (xmlParser) return xmlParser->getPrevPageUrl();
-  return emptyString;
+  return kNoValue;
 }
