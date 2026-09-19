@@ -38,6 +38,16 @@ class OpdsParser final : public Print {
   const std::string& getSearchDescriptionUrl() const { return searchDescriptionUrl; }
   const std::string& getNextPageUrl() const { return nextPageUrl; }
   const std::string& getPrevPageUrl() const { return prevPageUrl; }
+  const std::string& getFirstPageUrl() const { return firstPageUrl; }
+  const std::string& getLastPageUrl() const { return lastPageUrl; }
+  const std::string& getFeedTitle() const { return feedTitle; }
+  // Pagination metadata from the opensearch:* feed elements; 0 when absent.
+  uint32_t getNumberOfItems() const { return totalResults; }
+  uint32_t getItemsPerPage() const { return itemsPerPage; }
+  uint32_t getCurrentPage() const {
+    if (itemsPerPage == 0 || startIndex == 0) return 0;
+    return (startIndex - 1) / itemsPerPage + 1;
+  }
   OpdsParser(const OpdsParser&) = delete;
   OpdsParser& operator=(const OpdsParser&) = delete;
 
@@ -79,6 +89,12 @@ class OpdsParser final : public Print {
   std::string searchDescriptionUrl;
   std::string nextPageUrl;
   std::string prevPageUrl;
+  std::string firstPageUrl;
+  std::string lastPageUrl;
+  std::string feedTitle;
+  uint32_t totalResults = 0;
+  uint32_t startIndex = 0;
+  uint32_t itemsPerPage = 0;
   // Helper to find attribute value
   static const char* findAttribute(const XML_Char** atts, const char* name);
   static void assignBounded(std::string& target, const char* value, size_t maxLen);
@@ -91,11 +107,18 @@ class OpdsParser final : public Print {
 
   // Parser state
   bool inEntry = false;
+  bool inFeedTitle = false;
+  // Which opensearch:* feed-level counter element is open (else NONE).
+  enum class MetaField : uint8_t { NONE, TOTAL_RESULTS, START_INDEX, ITEMS_PER_PAGE } metaField = MetaField::NONE;
   bool inTitle = false;
   bool inAuthor = false;
   bool inAuthorName = false;
   bool inId = false;
   bool collectCurrentEntry = false;
+  // Best acquisition rank committed for the current entry, and whether that
+  // href points at a plain EPUB (see opdsAcquisitionRank()).
+  int entryAcqRank = -1;
+  bool entryHasPlainEpub = false;
 
   bool errorOccured = false;
   bool feedTruncated = false;

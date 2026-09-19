@@ -89,6 +89,17 @@ std::vector<OpdsEntry> OpdsFeedParser::takeEntries() {
   return {};
 }
 
+std::vector<OpdsEntry> OpdsFeedParser::takeFacetEntries() {
+  if (jsonParser) return jsonParser->takeFacetEntries();
+  return {};
+}
+
+const std::string& OpdsFeedParser::getFeedTitle() const {
+  if (jsonParser) return jsonParser->getFeedTitle();
+  if (xmlParser) return xmlParser->getFeedTitle();
+  return kNoValue;
+}
+
 const std::string& OpdsFeedParser::getSearchTemplate() const {
   if (jsonParser) return jsonParser->getSearchTemplate();
   if (xmlParser) return xmlParser->getSearchTemplate();
@@ -110,4 +121,34 @@ const std::string& OpdsFeedParser::getPrevPageUrl() const {
   if (jsonParser) return jsonParser->getPrevPageUrl();
   if (xmlParser) return xmlParser->getPrevPageUrl();
   return kNoValue;
+}
+
+const std::string& OpdsFeedParser::getFirstPageUrl() const {
+  if (jsonParser) return jsonParser->getFirstPageUrl();
+  if (xmlParser) return xmlParser->getFirstPageUrl();
+  return kNoValue;
+}
+
+const std::string& OpdsFeedParser::getLastPageUrl() const {
+  if (jsonParser) return jsonParser->getLastPageUrl();
+  if (xmlParser) return xmlParser->getLastPageUrl();
+  return kNoValue;
+}
+
+uint32_t OpdsFeedParser::getNumberOfItems() const {
+  if (jsonParser) return jsonParser->getNumberOfItems();
+  if (xmlParser) return xmlParser->getNumberOfItems();
+  return 0;
+}
+
+uint32_t OpdsFeedParser::getItemsPerPage() const {
+  if (jsonParser) return jsonParser->getItemsPerPage();
+  if (xmlParser) return xmlParser->getItemsPerPage();
+  return 0;
+}
+
+uint32_t OpdsFeedParser::getCurrentPage() const {
+  if (jsonParser) return jsonParser->getCurrentPage();
+  if (xmlParser) return xmlParser->getCurrentPage();
+  return 0;
 }

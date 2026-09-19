@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <cstring>
 #include <string>
 
 /**
@@ -20,7 +21,34 @@ struct OpdsEntry {
   std::string author;  // Only for books
   std::string href;    // Navigation URL or epub download URL
   std::string id;
+  // Section heading drawn above this row (group or facet-group title).
+  std::string heading;
+  // Right-column annotation (e.g. a facet's publication count).
+  std::string detail;
 };
+
+// Entry id marking a group's "see all" link; the UI supplies the label.
+inline constexpr const char* OPDS_SEE_ALL_ID = "opds:group-self";
+
+/**
+ * Preference rank of an acquisition link relation, covering both the OPDS 1.x
+ * URI forms and the OPDS 2.0 short names. Higher ranks are preferred when a
+ * publication offers several acquisition links. -1 means the link is not a
+ * usable acquisition for this device: not an acquisition rel at all, `buy`
+ * (needs a payment flow), or `sample`/`preview` (not the full book).
+ */
+inline int opdsAcquisitionRank(const char* rel) {
+  if (strstr(rel, "opds-spec.org/acquisition") != nullptr) {
+    if (strstr(rel, "/open-access") != nullptr) return 3;
+    if (strstr(rel, "/sample") != nullptr || strstr(rel, "/buy") != nullptr) return -1;
+    if (strstr(rel, "/borrow") != nullptr || strstr(rel, "/subscribe") != nullptr) return 1;
+    return 2;  // bare http://opds-spec.org/acquisition
+  }
+  if (strcmp(rel, "download") == 0 || strcmp(rel, "open-access") == 0) return 3;
+  if (strcmp(rel, "acquisition") == 0) return 2;
+  if (strcmp(rel, "borrow") == 0 || strcmp(rel, "subscribe") == 0) return 1;
+  return -1;  // buy, preview, or not an acquisition rel
+}
 
 // Shared memory bounds for both feed parsers.
 namespace OpdsLimits {

@@ -31,10 +31,19 @@ class OpdsFeedParser final : public Print {
   bool isOpds2() const { return jsonParser != nullptr; }
 
   std::vector<OpdsEntry> takeEntries();
+  // Facet rows (OPDS 2.0 only; the Atom parser produces none).
+  std::vector<OpdsEntry> takeFacetEntries();
+  const std::string& getFeedTitle() const;
   const std::string& getSearchTemplate() const;
   const std::string& getSearchDescriptionUrl() const;
   const std::string& getNextPageUrl() const;
   const std::string& getPrevPageUrl() const;
+  const std::string& getFirstPageUrl() const;
+  const std::string& getLastPageUrl() const;
+  // Pagination metadata; 0 when the feed doesn't provide it.
+  uint32_t getNumberOfItems() const;
+  uint32_t getItemsPerPage() const;
+  uint32_t getCurrentPage() const;
 
  private:
   bool selectBackend(uint8_t firstByte);

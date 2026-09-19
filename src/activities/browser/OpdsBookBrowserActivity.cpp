@@ -80,6 +80,10 @@ void OpdsBookBrowserActivity::onEnter() {
   searchQueryHistory.clear();
   pageNextHref.clear();
   pagePrevHref.clear();
+  pageFirstHref.clear();
+  pageLastHref.clear();
+  feedTitle.clear();
+  pageLabel[0] = '\0';
   selectorIndex = 0;
   errorMessage.clear();
   statusMessage = tr(STR_CHECKING_WIFI);
@@ -266,9 +270,13 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
   screen.spacer(static_cast<int16_t>(UITheme::getInstance().getMetrics().topPadding));
   fui::HeaderProps header;
   // An active search replaces the server name with the quoted query, like the
-  // library view, so the reader can see what produced the current list.
+  // library view, so the reader can see what produced the current list. With
+  // no search, a navigated feed's own title beats the server name.
   header.title = !headerSearchTitle.empty() ? headerSearchTitle.c_str()
-                                            : (server.name.empty() ? tr(STR_OPDS_BROWSER) : server.name.c_str());
+                 : !feedTitle.empty()       ? feedTitle.c_str()
+                 : server.name.empty()      ? tr(STR_OPDS_BROWSER)
+                                            : server.name.c_str();
+  if (state == BrowserState::BROWSING && pageLabel[0] != '\0') header.subtitle = pageLabel;
   header.borderEdges = fui::EdgeBottom;
   if (withSearch && hasSearch()) {
     header.trailingIcon = fui::bitmapFromIcon(icon_search_32);
@@ -452,10 +460,30 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   searchTemplate = parser.getSearchTemplate();
   searchDescriptionUrl = parser.getSearchDescriptionUrl();
   searchTemplateBase = "";  // feed-inline template resolves against the feed URL
+  feedTitle = parser.getFeedTitle();
+
+  // "Page X of Y" from the feed's pagination metadata (OPDS 2.0 metadata
+  // object or the opensearch:* elements of an Atom feed).
+  pageLabel[0] = '\0';
+  const uint32_t itemsPerPage = parser.getItemsPerPage();
+  const uint32_t totalItems = parser.getNumberOfItems();
+  const uint32_t page = parser.getCurrentPage();
+  const uint32_t totalPages = itemsPerPage > 0 ? (totalItems + itemsPerPage - 1) / itemsPerPage : 0;
+  if (page > 0 && totalPages > 1) {
+    snprintf(pageLabel, sizeof(pageLabel), tr(STR_OPDS_PAGE_POSITION), static_cast<unsigned long>(page),
+             static_cast<unsigned long>(totalPages));
+  }
   const auto& nextUrl = parser.getNextPageUrl();
   const auto& prevUrl = parser.getPrevPageUrl();
   pageNextHref = nextUrl;
   pagePrevHref = prevUrl;
+  // First/Last rows only when they reach further than Previous/Next.
+  pageFirstHref = (!parser.getFirstPageUrl().empty() && !prevUrl.empty() && parser.getFirstPageUrl() != prevUrl)
+                      ? parser.getFirstPageUrl()
+                      : "";
+  pageLastHref = (!parser.getLastPageUrl().empty() && !nextUrl.empty() && parser.getLastPageUrl() != nextUrl)
+                     ? parser.getLastPageUrl()
+                     : "";
   const bool feedTruncated = parser.truncated();
   // Reset the selection before the swap: the render task reads
   // entries[selectorIndex] under only an empty() guard, and the new feed can
@@ -464,12 +492,25 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   listNav.reset();
   entries = parser.takeEntries();
 
-  entries.reserve(entries.size() + (prevUrl.empty() ? 0 : 1) + (nextUrl.empty() ? 0 : 1));
+  auto facetRows = parser.takeFacetEntries();
+  entries.reserve(entries.size() + (prevUrl.empty() ? 0 : 1) + (nextUrl.empty() ? 0 : 1) +
+                  (pageFirstHref.empty() ? 0 : 1) + (pageLastHref.empty() ? 0 : 1) + facetRows.size());
   if (!prevUrl.empty()) {
     entries.insert(entries.begin(), OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_PREV_PAGE), "", prevUrl, ""});
   }
+  if (!pageFirstHref.empty()) {
+    entries.insert(entries.begin(), OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_FIRST_PAGE), "", pageFirstHref, ""});
+  }
   if (!nextUrl.empty()) {
     entries.push_back(OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_NEXT_PAGE), "", nextUrl, ""});
+  }
+  if (!pageLastHref.empty()) {
+    entries.push_back(OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_LAST_PAGE), "", pageLastHref, ""});
+  }
+  // Facet groups (sort orders, filters) come after the catalog content, each
+  // under its own section heading.
+  for (auto& facet : facetRows) {
+    entries.push_back(std::move(facet));
   }
   if (feedTruncated) {
     LOG_INF("OPDS", "Feed truncated to fit memory");
@@ -489,9 +530,12 @@ void OpdsBookBrowserActivity::rebuildRowItems() {
   rowItems.reserve(entries.size());
   for (const auto& entry : entries) {
     fui::ListItem item;
-    item.label = entry.title.c_str();
+    // A group's "see all" self link carries no title of its own; the UI
+    // supplies the label (the group name is the section heading above it).
+    item.label = entry.id == OPDS_SEE_ALL_ID ? tr(STR_OPDS_SEE_ALL) : entry.title.c_str();
+    if (!entry.heading.empty()) item.sectionHeading = entry.heading.c_str();
     if (entry.type == OpdsEntryType::BOOK && !entry.author.empty()) item.subtitle = entry.author.c_str();
-    if (entry.type == OpdsEntryType::NAVIGATION) item.value = ">";
+    if (entry.type == OpdsEntryType::NAVIGATION) item.value = entry.detail.empty() ? ">" : entry.detail.c_str();
     item.actionValue = static_cast<int16_t>(rowItems.size());
     rowItems.push_back(item);
   }
@@ -508,9 +552,9 @@ void OpdsBookBrowserActivity::releaseEntries() {
 void OpdsBookBrowserActivity::navigateToEntry(const OpdsEntry& entry) {
   navigationHistory.push_back(currentPath);
   searchQueryHistory.push_back(searchQuery);
-  // Following a results page (next/previous) stays within the same search;
-  // any other navigation leaves it.
-  if (entry.href != pageNextHref && entry.href != pagePrevHref) setSearchQuery("");
+  // Following a results page (first/previous/next/last) stays within the
+  // same search; any other navigation leaves it.
+  if (!isPaginationHref(entry.href)) setSearchQuery("");
   // Resolve to a full URL so sub-sub-navigation retains parent path context
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   currentPath = UrlUtils::buildUrl(feedUrl, entry.href);

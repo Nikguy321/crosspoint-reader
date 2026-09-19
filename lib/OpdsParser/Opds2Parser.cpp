@@ -2,12 +2,14 @@
 
 #include <Logging.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 using namespace OpdsLimits;
 
 Opds2Parser::Opds2Parser()
-    : parser(JsonCallbacks{this, &sOnKey, &sOnString, nullptr, &sOnBool, nullptr, &sOnObjectStart, &sOnObjectEnd,
+    : parser(JsonCallbacks{this, &sOnKey, &sOnString, &sOnNumber, &sOnBool, nullptr, &sOnObjectStart, &sOnObjectEnd,
                            &sOnArrayStart, &sOnArrayEnd}) {
   entries.reserve(ENTRY_STORAGE_CAPACITY);
 }
@@ -30,26 +32,25 @@ void Opds2Parser::assignBounded(std::string& target, const char* value, const si
   target.assign(value, len < maxLen ? len : maxLen);
 }
 
-// Acquisition relations per OPDS 2.0 §5.3: the OPDS 1.x URI aliases plus the
-// simplified values usable for a direct download.
-bool Opds2Parser::relIsAcquisition(const char* rel) {
-  if (strstr(rel, "opds-spec.org/acquisition") != nullptr) return true;
-  return strcmp(rel, "acquisition") == 0 || strcmp(rel, "download") == 0 || strcmp(rel, "open-access") == 0;
-}
-
 void Opds2Parser::resetLink() {
   link.href.clear();
   link.title.clear();
-  link.relSearch = link.relNext = link.relPrev = link.relAcquisition = false;
+  link.relSearch = link.relNext = link.relPrev = link.relFirst = link.relLast = link.relSelf = false;
+  link.acqRank = -1;
   link.typeEpub = false;
   link.templated = false;
+  link.numberOfItems = -1;
 }
 
 void Opds2Parser::applyRel(const char* rel) {
   if (strcmp(rel, "search") == 0) link.relSearch = true;
   if (strcmp(rel, "next") == 0) link.relNext = true;
   if (strcmp(rel, "previous") == 0 || strcmp(rel, "prev") == 0) link.relPrev = true;
-  if (relIsAcquisition(rel)) link.relAcquisition = true;
+  if (strcmp(rel, "first") == 0) link.relFirst = true;
+  if (strcmp(rel, "last") == 0) link.relLast = true;
+  if (strcmp(rel, "self") == 0) link.relSelf = true;
+  const int rank = opdsAcquisitionRank(rel);
+  if (rank > link.acqRank) link.acqRank = rank;
 }
 
 // ---- scope machine ----
@@ -57,20 +58,39 @@ void Opds2Parser::applyRel(const char* rel) {
 Opds2Parser::Scope Opds2Parser::scopeForChild(const Scope parent, const bool isObject) const {
   switch (parent) {
     case Scope::FEED:
-    case Scope::GROUP:
+      if (isObject && strcmp(pendingKey, "metadata") == 0) return Scope::FEED_META;
       if (!isObject) {
         if (strcmp(pendingKey, "links") == 0) return Scope::FEED_LINKS;
         if (strcmp(pendingKey, "navigation") == 0) return Scope::NAV;
         if (strcmp(pendingKey, "publications") == 0) return Scope::PUBS;
-        if (parent == Scope::FEED && strcmp(pendingKey, "groups") == 0) return Scope::GROUPS;
+        if (strcmp(pendingKey, "groups") == 0) return Scope::GROUPS;
+        if (strcmp(pendingKey, "facets") == 0) return Scope::FACETS;
+      }
+      return Scope::SKIP;
+    case Scope::FEED_META:
+      if (isObject && strcmp(pendingKey, "title") == 0) return Scope::FEED_TITLE;
+      return Scope::SKIP;
+    case Scope::GROUP:
+      if (isObject && strcmp(pendingKey, "metadata") == 0) return Scope::GROUP_META;
+      if (!isObject) {
+        if (strcmp(pendingKey, "links") == 0) return Scope::GROUP_LINKS;
+        if (strcmp(pendingKey, "navigation") == 0) return Scope::NAV;
+        if (strcmp(pendingKey, "publications") == 0) return Scope::PUBS;
       }
       return Scope::SKIP;
     case Scope::FEED_LINKS:
       return isObject ? Scope::FEED_LINK : Scope::SKIP;
+    case Scope::GROUP_LINKS:
+      return isObject ? Scope::GROUP_LINK : Scope::SKIP;
     case Scope::FEED_LINK:
     case Scope::PUB_LINK:
+    case Scope::GROUP_LINK:
       if (!isObject && strcmp(pendingKey, "rel") == 0) return Scope::LINK_REL;
       return Scope::SKIP;  // properties, alternate, children
+    case Scope::FACET_LINK:
+      if (!isObject && strcmp(pendingKey, "rel") == 0) return Scope::LINK_REL;
+      if (isObject && strcmp(pendingKey, "properties") == 0) return Scope::FACET_PROPS;
+      return Scope::SKIP;
     case Scope::NAV:
       return isObject ? Scope::NAV_LINK : Scope::SKIP;
     case Scope::PUBS:
@@ -89,9 +109,42 @@ Opds2Parser::Scope Opds2Parser::scopeForChild(const Scope parent, const bool isO
       return isObject ? Scope::PUB_LINK : Scope::SKIP;
     case Scope::GROUPS:
       return isObject ? Scope::GROUP : Scope::SKIP;
+    case Scope::FACETS:
+      return isObject ? Scope::FACET : Scope::SKIP;
+    case Scope::FACET:
+      if (isObject && strcmp(pendingKey, "metadata") == 0) return Scope::FACET_META;
+      if (!isObject && strcmp(pendingKey, "links") == 0) return Scope::FACET_LINKS;
+      return Scope::SKIP;
+    case Scope::FACET_LINKS:
+      return isObject ? Scope::FACET_LINK : Scope::SKIP;
     default:
       return Scope::SKIP;
   }
+}
+
+void Opds2Parser::beginGroup() {
+  inGroup = true;
+  groupTitle.clear();
+  groupSelfHref.clear();
+  groupStartIndex = entries.size();
+}
+
+void Opds2Parser::endGroup() {
+  // Field order in the group object is not guaranteed, so the heading and the
+  // "see all" entry are applied only once the whole group has been read.
+  if (!groupSelfHref.empty() && entries.size() < MAX_ENTRIES) {
+    OpdsEntry seeAll;
+    seeAll.type = OpdsEntryType::NAVIGATION;
+    seeAll.id = OPDS_SEE_ALL_ID;
+    seeAll.href = std::move(groupSelfHref);
+    entries.push_back(std::move(seeAll));
+  }
+  if (!groupTitle.empty() && entries.size() > groupStartIndex) {
+    entries[groupStartIndex].heading = std::move(groupTitle);
+  }
+  inGroup = false;
+  groupTitle.clear();
+  groupSelfHref.clear();
 }
 
 void Opds2Parser::onContainerStart(const bool isObject) {
@@ -106,10 +159,28 @@ void Opds2Parser::onContainerStart(const bool isObject) {
   } else {
     next = scopeForChild(current(), isObject);
   }
-  if (next == Scope::FEED_LINK || next == Scope::NAV_LINK || next == Scope::PUB_LINK) resetLink();
-  if (next == Scope::PUB) {
-    currentEntry = OpdsEntry{};
-    pubHasPlainEpub = false;
+  switch (next) {
+    case Scope::FEED_LINK:
+    case Scope::NAV_LINK:
+    case Scope::PUB_LINK:
+    case Scope::GROUP_LINK:
+    case Scope::FACET_LINK:
+      resetLink();
+      break;
+    case Scope::PUB:
+      currentEntry = OpdsEntry{};
+      pubAcqRank = -1;
+      pubHasPlainEpub = false;
+      break;
+    case Scope::GROUP:
+      beginGroup();
+      break;
+    case Scope::FACET:
+      facetTitle.clear();
+      facetStartIndex = facetEntries.size();
+      break;
+    default:
+      break;
   }
   stack[depth++] = next;
   pendingKey[0] = '\0';
@@ -129,8 +200,23 @@ void Opds2Parser::onContainerEnd() {
     case Scope::PUB_LINK:
       commitPubLink();
       break;
+    case Scope::GROUP_LINK:
+      commitGroupLink();
+      break;
+    case Scope::FACET_LINK:
+      commitFacetLink();
+      break;
     case Scope::PUB:
       commitPublication();
+      break;
+    case Scope::GROUP:
+      endGroup();
+      break;
+    case Scope::FACET:
+      if (!facetTitle.empty() && facetEntries.size() > facetStartIndex) {
+        facetEntries[facetStartIndex].heading = std::move(facetTitle);
+      }
+      facetTitle.clear();
       break;
     default:
       break;
@@ -142,6 +228,8 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
     case Scope::FEED_LINK:
     case Scope::NAV_LINK:
     case Scope::PUB_LINK:
+    case Scope::GROUP_LINK:
+    case Scope::FACET_LINK:
       if (strcmp(pendingKey, "href") == 0) {
         assignBounded(link.href, value, len, MAX_HREF_CHARS);
       } else if (strcmp(pendingKey, "title") == 0) {
@@ -154,6 +242,19 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
       break;
     case Scope::LINK_REL:
       applyRel(value);
+      break;
+    case Scope::FEED_META:
+      if (strcmp(pendingKey, "title") == 0) assignBounded(feedTitle, value, len, MAX_TITLE_CHARS);
+      break;
+    case Scope::FEED_TITLE:
+      // Localized feed title object: take the first translation.
+      if (feedTitle.empty()) assignBounded(feedTitle, value, len, MAX_TITLE_CHARS);
+      break;
+    case Scope::GROUP_META:
+      if (strcmp(pendingKey, "title") == 0) assignBounded(groupTitle, value, len, MAX_TITLE_CHARS);
+      break;
+    case Scope::FACET_META:
+      if (strcmp(pendingKey, "title") == 0) assignBounded(facetTitle, value, len, MAX_TITLE_CHARS);
       break;
     case Scope::PUB_META:
       if (strcmp(pendingKey, "title") == 0) {
@@ -182,17 +283,39 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
   }
 }
 
+void Opds2Parser::onNumberValue(const char* value) {
+  switch (current()) {
+    case Scope::FEED_META:
+      if (strcmp(pendingKey, "numberOfItems") == 0) {
+        numberOfItems = static_cast<uint32_t>(strtoul(value, nullptr, 10));
+      } else if (strcmp(pendingKey, "itemsPerPage") == 0) {
+        itemsPerPage = static_cast<uint32_t>(strtoul(value, nullptr, 10));
+      } else if (strcmp(pendingKey, "currentPage") == 0) {
+        currentPage = static_cast<uint32_t>(strtoul(value, nullptr, 10));
+      }
+      break;
+    case Scope::FACET_PROPS:
+      if (strcmp(pendingKey, "numberOfItems") == 0) {
+        link.numberOfItems = static_cast<int32_t>(strtol(value, nullptr, 10));
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 // ---- commits ----
 
 void Opds2Parser::commitFeedLink() {
   if (link.href.empty()) return;
   if (link.relSearch && (link.templated || link.href.find('{') != std::string::npos)) {
     if (searchTemplate.empty() && link.href.size() <= MAX_SEARCH_TEMPLATE_CHARS) searchTemplate = link.href;
-  } else if (link.relNext && nextPageUrl.empty()) {
-    nextPageUrl = link.href;
-  } else if (link.relPrev && prevPageUrl.empty()) {
-    prevPageUrl = link.href;
+    return;
   }
+  if (link.relNext && nextPageUrl.empty()) nextPageUrl = link.href;
+  if (link.relPrev && prevPageUrl.empty()) prevPageUrl = link.href;
+  if (link.relFirst && firstPageUrl.empty()) firstPageUrl = link.href;
+  if (link.relLast && lastPageUrl.empty()) lastPageUrl = link.href;
 }
 
 void Opds2Parser::commitNavLink() {
@@ -208,14 +331,35 @@ void Opds2Parser::commitNavLink() {
   entries.push_back(std::move(entry));
 }
 
+void Opds2Parser::commitGroupLink() {
+  if (link.relSelf && groupSelfHref.empty()) groupSelfHref = std::move(link.href);
+}
+
+void Opds2Parser::commitFacetLink() {
+  if (link.href.empty() || link.title.empty()) return;
+  if (facetEntries.size() >= MAX_FACET_ENTRIES) return;
+  OpdsEntry entry;
+  entry.type = OpdsEntryType::NAVIGATION;
+  entry.title = std::move(link.title);
+  entry.href = std::move(link.href);
+  if (link.numberOfItems >= 0) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%ld", static_cast<long>(link.numberOfItems));
+    entry.detail = buf;
+  }
+  facetEntries.push_back(std::move(entry));
+}
+
 void Opds2Parser::commitPubLink() {
-  if (link.href.empty() || !link.typeEpub || !link.relAcquisition) return;
-  // Prefer plain EPUB links over derived formats when a publication carries
-  // several acquisition links (same heuristic as the Atom parser).
+  if (link.href.empty() || !link.typeEpub || link.acqRank < 0) return;
+  // Prefer higher-ranked acquisitions (open-access over borrow); at equal
+  // rank prefer a plain EPUB path over derived formats (kepub etc.).
   const bool isPlainEpub =
       link.href.find(".epub") != std::string::npos || link.href.find("/epub/") != std::string::npos;
-  if (currentEntry.href.empty() || (isPlainEpub && !pubHasPlainEpub)) {
+  if (currentEntry.href.empty() || link.acqRank > pubAcqRank ||
+      (link.acqRank == pubAcqRank && isPlainEpub && !pubHasPlainEpub)) {
     currentEntry.href = std::move(link.href);
+    pubAcqRank = link.acqRank;
     pubHasPlainEpub = isPlainEpub;
   }
 }
@@ -243,6 +387,10 @@ void Opds2Parser::sOnKey(void* ctx, const char* key, size_t len) {
 
 void Opds2Parser::sOnString(void* ctx, const char* value, const size_t len) {
   static_cast<Opds2Parser*>(ctx)->onStringValue(value, len);
+}
+
+void Opds2Parser::sOnNumber(void* ctx, const char* value, size_t) {
+  static_cast<Opds2Parser*>(ctx)->onNumberValue(value);
 }
 
 void Opds2Parser::sOnBool(void* ctx, const bool value) {

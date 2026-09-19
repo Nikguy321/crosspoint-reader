@@ -49,6 +49,16 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // search-term header (page 2 of results is still the same search).
   std::string pageNextHref;
   std::string pagePrevHref;
+  std::string pageFirstHref;
+  std::string pageLastHref;
+  bool isPaginationHref(const std::string& href) const {
+    return (!href.empty()) &&
+           (href == pageNextHref || href == pagePrevHref || href == pageFirstHref || href == pageLastHref);
+  }
+  // Title of the current feed (shown in the header when no search is active).
+  std::string feedTitle;
+  // "Page X of Y" header subtitle; empty when the feed has no page metadata.
+  char pageLabel[48] = {0};
   void setSearchQuery(const std::string& query);
   // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
   // either inlined in the feed or fetched from an OpenSearch description.
