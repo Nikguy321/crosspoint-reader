@@ -5,16 +5,7 @@
 
 #include <cstring>
 
-namespace {
-constexpr size_t ENTRY_STORAGE_CAPACITY = 64;
-constexpr size_t MAX_ENTRIES = ENTRY_STORAGE_CAPACITY - 2;
-constexpr size_t MAX_TITLE_CHARS = 160;
-constexpr size_t MAX_AUTHOR_CHARS = 120;
-constexpr size_t MAX_ID_CHARS = 128;
-constexpr size_t MAX_HREF_CHARS = 768;
-constexpr size_t MAX_SEARCH_TEMPLATE_CHARS = 768;
-constexpr size_t MAX_PAGE_URL_CHARS = 768;
-}  // namespace
+using namespace OpdsLimits;
 
 OpdsParser::OpdsParser() {
   parser = XML_ParserCreate(nullptr);
@@ -78,6 +69,7 @@ bool OpdsParser::error() const { return errorOccured; }
 void OpdsParser::clear() {
   entries.clear();
   searchTemplate.clear();
+  searchDescriptionUrl.clear();
   nextPageUrl.clear();
   prevPageUrl.clear();
   currentEntry = OpdsEntry{};
@@ -138,10 +130,14 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
       if (rel && strcmp(rel, "search") == 0) {
         if (strstr(href, "{searchTerms}") != nullptr) {
           assignBounded(self->searchTemplate, href, MAX_SEARCH_TEMPLATE_CHARS);
+        } else {
+          // No inline template: href points at an OpenSearch description
+          // document (calibre-web, COPS, Kavita).
+          assignBounded(self->searchDescriptionUrl, href, MAX_SEARCH_TEMPLATE_CHARS);
         }
       } else if (rel && strcmp(rel, "next") == 0 && !self->inEntry) {
         assignBounded(self->nextPageUrl, href, MAX_PAGE_URL_CHARS);
-      } else if (rel && strcmp(rel, "previous") == 0 && !self->inEntry) {
+      } else if (rel && (strcmp(rel, "previous") == 0 || strcmp(rel, "prev") == 0) && !self->inEntry) {
         assignBounded(self->prevPageUrl, href, MAX_PAGE_URL_CHARS);
       }
 

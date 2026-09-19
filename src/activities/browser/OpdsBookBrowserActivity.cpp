@@ -7,7 +7,9 @@
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
-#include <OpdsStream.h>
+#include <OpdsFeedParser.h>
+#include <OpdsSearchTemplate.h>
+#include <OpenSearchDescParser.h>
 #include <WiFi.h>
 
 #include "CrossPointSettings.h"
@@ -50,6 +52,8 @@ void OpdsBookBrowserActivity::onEnter() {
   entries.clear();
   navigationHistory.clear();
   searchTemplate = "";
+  searchDescriptionUrl = "";
+  searchTemplateBase = "";
   currentPath = "";
   selectorIndex = 0;
   errorMessage.clear();
@@ -147,7 +151,7 @@ void OpdsBookBrowserActivity::loop() {
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       navigateBack();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Left)) {
-      if (!searchTemplate.empty() && selectorIndex == 0) launchSearch();
+      if (hasSearch() && selectorIndex == 0) launchSearch();
     }
 
     // Touch goes through the FreeInkApp: render() registered every tap target
@@ -233,7 +237,7 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
   fui::HeaderProps header;
   header.title = server.name.empty() ? tr(STR_OPDS_BROWSER) : server.name.c_str();
   header.borderEdges = fui::EdgeBottom;
-  if (withSearch && !searchTemplate.empty()) {
+  if (withSearch && hasSearch()) {
     header.trailingIcon = fui::bitmapFromIcon(icon_search_32);
     header.trailingAction = ACTION_SEARCH;
     // Optically align the icon with the title glyphs: text hangs low in its
@@ -336,7 +340,7 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
     case BrowserState::BROWSING: {
       const char* confirmLabel =
           (!entries.empty() && entries[selectorIndex].type == OpdsEntryType::BOOK) ? tr(STR_DOWNLOAD) : tr(STR_OPEN);
-      const char* searchLabel = (!searchTemplate.empty() && selectorIndex == 0) ? tr(STR_SEARCH) : tr(STR_DIR_UP);
+      const char* searchLabel = (hasSearch() && selectorIndex == 0) ? tr(STR_SEARCH) : tr(STR_DIR_UP);
       labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, searchLabel, tr(STR_DIR_DOWN));
       break;
     }
@@ -366,25 +370,32 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
 
   std::string url = UrlUtils::buildUrl(server.url, path);
   LOG_DBG("OPDS", "Fetching: %s", url.c_str());
-  OpdsParser parser;
-  {
-    OpdsParserStream stream{parser};
-    if (!HttpDownloader::fetchUrl(url, stream, server.username, server.password)) {
-      state = BrowserState::ERROR;
-      errorMessage = tr(STR_FETCH_FEED_FAILED);
-      requestUpdate();
-      return;
-    }
-  }
+  OpdsFeedParser parser;
+  const bool fetched = HttpDownloader::fetchUrl(
+      url,
+      [&parser](const uint8_t* data, const size_t len) {
+        parser.write(data, len);
+        return !parser.error();  // abort the transfer on a parse error
+      },
+      server.username, server.password);
+  parser.flush();
 
-  if (!parser) {
+  if (parser.error()) {
     state = BrowserState::ERROR;
     errorMessage = tr(STR_PARSE_FEED_FAILED);
     requestUpdate();
     return;
   }
+  if (!fetched) {
+    state = BrowserState::ERROR;
+    errorMessage = tr(STR_FETCH_FEED_FAILED);
+    requestUpdate();
+    return;
+  }
 
   searchTemplate = parser.getSearchTemplate();
+  searchDescriptionUrl = parser.getSearchDescriptionUrl();
+  searchTemplateBase = "";  // feed-inline template resolves against the feed URL
   const auto& nextUrl = parser.getNextPageUrl();
   const auto& prevUrl = parser.getPrevPageUrl();
   const bool feedTruncated = parser.truncated();
@@ -393,7 +404,7 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   // be shorter than the old selection.
   selectorIndex = 0;
   listNav.reset();
-  entries = std::move(parser).getEntries();
+  entries = parser.takeEntries();
 
   entries.reserve(entries.size() + (prevUrl.empty() ? 0 : 1) + (nextUrl.empty() ? 0 : 1));
   if (!prevUrl.empty()) {
@@ -591,9 +602,48 @@ void OpdsBookBrowserActivity::launchSearch() {
   });
 }
 
+// Resolves the search template lazily: OPDS 1.x servers such as calibre-web,
+// COPS and Kavita publish it in a separate OpenSearch description document
+// instead of inlining it in the feed.
+bool OpdsBookBrowserActivity::ensureSearchTemplate() {
+  if (!searchTemplate.empty()) return true;
+  if (searchDescriptionUrl.empty()) return false;
+
+  const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
+  const std::string descUrl = UrlUtils::buildUrl(feedUrl, searchDescriptionUrl);
+  LOG_DBG("OPDS", "Fetching OpenSearch description: %s", descUrl.c_str());
+  OpenSearchDescParser parser;
+  const bool fetched = HttpDownloader::fetchUrl(
+      descUrl,
+      [&parser](const uint8_t* data, const size_t len) {
+        parser.write(data, len);
+        return !parser.error();
+      },
+      server.username, server.password);
+  parser.flush();
+  if (!fetched || parser.error() || parser.getTemplate().empty()) {
+    LOG_ERR("OPDS", "OpenSearch description unusable");
+    return false;
+  }
+  searchTemplate = parser.getTemplate();
+  searchTemplateBase = descUrl;  // relative templates resolve against the description doc
+  return true;
+}
+
 void OpdsBookBrowserActivity::performSearch(const std::string& query) {
-  if (query.empty() || searchTemplate.empty()) {
+  if (query.empty()) {
     state = BrowserState::BROWSING;
+    requestUpdate();
+    return;
+  }
+
+  state = BrowserState::LOADING;
+  statusMessage = tr(STR_LOADING);
+  requestUpdate();
+
+  if (!ensureSearchTemplate()) {
+    state = BrowserState::ERROR;
+    errorMessage = tr(STR_FETCH_FEED_FAILED);
     requestUpdate();
     return;
   }
@@ -613,10 +663,12 @@ void OpdsBookBrowserActivity::performSearch(const std::string& query) {
     return out;
   };
 
-  std::string url = searchTemplate;
-  const std::string placeholder = "{searchTerms}";
-  const size_t pos = url.find(placeholder);
-  if (pos != std::string::npos) url.replace(pos, placeholder.length(), urlEncode(query));
+  // Expand the template first: buildUrl percent-encodes braces, so a raw
+  // template must never pass through URL resolution.
+  const std::string expanded = expandOpdsSearchTemplate(searchTemplate, urlEncode(query));
+  const std::string base =
+      searchTemplateBase.empty() ? UrlUtils::buildUrl(server.url, currentPath) : searchTemplateBase;
+  const std::string url = UrlUtils::buildUrl(base, expanded);
 
   navigationHistory.push_back(currentPath);
   currentPath = url;

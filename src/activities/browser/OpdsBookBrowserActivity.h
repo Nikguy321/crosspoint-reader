@@ -1,5 +1,5 @@
 #pragma once
-#include <OpdsParser.h>
+#include <OpdsEntry.h>
 
 #include <string>
 #include <utility>
@@ -36,7 +36,15 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void rebuildRowItems();
   std::vector<std::string> navigationHistory;
   std::string currentPath;
+  // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
+  // either inlined in the feed or fetched from an OpenSearch description.
   std::string searchTemplate;
+  // OpenSearch description document URL (OPDS 1.x feeds that don't inline a
+  // template); fetched lazily on first search.
+  std::string searchDescriptionUrl;
+  // Base URL the template is relative to: the OpenSearch description URL, or
+  // empty when the template came from the feed itself (resolve against feed).
+  std::string searchTemplateBase;
   int selectorIndex = 0;
   std::string errorMessage;
   std::string statusMessage;
@@ -75,6 +83,8 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void navigateToEntry(const OpdsEntry& entry);
   void navigateBack();
   void downloadBook(const OpdsEntry& book);
+  bool hasSearch() const { return !searchTemplate.empty() || !searchDescriptionUrl.empty(); }
+  bool ensureSearchTemplate();
   void launchSearch();
   void performSearch(const std::string& query);
   bool preventAutoSleep() override;

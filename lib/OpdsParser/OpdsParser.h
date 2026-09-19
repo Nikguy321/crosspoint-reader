@@ -5,24 +5,7 @@
 #include <string>
 #include <vector>
 
-/**
- * Type of OPDS entry.
- */
-enum class OpdsEntryType {
-  NAVIGATION,  // Link to another catalog
-  BOOK         // Downloadable book
-};
-
-/**
- * Represents an entry from an OPDS feed (either a navigation link or a book).
- */
-struct OpdsEntry {
-  OpdsEntryType type = OpdsEntryType::NAVIGATION;
-  std::string title;
-  std::string author;  // Only for books
-  std::string href;    // Navigation URL or epub download URL
-  std::string id;
-};
+#include "OpdsEntry.h"
 
 // Legacy alias for backward compatibility
 using OpdsBook = OpdsEntry;
@@ -50,6 +33,9 @@ class OpdsParser final : public Print {
 
   // Disable copy
   const std::string& getSearchTemplate() const { return searchTemplate; }
+  // rel="search" link without an inline template: an OpenSearch description
+  // document the caller must fetch and parse to obtain the template.
+  const std::string& getSearchDescriptionUrl() const { return searchDescriptionUrl; }
   const std::string& getNextPageUrl() const { return nextPageUrl; }
   const std::string& getPrevPageUrl() const { return prevPageUrl; }
   OpdsParser(const OpdsParser&) = delete;
@@ -90,6 +76,7 @@ class OpdsParser final : public Print {
   static void XMLCALL characterData(void* userData, const XML_Char* s, int len);
 
   std::string searchTemplate;
+  std::string searchDescriptionUrl;
   std::string nextPageUrl;
   std::string prevPageUrl;
   // Helper to find attribute value
