@@ -1,6 +1,7 @@
 #include "OpdsSearchTemplate.h"
 
 #include <cctype>
+#include <cstdio>
 
 namespace {
 
@@ -69,6 +70,21 @@ std::string expandOpdsSearchTemplate(const std::string& templateUrl, const std::
       // Simple expression: the search term variable expands to the query,
       // anything else (optional OpenSearch parameters) to an empty string.
       if (isQueryVar(bareVarName(expr))) out += encodedQuery;
+    }
+  }
+  return out;
+}
+
+std::string opdsPercentEncode(const std::string& value) {
+  std::string out;
+  out.reserve(value.size() * 3);
+  for (const unsigned char c : value) {
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      out += static_cast<char>(c);
+    } else {
+      char buf[4];
+      snprintf(buf, sizeof(buf), "%%%02X", c);
+      out += buf;
     }
   }
   return out;

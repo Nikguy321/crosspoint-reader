@@ -75,10 +75,13 @@ void Opds2Parser::resetLink() {
   link.href.clear();
   link.title.clear();
   link.relSearch = link.relNext = link.relPrev = link.relFirst = link.relLast = link.relSelf = false;
+  link.relShelf = link.relWishlist = link.relHistory = false;
   link.acqRank = -1;
   link.typeEpub = false;
   link.templated = false;
   link.numberOfItems = -1;
+  link.priceValue.clear();
+  link.priceCurrency.clear();
 }
 
 void Opds2Parser::applyRel(const char* rel) {
@@ -88,6 +91,9 @@ void Opds2Parser::applyRel(const char* rel) {
   if (strcmp(rel, "first") == 0) link.relFirst = true;
   if (strcmp(rel, "last") == 0) link.relLast = true;
   if (strcmp(rel, "self") == 0) link.relSelf = true;
+  if (strstr(rel, "opds-spec.org/shelf") != nullptr) link.relShelf = true;
+  if (strstr(rel, "opds-spec.org/wishlist") != nullptr) link.relWishlist = true;
+  if (strstr(rel, "opds-spec.org/history") != nullptr) link.relHistory = true;
   const int rank = opdsAcquisitionRank(rel);
   if (rank > link.acqRank) link.acqRank = rank;
 }
@@ -122,10 +128,16 @@ Opds2Parser::Scope Opds2Parser::scopeForChild(const Scope parent, const bool isO
     case Scope::GROUP_LINKS:
       return isObject ? Scope::GROUP_LINK : Scope::SKIP;
     case Scope::FEED_LINK:
-    case Scope::PUB_LINK:
     case Scope::GROUP_LINK:
       if (!isObject && strcmp(pendingKey, "rel") == 0) return Scope::LINK_REL;
       return Scope::SKIP;  // properties, alternate, children
+    case Scope::PUB_LINK:
+      if (!isObject && strcmp(pendingKey, "rel") == 0) return Scope::LINK_REL;
+      if (isObject && strcmp(pendingKey, "properties") == 0) return Scope::PUB_LINK_PROPS;
+      return Scope::SKIP;
+    case Scope::PUB_LINK_PROPS:
+      if (isObject && strcmp(pendingKey, "price") == 0) return Scope::PRICE;
+      return Scope::SKIP;  // indirectAcquisition, availability
     case Scope::FACET_LINK:
       if (!isObject && strcmp(pendingKey, "rel") == 0) return Scope::LINK_REL;
       if (isObject && strcmp(pendingKey, "properties") == 0) return Scope::FACET_PROPS;
@@ -162,7 +174,6 @@ Opds2Parser::Scope Opds2Parser::scopeForChild(const Scope parent, const bool isO
 }
 
 void Opds2Parser::beginGroup() {
-  inGroup = true;
   sawGroups = true;
   groupTitle.clear();
   groupSelfHref.clear();
@@ -182,7 +193,6 @@ void Opds2Parser::endGroup() {
   if (!groupTitle.empty() && entries.size() > groupStartIndex) {
     entries[groupStartIndex].heading = std::move(groupTitle);
   }
-  inGroup = false;
   groupTitle.clear();
   groupSelfHref.clear();
 }
@@ -318,6 +328,9 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
       // Array of contributor name strings: take the first.
       if (currentEntry.author.empty()) assignBounded(currentEntry.author, value, len, MAX_AUTHOR_CHARS);
       break;
+    case Scope::PRICE:
+      if (strcmp(pendingKey, "currency") == 0) assignBounded(link.priceCurrency, value, len, 8);
+      break;
     default:
       break;
   }
@@ -339,6 +352,9 @@ void Opds2Parser::onNumberValue(const char* value) {
         link.numberOfItems = static_cast<int32_t>(strtol(value, nullptr, 10));
       }
       break;
+    case Scope::PRICE:
+      if (strcmp(pendingKey, "value") == 0) link.priceValue.assign(value, strnlen(value, 16));
+      break;
     default:
       break;
   }
@@ -356,6 +372,9 @@ void Opds2Parser::commitFeedLink() {
   if (link.relPrev && prevPageUrl.empty()) prevPageUrl = link.href;
   if (link.relFirst && firstPageUrl.empty()) firstPageUrl = link.href;
   if (link.relLast && lastPageUrl.empty()) lastPageUrl = link.href;
+  if (link.relShelf && shelfUrl.empty()) shelfUrl = link.href;
+  if (link.relWishlist && wishlistUrl.empty()) wishlistUrl = link.href;
+  if (link.relHistory && historyUrl.empty()) historyUrl = link.href;
 }
 
 void Opds2Parser::commitNavLink() {
@@ -406,6 +425,15 @@ void Opds2Parser::commitPubLink() {
     currentEntry.href = std::move(link.href);
     pubAcqRank = link.acqRank;
     pubHasPlainEpub = isPlainEpub;
+    currentEntry.purchase = link.acqRank == 0;
+    currentEntry.detail.clear();
+    if (currentEntry.purchase && !link.priceValue.empty()) {
+      currentEntry.detail = link.priceValue;
+      if (!link.priceCurrency.empty()) {
+        currentEntry.detail += ' ';
+        currentEntry.detail += link.priceCurrency;
+      }
+    }
   }
 }
 

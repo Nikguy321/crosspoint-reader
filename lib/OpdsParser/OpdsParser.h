@@ -40,6 +40,9 @@ class OpdsParser final : public Print {
   const std::string& getPrevPageUrl() const { return prevPageUrl; }
   const std::string& getFirstPageUrl() const { return firstPageUrl; }
   const std::string& getLastPageUrl() const { return lastPageUrl; }
+  const std::string& getShelfUrl() const { return shelfUrl; }
+  const std::string& getWishlistUrl() const { return wishlistUrl; }
+  const std::string& getHistoryUrl() const { return historyUrl; }
   const std::string& getFeedTitle() const { return feedTitle; }
   // Pagination metadata from the opensearch:* feed elements; 0 when absent.
   uint32_t getNumberOfItems() const { return totalResults; }
@@ -67,6 +70,9 @@ class OpdsParser final : public Print {
    */
   const std::vector<OpdsEntry>& getEntries() const& { return entries; }
   std::vector<OpdsEntry> getEntries() && { return std::move(entries); }
+  // Facet links (rel http://opds-spec.org/facet), one section per
+  // opds:facetGroup, with thr:count as the row detail.
+  std::vector<OpdsEntry> takeFacetEntries() { return std::move(facetEntries); }
 
   /**
    * Get only book entries (legacy compatibility).
@@ -91,6 +97,9 @@ class OpdsParser final : public Print {
   std::string prevPageUrl;
   std::string firstPageUrl;
   std::string lastPageUrl;
+  std::string shelfUrl;
+  std::string wishlistUrl;
+  std::string historyUrl;
   std::string feedTitle;
   uint32_t totalResults = 0;
   uint32_t startIndex = 0;
@@ -102,6 +111,10 @@ class OpdsParser final : public Print {
 
   XML_Parser parser = nullptr;
   std::vector<OpdsEntry> entries;
+  std::vector<OpdsEntry> facetEntries;
+  // facetGroup of the last collected facet link; a change starts a new
+  // section heading.
+  std::string lastFacetGroup;
   OpdsEntry currentEntry;
   std::string currentText;
 
@@ -119,6 +132,14 @@ class OpdsParser final : public Print {
   // href points at a plain EPUB (see opdsAcquisitionRank()).
   int entryAcqRank = -1;
   bool entryHasPlainEpub = false;
+  // Inside an entry's <link> element (OPDS 1.x price is a child element:
+  // <link ...><opds:price currencycode="USD">4.99</opds:price></link>).
+  bool inEntryLink = false;
+  // The enclosing link is the entry's chosen purchase acquisition; its price
+  // becomes the entry detail.
+  bool chosenLinkIsPurchase = false;
+  bool inPrice = false;
+  std::string priceCurrency;
 
   bool errorOccured = false;
   bool feedTruncated = false;

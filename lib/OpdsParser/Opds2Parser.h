@@ -52,6 +52,10 @@ class Opds2Parser final : public Print {
   const std::string& getPrevPageUrl() const { return prevPageUrl; }
   const std::string& getFirstPageUrl() const { return firstPageUrl; }
   const std::string& getLastPageUrl() const { return lastPageUrl; }
+  // Standard OPDS user-collection links (empty when the feed omits them).
+  const std::string& getShelfUrl() const { return shelfUrl; }
+  const std::string& getWishlistUrl() const { return wishlistUrl; }
+  const std::string& getHistoryUrl() const { return historyUrl; }
   // Pagination metadata; 0 when the feed doesn't provide it.
   uint32_t getNumberOfItems() const { return numberOfItems; }
   uint32_t getItemsPerPage() const { return itemsPerPage; }
@@ -62,33 +66,35 @@ class Opds2Parser final : public Print {
   // and the key that introduced it. SKIP swallows entire subtrees (images,
   // metadata we don't consume, unknown extensions).
   enum class Scope : uint8_t {
-    FEED,         // root object
-    FEED_META,    // feed "metadata" object
-    FEED_TITLE,   // localized feed title object
-    FEED_LINKS,   // feed "links" array
-    FEED_LINK,    // one feed link object
-    LINK_REL,     // "rel" array inside any link object
-    NAV,          // "navigation" array (feed or group)
-    NAV_LINK,     // one navigation link object
-    PUBS,         // "publications" array (feed or group)
-    PUB,          // one publication object
-    PUB_META,     // publication "metadata" object
-    PUB_TITLE,    // localized title object ({"en": "..."})
-    AUTHOR,       // contributor object ({"name": ...})
-    AUTHOR_ARR,   // contributor array (strings and/or objects)
-    PUB_LINKS,    // publication "links" array
-    PUB_LINK,     // one publication link object
-    GROUPS,       // "groups" array
-    GROUP,        // one group object
-    GROUP_META,   // group "metadata" object
-    GROUP_LINKS,  // group "links" array (rel self -> "see all")
-    GROUP_LINK,   // one group link object
-    FACETS,       // "facets" array
-    FACET,        // one facet group object
-    FACET_META,   // facet group "metadata" object
-    FACET_LINKS,  // facet group "links" array
-    FACET_LINK,   // one facet link object
-    FACET_PROPS,  // facet link "properties" object (numberOfItems)
+    FEED,            // root object
+    FEED_META,       // feed "metadata" object
+    FEED_TITLE,      // localized feed title object
+    FEED_LINKS,      // feed "links" array
+    FEED_LINK,       // one feed link object
+    LINK_REL,        // "rel" array inside any link object
+    NAV,             // "navigation" array (feed or group)
+    NAV_LINK,        // one navigation link object
+    PUBS,            // "publications" array (feed or group)
+    PUB,             // one publication object
+    PUB_META,        // publication "metadata" object
+    PUB_TITLE,       // localized title object ({"en": "..."})
+    AUTHOR,          // contributor object ({"name": ...})
+    AUTHOR_ARR,      // contributor array (strings and/or objects)
+    PUB_LINKS,       // publication "links" array
+    PUB_LINK,        // one publication link object
+    GROUPS,          // "groups" array
+    GROUP,           // one group object
+    GROUP_META,      // group "metadata" object
+    GROUP_LINKS,     // group "links" array (rel self -> "see all")
+    GROUP_LINK,      // one group link object
+    FACETS,          // "facets" array
+    FACET,           // one facet group object
+    FACET_META,      // facet group "metadata" object
+    FACET_LINKS,     // facet group "links" array
+    FACET_LINK,      // one facet link object
+    FACET_PROPS,     // facet link "properties" object (numberOfItems)
+    PUB_LINK_PROPS,  // publication link "properties" object
+    PRICE,           // "price" object of a buy link ({currency, value})
     SKIP,
   };
 
@@ -125,7 +131,6 @@ class Opds2Parser final : public Print {
   StreamingJsonParser parser;
 
   static constexpr uint8_t MAX_DEPTH = StreamingJsonParser::MAX_NESTING + 1;
-  static constexpr size_t MAX_FACET_ENTRIES = 24;
   Scope stack[MAX_DEPTH];
   uint8_t depth = 0;
   bool sawRoot = false;
@@ -149,10 +154,15 @@ class Opds2Parser final : public Print {
     bool relFirst = false;
     bool relLast = false;
     bool relSelf = false;
+    bool relShelf = false;
+    bool relWishlist = false;
+    bool relHistory = false;
     int acqRank = -1;
     bool typeEpub = false;
     bool templated = false;
     int32_t numberOfItems = -1;
+    std::string priceValue;     // raw decimal from the price object
+    std::string priceCurrency;  // ISO 4217 code
   } link;
   // Best acquisition rank already committed for the current publication, and
   // whether that href points at a plain EPUB (see commitPubLink()).
@@ -167,7 +177,6 @@ class Opds2Parser final : public Print {
   std::string groupTitle;
   std::string groupSelfHref;
   size_t groupStartIndex = 0;
-  bool inGroup = false;
   // Current facet group accumulation.
   std::string facetTitle;
   size_t facetStartIndex = 0;
@@ -178,6 +187,9 @@ class Opds2Parser final : public Print {
   std::string prevPageUrl;
   std::string firstPageUrl;
   std::string lastPageUrl;
+  std::string shelfUrl;
+  std::string wishlistUrl;
+  std::string historyUrl;
   uint32_t numberOfItems = 0;
   uint32_t itemsPerPage = 0;
   uint32_t currentPage = 0;

@@ -23,8 +23,11 @@ struct OpdsEntry {
   std::string id;
   // Section heading drawn above this row (group or facet-group title).
   std::string heading;
-  // Right-column annotation (e.g. a facet's publication count).
+  // Right-column annotation (a facet's publication count, or a price).
   std::string detail;
+  // The chosen acquisition is a purchase (rel buy): the UI labels the action
+  // accordingly, and the download is verified to actually be a book.
+  bool purchase = false;
 };
 
 // Entry id marking a group's "see all" link; the UI supplies the label.
@@ -33,21 +36,24 @@ inline constexpr const char* OPDS_SEE_ALL_ID = "opds:group-self";
 /**
  * Preference rank of an acquisition link relation, covering both the OPDS 1.x
  * URI forms and the OPDS 2.0 short names. Higher ranks are preferred when a
- * publication offers several acquisition links. -1 means the link is not a
- * usable acquisition for this device: not an acquisition rel at all, `buy`
- * (needs a payment flow), or `sample`/`preview` (not the full book).
+ * publication offers several acquisition links. `buy` (rank 0) is a last
+ * resort: attempted with the user's credentials and verified after download.
+ * -1 means unusable: not an acquisition rel, or `sample`/`preview` (not the
+ * full book).
  */
 inline int opdsAcquisitionRank(const char* rel) {
   if (strstr(rel, "opds-spec.org/acquisition") != nullptr) {
     if (strstr(rel, "/open-access") != nullptr) return 3;
-    if (strstr(rel, "/sample") != nullptr || strstr(rel, "/buy") != nullptr) return -1;
+    if (strstr(rel, "/sample") != nullptr) return -1;
+    if (strstr(rel, "/buy") != nullptr) return 0;
     if (strstr(rel, "/borrow") != nullptr || strstr(rel, "/subscribe") != nullptr) return 1;
     return 2;  // bare http://opds-spec.org/acquisition
   }
   if (strcmp(rel, "download") == 0 || strcmp(rel, "open-access") == 0) return 3;
   if (strcmp(rel, "acquisition") == 0) return 2;
   if (strcmp(rel, "borrow") == 0 || strcmp(rel, "subscribe") == 0) return 1;
-  return -1;  // buy, preview, or not an acquisition rel
+  if (strcmp(rel, "buy") == 0) return 0;
+  return -1;  // preview/sample, or not an acquisition rel
 }
 
 // Shared memory bounds for both feed parsers.
@@ -60,4 +66,5 @@ constexpr size_t MAX_ID_CHARS = 128;
 constexpr size_t MAX_HREF_CHARS = 768;
 constexpr size_t MAX_SEARCH_TEMPLATE_CHARS = 768;
 constexpr size_t MAX_PAGE_URL_CHARS = 768;
+constexpr size_t MAX_FACET_ENTRIES = 24;
 }  // namespace OpdsLimits

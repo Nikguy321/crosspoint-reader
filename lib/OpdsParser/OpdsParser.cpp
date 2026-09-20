@@ -75,12 +75,21 @@ void OpdsParser::clear() {
   prevPageUrl.clear();
   firstPageUrl.clear();
   lastPageUrl.clear();
+  shelfUrl.clear();
+  wishlistUrl.clear();
+  historyUrl.clear();
   feedTitle.clear();
   totalResults = startIndex = itemsPerPage = 0;
   metaField = MetaField::NONE;
   inFeedTitle = false;
   entryAcqRank = -1;
   entryHasPlainEpub = false;
+  facetEntries.clear();
+  lastFacetGroup.clear();
+  inEntryLink = false;
+  chosenLinkIsPurchase = false;
+  inPrice = false;
+  priceCurrency.clear();
   currentEntry = OpdsEntry{};
   currentText.clear();
   inEntry = inTitle = inAuthor = inAuthorName = inId = false;
@@ -99,6 +108,16 @@ std::vector<OpdsEntry> OpdsParser::getBooks() const {
 const char* OpdsParser::findAttribute(const XML_Char** atts, const char* name) {
   for (int i = 0; atts[i]; i += 2) {
     if (strcmp(atts[i], name) == 0) return atts[i + 1];
+  }
+  return nullptr;
+}
+
+// Attribute lookup ignoring a namespace prefix ("opds:facetGroup" matches
+// "facetGroup"); expat reports attribute names verbatim without namespace
+// processing, and the prefix is whatever the feed declared.
+static const char* findAttributeLocal(const XML_Char** atts, const char* localName) {
+  for (int i = 0; atts[i]; i += 2) {
+    if (xmlLocalNameEquals(atts[i], localName)) return atts[i + 1];
   }
   return nullptr;
 }
@@ -129,6 +148,9 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
     self->inTitle = self->inAuthor = self->inAuthorName = self->inId = false;
     self->entryAcqRank = -1;
     self->entryHasPlainEpub = false;
+    self->inEntryLink = false;
+    self->chosenLinkIsPurchase = false;
+    self->inPrice = false;
     return;
   }
 
@@ -154,9 +176,33 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
         assignBounded(self->firstPageUrl, href, MAX_PAGE_URL_CHARS);
       } else if (rel && strcmp(rel, "last") == 0 && !self->inEntry) {
         assignBounded(self->lastPageUrl, href, MAX_PAGE_URL_CHARS);
+      } else if (rel && strstr(rel, "opds-spec.org/shelf") != nullptr && !self->inEntry) {
+        assignBounded(self->shelfUrl, href, MAX_PAGE_URL_CHARS);
+      } else if (rel && strstr(rel, "opds-spec.org/wishlist") != nullptr && !self->inEntry) {
+        assignBounded(self->wishlistUrl, href, MAX_PAGE_URL_CHARS);
+      } else if (rel && strstr(rel, "opds-spec.org/history") != nullptr && !self->inEntry) {
+        assignBounded(self->historyUrl, href, MAX_PAGE_URL_CHARS);
+      } else if (rel && strstr(rel, "opds-spec.org/facet") != nullptr && !self->inEntry) {
+        const char* title = findAttribute(atts, "title");
+        if (title && title[0] != '\0' && self->facetEntries.size() < MAX_FACET_ENTRIES) {
+          OpdsEntry facet;
+          facet.type = OpdsEntryType::NAVIGATION;
+          assignBounded(facet.title, title, MAX_TITLE_CHARS);
+          assignBounded(facet.href, href, MAX_HREF_CHARS);
+          const char* count = findAttributeLocal(atts, "count");
+          if (count) assignBounded(facet.detail, count, 12);
+          const char* group = findAttributeLocal(atts, "facetGroup");
+          if (group && self->lastFacetGroup != group) {
+            assignBounded(facet.heading, group, MAX_TITLE_CHARS);
+            self->lastFacetGroup = group;
+          }
+          self->facetEntries.push_back(std::move(facet));
+        }
       }
 
       if (self->inEntry && self->collectCurrentEntry) {
+        self->inEntryLink = true;
+        self->chosenLinkIsPurchase = false;
         const int rank = rel ? opdsAcquisitionRank(rel) : -1;
         if (rank >= 0 && type && strcmp(type, "application/epub+zip") == 0) {
           // Prefer higher-ranked acquisitions (open-access over borrow,
@@ -169,6 +215,9 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
             assignBounded(self->currentEntry.href, href, MAX_HREF_CHARS);
             self->entryAcqRank = rank;
             self->entryHasPlainEpub = isPlainEpub;
+            self->currentEntry.purchase = rank == 0;
+            self->currentEntry.detail.clear();
+            self->chosenLinkIsPurchase = self->currentEntry.purchase;
           }
         } else if (type && strstr(type, "application/atom+xml") != nullptr) {
           if (self->currentEntry.type != OpdsEntryType::BOOK) {
@@ -178,6 +227,16 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
         }
       }
     }
+  }
+
+  if (self->inEntry && self->inEntryLink && self->collectCurrentEntry &&
+      (strcmp(name, "price") == 0 || strstr(name, ":price") != nullptr)) {
+    self->inPrice = true;
+    self->currentText.clear();
+    const char* currency = findAttribute(atts, "currencycode");
+    if (!currency) currency = findAttribute(atts, "currency");
+    assignBounded(self->priceCurrency, currency, 8);
+    return;
   }
 
   if (!self->inEntry) {
@@ -241,6 +300,22 @@ void XMLCALL OpdsParser::endElement(void* userData, const XML_Char* name) {
     }
     self->metaField = MetaField::NONE;
   } else if (self->inEntry) {
+    if (self->inPrice && (strcmp(name, "price") == 0 || strstr(name, ":price") != nullptr)) {
+      if (self->chosenLinkIsPurchase && !self->currentText.empty()) {
+        self->currentEntry.detail = self->currentText;
+        if (!self->priceCurrency.empty()) {
+          self->currentEntry.detail += ' ';
+          self->currentEntry.detail += self->priceCurrency;
+        }
+      }
+      self->inPrice = false;
+      return;
+    }
+    if (strcmp(name, "link") == 0 || strstr(name, ":link") != nullptr) {
+      self->inEntryLink = false;
+      self->chosenLinkIsPurchase = false;
+      return;
+    }
     if (strcmp(name, "title") == 0 || strstr(name, ":title") != nullptr) {
       if (self->inTitle) self->currentEntry.title = self->currentText;
       self->inTitle = false;
@@ -267,6 +342,10 @@ void XMLCALL OpdsParser::characterData(void* userData, const XML_Char* s, const 
     return;
   }
   if (!self->collectCurrentEntry) return;
+  if (self->inPrice) {
+    appendBounded(self->currentText, s, len, 16);
+    return;
+  }
   if (self->inTitle) {
     appendBounded(self->currentText, s, len, MAX_TITLE_CHARS);
   } else if (self->inAuthorName) {

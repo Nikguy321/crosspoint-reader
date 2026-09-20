@@ -57,8 +57,6 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   }
   // Title of the current feed (shown in the header when no search is active).
   std::string feedTitle;
-  // "Page X of Y" header subtitle; empty when the feed has no page metadata.
-  char pageLabel[48] = {0};
   void setSearchQuery(const std::string& query);
   // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
   // either inlined in the feed or fetched from an OpenSearch description.
@@ -72,6 +70,14 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // OAuth access token obtained via the OPDS authentication document's
   // password-grant flow; sent as "Authorization: Bearer" when non-empty.
   std::string bearerToken;
+  // Send HTTP Basic auth from the stored credentials. Latched only after a
+  // 401 whose auth document offers Basic (or a bare Basic challenge): sending
+  // Basic preemptively breaks OAuth-only servers, which reject an unknown
+  // Basic header with 401 even on public resources.
+  bool useBasicAuth = false;
+  // Set by authenticateWithServer(): the server demands login but the entry
+  // has no stored credentials (distinct error message).
+  bool credentialsMissing = false;
   int selectorIndex = 0;
   std::string errorMessage;
   std::string statusMessage;

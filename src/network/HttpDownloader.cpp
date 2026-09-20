@@ -75,6 +75,14 @@ bool isRedirect(int status) {
   return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
 }
 
+// Path + query of a URL; "" when the URL ends at the host.
+std::string pathAndQueryOf(const std::string& url) {
+  size_t start = url.find("://");
+  start = start == std::string::npos ? 0 : start + 3;
+  const size_t slash = url.find('/', start);
+  return slash == std::string::npos ? "" : url.substr(slash);
+}
+
 // OtaUpdater.cpp already disables WiFi power-save for firmware downloads, but
 // OPDS feed/book fetches never did despite being able to run just as long for
 // a large category. Modem sleep periodically powers the radio down between
@@ -163,10 +171,22 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink
         return HttpDownloader::HTTP_ERROR;
       }
       const std::string location = http.getHeader("location");
-      if (location.empty() || !freeink::SecureHttpClient::resolveUrl(url, location, url)) {
+      std::string next;
+      if (location.empty() || !freeink::SecureHttpClient::resolveUrl(url, location, next)) {
         LOG_ERR("HTTP", "wolfSSL bad redirect: %d", status);
         return HttpDownloader::HTTP_ERROR;
       }
+      // Apex->www canonicalization redirects (Apache `Redirect /` without a
+      // capture) often drop the request path: lirtuel.be/v1/home.opds2 ->
+      // "Location: http://www.lirtuel.be". Re-apply the original path when
+      // the target has none.
+      const std::string requestPath = pathAndQueryOf(url);
+      if (pathAndQueryOf(next).size() <= 1 && requestPath.size() > 1) {
+        if (!next.empty() && next.back() == '/') next.pop_back();
+        next += requestPath;
+        LOG_DBG("HTTP", "redirect dropped the path; retrying with %s", next.c_str());
+      }
+      url = std::move(next);
       if (downgradeRedirectsToHttp && url.rfind("https://", 0) == 0) {
         // Fetch the redirect target over plain HTTP. GitHub's release-asset
         // CDN serves its signed URLs on both schemes, and skipping the second
@@ -177,7 +197,13 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink
       continue;
     }
     if (status != 200 && status != 206) {
-      if (!(sink.captureErrorBody && status == 401)) LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
+      // 401 is an expected, handled condition (OPDS authentication kicks in);
+      // keep it out of the error log.
+      if (status == 401) {
+        LOG_DBG("HTTP", "wolfSSL status 401");
+      } else {
+        LOG_ERR("HTTP", "wolfSSL unexpected status: %d", status);
+      }
       return HttpDownloader::HTTP_ERROR;
     }
     if (http.callbackAborted()) return HttpDownloader::FILE_ERROR;

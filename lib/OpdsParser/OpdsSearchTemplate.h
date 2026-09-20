@@ -13,3 +13,10 @@
  *    other variables.
  */
 std::string expandOpdsSearchTemplate(const std::string& templateUrl, const std::string& encodedQuery);
+
+/**
+ * Percent-encode a value for a URL query parameter or an
+ * application/x-www-form-urlencoded body (RFC 3986 unreserved set kept
+ * literal, everything else %XX).
+ */
+std::string opdsPercentEncode(const std::string& value);

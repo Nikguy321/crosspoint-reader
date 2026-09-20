@@ -97,7 +97,10 @@ void onObjectEnd(void* ud) {
     ctx.linkObjectDepth = 0;
   } else if (ctx.authObjectDepth != 0 && ctx.depth == ctx.authObjectDepth) {
     if (ctx.current.isBasic) ctx.out->hasBasic = true;
-    if (ctx.current.isOauthImplicit) ctx.out->hasOauthImplicit = true;
+    if (ctx.current.isOauthImplicit) {
+      ctx.out->hasOauthImplicit = true;
+      if (ctx.out->implicitUrl.empty()) ctx.out->implicitUrl = ctx.current.authenticateHref;
+    }
     if (ctx.current.isOauthPassword) {
       ctx.out->hasOauthPassword = true;
       if (ctx.out->tokenUrl.empty()) ctx.out->tokenUrl = std::move(ctx.current.authenticateHref);

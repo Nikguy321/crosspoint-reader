@@ -23,6 +23,7 @@
 #include "components/icons/search32.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
+#include "network/OpdsImplicitAuth.h"
 #include "util/BookCacheUtils.h"
 #include "util/OpdsFilename.h"
 #include "util/StringUtils.h"
@@ -38,22 +39,6 @@ constexpr int DOWNLOAD_PROGRESS_STEP_PERCENT = 5;
 constexpr unsigned long DOWNLOAD_PROGRESS_MIN_UPDATE_MS = 5000;
 // OPDS authentication documents are small; cap the 401-body capture.
 constexpr size_t MAX_AUTH_DOC_BYTES = 8192;
-
-// Percent-encode a value for a query string or form-urlencoded body.
-std::string percentEncode(const std::string& s) {
-  std::string out;
-  out.reserve(s.size() * 3);
-  for (const unsigned char c : s) {
-    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-      out += static_cast<char>(c);
-    } else {
-      char buf[4];
-      snprintf(buf, sizeof(buf), "%%%02X", c);
-      out += buf;
-    }
-  }
-  return out;
-}
 
 }  // namespace
 
@@ -74,6 +59,7 @@ void OpdsBookBrowserActivity::onEnter() {
   searchDescriptionUrl = "";
   searchTemplateBase = "";
   bearerToken = "";
+  useBasicAuth = false;
   currentPath = "";
   searchQuery.clear();
   headerSearchTitle.clear();
@@ -83,7 +69,6 @@ void OpdsBookBrowserActivity::onEnter() {
   pageFirstHref.clear();
   pageLastHref.clear();
   feedTitle.clear();
-  pageLabel[0] = '\0';
   selectorIndex = 0;
   errorMessage.clear();
   statusMessage = tr(STR_CHECKING_WIFI);
@@ -276,7 +261,6 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
                  : !feedTitle.empty()       ? feedTitle.c_str()
                  : server.name.empty()      ? tr(STR_OPDS_BROWSER)
                                             : server.name.c_str();
-  if (state == BrowserState::BROWSING && pageLabel[0] != '\0') header.subtitle = pageLabel;
   header.borderEdges = fui::EdgeBottom;
   if (withSearch && hasSearch()) {
     header.trailingIcon = fui::bitmapFromIcon(icon_search_32);
@@ -379,8 +363,10 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
   MappedInputManager::Labels labels;
   switch (state) {
     case BrowserState::BROWSING: {
-      const char* confirmLabel =
-          (!entries.empty() && entries[selectorIndex].type == OpdsEntryType::BOOK) ? tr(STR_DOWNLOAD) : tr(STR_OPEN);
+      const char* confirmLabel = tr(STR_OPEN);
+      if (!entries.empty() && entries[selectorIndex].type == OpdsEntryType::BOOK) {
+        confirmLabel = entries[selectorIndex].purchase ? tr(STR_OPDS_BUY) : tr(STR_DOWNLOAD);
+      }
       const char* searchLabel = (hasSearch() && selectorIndex == 0) ? tr(STR_SEARCH) : tr(STR_DIR_UP);
       labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, searchLabel, tr(STR_DIR_DOWN));
       break;
@@ -415,8 +401,10 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   for (int authAttempt = 0;; ++authAttempt) {
     int status = 0;
     HttpDownloader::FetchOptions options;
-    options.username = server.username;
-    options.password = server.password;
+    if (useBasicAuth) {
+      options.username = server.username;
+      options.password = server.password;
+    }
     options.bearer = bearerToken;
     // Prefer OPDS 2.0 JSON from servers that content-negotiate (e.g.
     // Mayberry); Atom-only servers ignore this and serve their usual feed.
@@ -436,12 +424,20 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
       // describing the server's flows. One re-auth attempt (covers both a
       // missing and an expired token), then give up.
       bearerToken.clear();
+      useBasicAuth = false;
+      credentialsMissing = false;
+      // The login can take several seconds (multiple TLS handshakes across the
+      // catalog and its SSO); show progress instead of a frozen "Loading".
+      statusMessage = tr(STR_OPDS_SIGNING_IN);
+      requestUpdate(true);
       if (authAttempt == 0 && authenticateWithServer(url)) {
         parser.reset();  // drop any finalized backend before the retry
+        statusMessage = tr(STR_LOADING);
+        requestUpdate(true);
         continue;
       }
       state = BrowserState::ERROR;
-      errorMessage = tr(STR_OPDS_AUTH_FAILED);
+      errorMessage = credentialsMissing ? tr(STR_SET_CREDENTIALS_FIRST) : tr(STR_OPDS_AUTH_FAILED);
       requestUpdate();
       return;
     }
@@ -465,17 +461,6 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   searchTemplateBase = "";  // feed-inline template resolves against the feed URL
   feedTitle = parser.getFeedTitle();
 
-  // "Page X of Y" from the feed's pagination metadata (OPDS 2.0 metadata
-  // object or the opensearch:* elements of an Atom feed).
-  pageLabel[0] = '\0';
-  const uint32_t itemsPerPage = parser.getItemsPerPage();
-  const uint32_t totalItems = parser.getNumberOfItems();
-  const uint32_t page = parser.getCurrentPage();
-  const uint32_t totalPages = itemsPerPage > 0 ? (totalItems + itemsPerPage - 1) / itemsPerPage : 0;
-  if (page > 0 && totalPages > 1) {
-    snprintf(pageLabel, sizeof(pageLabel), tr(STR_OPDS_PAGE_POSITION), static_cast<unsigned long>(page),
-             static_cast<unsigned long>(totalPages));
-  }
   const auto& nextUrl = parser.getNextPageUrl();
   const auto& prevUrl = parser.getPrevPageUrl();
   pageNextHref = nextUrl;
@@ -515,6 +500,36 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   for (auto& facet : facetRows) {
     entries.push_back(std::move(facet));
   }
+
+  // Standard OPDS user collections (loans, reading list, history), advertised
+  // as feed-level links, become navigation rows under a "My Account" heading
+  // so they are reachable without pasting a URL. Authentication kicks in when
+  // one is opened. Only surfaced on the catalog root (no navigation history),
+  // since the same links repeat on every feed.
+  if (navigationHistory.empty()) {
+    struct UserLink {
+      const std::string& href;
+      const char* label;  // tr()'d value; runtime StrId can't go through the macro
+    };
+    const UserLink userLinks[] = {
+        {parser.getShelfUrl(), tr(STR_OPDS_SHELF)},
+        {parser.getWishlistUrl(), tr(STR_OPDS_WISHLIST)},
+        {parser.getHistoryUrl(), tr(STR_OPDS_HISTORY)},
+    };
+    bool firstUserLink = true;
+    for (const auto& link : userLinks) {
+      if (link.href.empty() || entries.size() >= OpdsLimits::MAX_ENTRIES) continue;
+      OpdsEntry entry;
+      entry.type = OpdsEntryType::NAVIGATION;
+      entry.title = link.label;
+      entry.href = link.href;
+      if (firstUserLink) {
+        entry.heading = tr(STR_OPDS_MY_ACCOUNT);
+        firstUserLink = false;
+      }
+      entries.push_back(std::move(entry));
+    }
+  }
   if (feedTruncated) {
     LOG_INF("OPDS", "Feed truncated to fit memory");
   }
@@ -539,6 +554,8 @@ void OpdsBookBrowserActivity::rebuildRowItems() {
     if (!entry.heading.empty()) item.sectionHeading = entry.heading.c_str();
     if (entry.type == OpdsEntryType::BOOK && !entry.author.empty()) item.subtitle = entry.author.c_str();
     if (entry.type == OpdsEntryType::NAVIGATION) item.value = entry.detail.empty() ? ">" : entry.detail.c_str();
+    // Purchases show their price in the value column.
+    if (entry.type == OpdsEntryType::BOOK && entry.purchase && !entry.detail.empty()) item.value = entry.detail.c_str();
     item.actionValue = static_cast<int16_t>(rowItems.size());
     rowItems.push_back(item);
   }
@@ -672,9 +689,30 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
           requestUpdate(true);
         }
       },
-      &cancelDownload, server.username, server.password, false, bearerToken);
+      &cancelDownload, useBasicAuth ? server.username : std::string(), useBasicAuth ? server.password : std::string(),
+      false, bearerToken);
 
   if (result == HttpDownloader::OK) {
+    // A purchase link (or any misbehaving endpoint) can answer 200 with an
+    // HTML page; a real EPUB is a ZIP container. Check the magic before
+    // accepting the file.
+    uint8_t magic[4] = {0};
+    {
+      HalFile check;
+      if (Storage.openFileForRead("OPDS", filename.c_str(), check)) {
+        check.read(magic, sizeof(magic));
+      }
+      if (check.isOpen()) check.close();  // close before any remove() on the same path
+    }
+    if (!(magic[0] == 'P' && magic[1] == 'K' && magic[2] == 3 && magic[3] == 4)) {
+      LOG_ERR("OPDS", "Downloaded file is not an EPUB (magic %02x%02x%02x%02x)", magic[0], magic[1], magic[2],
+              magic[3]);
+      Storage.remove(filename.c_str());
+      state = BrowserState::ERROR;
+      errorMessage = tr(STR_OPDS_NOT_A_BOOK);
+      requestUpdate();
+      return;
+    }
     clearBookCache(filename);
     state = BrowserState::LOADING;
     statusMessage = tr(STR_LOADING);
@@ -738,18 +776,26 @@ bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resource
         return true;
       },
       options);
-  if (status != 401 || body.empty()) return false;
+  if (status != 401) return false;  // not an auth challenge
 
+  // An empty 401 body is a bare Basic challenge; a JSON body is an OPDS auth
+  // document. Either way we proceed to pick a flow below.
   OpdsAuthDoc doc;
-  if (!parseOpdsAuthDocument(body.data(), body.size(), doc)) {
-    LOG_ERR("OPDS", "401 without a usable authentication document");
+  const bool haveAuthDoc = parseOpdsAuthDocument(body.data(), body.size(), doc);
+  LOG_DBG("OPDS", "Auth flows: doc=%d basic=%d password=%d implicit=%d", haveAuthDoc, doc.hasBasic,
+          doc.hasOauthPassword, doc.hasOauthImplicit);
+  if (server.username.empty() || server.password.empty()) {
+    // Every flow needs the stored credentials; surface the real problem
+    // instead of a generic auth failure.
+    LOG_ERR("OPDS", "Server requires login but no credentials are configured");
+    credentialsMissing = true;
     return false;
   }
 
   if (doc.hasOauthPassword && !doc.tokenUrl.empty() && !server.username.empty() && !server.password.empty()) {
     const std::string tokenUrl = UrlUtils::buildUrl(resourceUrl, doc.tokenUrl);
-    const std::string form = "grant_type=password&username=" + percentEncode(server.username) +
-                             "&password=" + percentEncode(server.password);
+    const std::string form = "grant_type=password&username=" + opdsPercentEncode(server.username) +
+                             "&password=" + opdsPercentEncode(server.password);
     std::string response;
     int tokenStatus = 0;
     if (HttpDownloader::postForm(tokenUrl, form, response, &tokenStatus)) {
@@ -764,8 +810,27 @@ bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resource
     return false;
   }
 
-  if (doc.hasOauthImplicit && !doc.hasBasic && !doc.hasOauthPassword) {
-    LOG_ERR("OPDS", "Server only offers browser-based OAuth (implicit)");
+  // Implicit grant: the server's login is an HTML form (possibly a federated
+  // SSO on another host). Drive it headlessly with the stored credentials and
+  // capture the opds://authorize callback token.
+  if (doc.hasOauthImplicit && !doc.implicitUrl.empty()) {
+    const std::string implicitUrl = UrlUtils::buildUrl(resourceUrl, doc.implicitUrl);
+    std::string token;
+    if (opdsImplicitAuthenticate(implicitUrl, server.username, server.password, token)) {
+      bearerToken = std::move(token);
+      LOG_INF("OPDS", "Implicit OAuth login succeeded");
+      return true;
+    }
+    return false;
+  }
+
+  // HTTP Basic: either the auth document offers it, or the 401 wasn't an OPDS
+  // auth document at all (a plain Basic-protected server, e.g. calibre-web).
+  // Latch it so subsequent requests send the credentials.
+  if (doc.hasBasic || !haveAuthDoc) {
+    LOG_INF("OPDS", "Using HTTP Basic authentication");
+    useBasicAuth = true;
+    return true;
   }
   return false;
 }
@@ -782,8 +847,10 @@ bool OpdsBookBrowserActivity::ensureSearchTemplate() {
   LOG_DBG("OPDS", "Fetching OpenSearch description: %s", descUrl.c_str());
   OpenSearchDescParser parser;
   HttpDownloader::FetchOptions options;
-  options.username = server.username;
-  options.password = server.password;
+  if (useBasicAuth) {
+    options.username = server.username;
+    options.password = server.password;
+  }
   options.bearer = bearerToken;
   const bool fetched = HttpDownloader::fetchUrl(
       descUrl,
@@ -822,7 +889,7 @@ void OpdsBookBrowserActivity::performSearch(const std::string& query) {
 
   // Expand the template first: buildUrl percent-encodes braces, so a raw
   // template must never pass through URL resolution.
-  const std::string expanded = expandOpdsSearchTemplate(searchTemplate, percentEncode(query));
+  const std::string expanded = expandOpdsSearchTemplate(searchTemplate, opdsPercentEncode(query));
   const std::string base =
       searchTemplateBase.empty() ? UrlUtils::buildUrl(server.url, currentPath) : searchTemplateBase;
   const std::string url = UrlUtils::buildUrl(base, expanded);

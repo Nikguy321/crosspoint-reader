@@ -10,9 +10,10 @@
 struct OpdsAuthDoc {
   bool hasBasic = false;          // http://opds-spec.org/auth/basic
   bool hasOauthPassword = false;  // http://opds-spec.org/auth/oauth/password
-  bool hasOauthImplicit = false;  // http://opds-spec.org/auth/oauth/implicit (needs a browser)
+  bool hasOauthImplicit = false;  // http://opds-spec.org/auth/oauth/implicit
   std::string tokenUrl;           // "authenticate" link of the OAuth password flow
   std::string refreshUrl;         // optional "refresh" link of the OAuth password flow
+  std::string implicitUrl;        // "authenticate" link of the implicit flow (HTML login)
 };
 
 /**

@@ -98,6 +98,7 @@ std::vector<OpdsEntry> OpdsFeedParser::takeEntries() {
 
 std::vector<OpdsEntry> OpdsFeedParser::takeFacetEntries() {
   if (jsonParser) return jsonParser->takeFacetEntries();
+  if (xmlParser) return xmlParser->takeFacetEntries();
   return {};
 }
 
@@ -139,6 +140,24 @@ const std::string& OpdsFeedParser::getFirstPageUrl() const {
 const std::string& OpdsFeedParser::getLastPageUrl() const {
   if (jsonParser) return jsonParser->getLastPageUrl();
   if (xmlParser) return xmlParser->getLastPageUrl();
+  return kNoValue;
+}
+
+const std::string& OpdsFeedParser::getShelfUrl() const {
+  if (jsonParser) return jsonParser->getShelfUrl();
+  if (xmlParser) return xmlParser->getShelfUrl();
+  return kNoValue;
+}
+
+const std::string& OpdsFeedParser::getWishlistUrl() const {
+  if (jsonParser) return jsonParser->getWishlistUrl();
+  if (xmlParser) return xmlParser->getWishlistUrl();
+  return kNoValue;
+}
+
+const std::string& OpdsFeedParser::getHistoryUrl() const {
+  if (jsonParser) return jsonParser->getHistoryUrl();
+  if (xmlParser) return xmlParser->getHistoryUrl();
   return kNoValue;
 }
 
