@@ -102,7 +102,15 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onSearchEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onCancelEvent(const freeink::ui::ActionEvent& event, void* user);
+  static void onPageEvent(const freeink::ui::ActionEvent& event, void* user);
   void screenHeader(UiScreen& screen, bool withSearch);
+  // Bottom pagination tab bar (arrow icons); drawn only when the feed
+  // advertises next/previous/first/last links.
+  void buildPaginationBar(UiScreen& screen);
+  bool hasPagination() const {
+    return !pageNextHref.empty() || !pagePrevHref.empty() || !pageFirstHref.empty() || !pageLastHref.empty();
+  }
+  void followPageLink(const std::string& href);
   void buildBrowsingScreen(UiScreen& screen);
   void buildDownloadScreen(UiScreen& screen);
   void buildStatusScreen(UiScreen& screen);

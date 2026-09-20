@@ -20,6 +20,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
+#include "components/icons/opdsIcons.h"
 #include "components/icons/search32.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
@@ -35,6 +36,12 @@ namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_SEARCH = 2;
 constexpr fui::ActionId ACTION_CANCEL = 3;
+constexpr fui::ActionId ACTION_PAGE = 4;
+// ACTION_PAGE values: which pagination link a tab follows.
+constexpr int16_t PAGE_FIRST = 0;
+constexpr int16_t PAGE_PREV = 1;
+constexpr int16_t PAGE_NEXT = 2;
+constexpr int16_t PAGE_LAST = 3;
 constexpr int DOWNLOAD_PROGRESS_STEP_PERCENT = 5;
 constexpr unsigned long DOWNLOAD_PROGRESS_MIN_UPDATE_MS = 5000;
 // OPDS authentication documents are small; cap the 401-body capture.
@@ -78,6 +85,7 @@ void OpdsBookBrowserActivity::onEnter() {
   app.on(ACTION_ROW, &OpdsBookBrowserActivity::onRowEvent, this);
   app.on(ACTION_SEARCH, &OpdsBookBrowserActivity::onSearchEvent, this);
   app.on(ACTION_CANCEL, &OpdsBookBrowserActivity::onCancelEvent, this);
+  app.on(ACTION_PAGE, &OpdsBookBrowserActivity::onPageEvent, this);
   app.setScreen(&OpdsBookBrowserActivity::rootScreen, this);
   requestUpdate();
 
@@ -127,6 +135,39 @@ void OpdsBookBrowserActivity::onCancelEvent(const fui::ActionEvent&, void* user)
   self->cancelDownload = true;
 }
 
+void OpdsBookBrowserActivity::onPageEvent(const fui::ActionEvent& event, void* user) {
+  auto* self = static_cast<OpdsBookBrowserActivity*>(user);
+  if (self->state != BrowserState::BROWSING) return;
+  self->app.clearTapFlash();
+  const std::string* href = nullptr;
+  switch (event.value) {
+    case PAGE_FIRST:
+      href = &self->pageFirstHref;
+      break;
+    case PAGE_PREV:
+      href = &self->pagePrevHref;
+      break;
+    case PAGE_NEXT:
+      href = &self->pageNextHref;
+      break;
+    case PAGE_LAST:
+      href = &self->pageLastHref;
+      break;
+    default:
+      return;
+  }
+  if (href && !href->empty()) self->followPageLink(*href);
+}
+
+// Follow a pagination link. isPaginationHref() keeps the search-term header
+// across page turns; navigateToEntry() does the history push and fetch.
+void OpdsBookBrowserActivity::followPageLink(const std::string& href) {
+  OpdsEntry entry;
+  entry.type = OpdsEntryType::NAVIGATION;
+  entry.href = href;
+  navigateToEntry(entry);
+}
+
 void OpdsBookBrowserActivity::setSearchQuery(const std::string& query) {
   searchQuery = query;
   headerSearchTitle = query.empty() ? std::string() : "\u201c" + query + "\u201d";
@@ -165,6 +206,17 @@ void OpdsBookBrowserActivity::loop() {
   if (state == BrowserState::DOWNLOADING) return;
 
   if (state == BrowserState::BROWSING) {
+    // Side page-turn buttons follow the feed's pagination links, the natural
+    // e-reader mapping now that the Next/Previous rows are a touch tab bar.
+    if (mappedInput.wasReleased(MappedInputManager::Button::PageForward) && !pageNextHref.empty()) {
+      followPageLink(pageNextHref);
+      return;
+    }
+    if (mappedInput.wasReleased(MappedInputManager::Button::PageBack) && !pagePrevHref.empty()) {
+      followPageLink(pagePrevHref);
+      return;
+    }
+
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
       activateSelected();
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
@@ -191,8 +243,15 @@ void OpdsBookBrowserActivity::loop() {
       // off-screen) and button navigation pulls the view back to it.
       const auto swipe = mappedInput.wasSwipe();
       if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
-        const int delta = swipe == MappedInputManager::SwipeDir::Up ? listNav.visibleRows : -listNav.visibleRows;
-        if (listNav.scrollBy(delta, static_cast<int>(entries.size()))) requestUpdate();
+        // Step by the rows the last build actually drew, not the fixed-height
+        // visibleRows estimate: OPDS rows vary in height (author subtitles,
+        // section headings), so the estimate overshoots and would skip past a
+        // partially-shown trailing row. requestScroll defers the clamp to the
+        // render task's syncToProps (never touch render state from here).
+        const int delta =
+            swipe == MappedInputManager::SwipeDir::Up ? listNav.inputPageRows() : -listNav.inputPageRows();
+        listNav.requestScroll(delta);
+        requestUpdate();
         return;
       }
 
@@ -207,10 +266,10 @@ void OpdsBookBrowserActivity::loop() {
       buttonNavigator.onPreviousRelease(
           [this, &moveSelection] { moveSelection(ButtonNavigator::previousIndex(selectorIndex, entries.size())); });
       buttonNavigator.onNextContinuous([this, &moveSelection] {
-        moveSelection(ButtonNavigator::nextPageIndex(selectorIndex, entries.size(), listNav.visibleRows));
+        moveSelection(ButtonNavigator::nextPageIndex(selectorIndex, entries.size(), listNav.inputPageRows()));
       });
       buttonNavigator.onPreviousContinuous([this, &moveSelection] {
-        moveSelection(ButtonNavigator::previousPageIndex(selectorIndex, entries.size(), listNav.visibleRows));
+        moveSelection(ButtonNavigator::previousPageIndex(selectorIndex, entries.size(), listNav.inputPageRows()));
       });
     }
   }
@@ -276,8 +335,49 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
   screen.spacer(static_cast<int16_t>(UITheme::getInstance().getMetrics().verticalSpacing));
 }
 
+// Bottom pagination bar: arrow-icon tabs following the feed's first/prev/next/
+// last links. Prev and Next always show when the feed is paginated (the
+// unavailable direction is disabled); First/Last appear only when advertised.
+void OpdsBookBrowserActivity::buildPaginationBar(UiScreen& screen) {
+  constexpr int MAX_PAGE_TABS = 4;
+  fui::TabItem tabs[MAX_PAGE_TABS];
+  int count = 0;
+  const auto addTab = [&](const freeink::Icon& icon, const int16_t value, const std::string& href) {
+    if (count >= MAX_PAGE_TABS) return;
+    tabs[count].icon = fui::bitmapFromIcon(icon);
+    tabs[count].value = value;
+    tabs[count].enabled = !href.empty();
+    ++count;
+  };
+  if (!pageFirstHref.empty()) addTab(icon_page_first_32, PAGE_FIRST, pageFirstHref);
+  addTab(icon_page_prev_32, PAGE_PREV, pagePrevHref);
+  addTab(icon_page_next_32, PAGE_NEXT, pageNextHref);
+  if (!pageLastHref.empty()) addTab(icon_page_last_32, PAGE_LAST, pageLastHref);
+
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const fui::Rect band = screen.takeBottom(static_cast<int16_t>(metrics.tabBarHeight));
+  // Full-width band with a top rule, matching the tab chrome elsewhere.
+  const fui::Rect frameRect = screen.frame().screen();
+  const fui::Rect barRect{frameRect.x, band.y, frameRect.width, band.height};
+  screen.target().fill(fui::Rect{barRect.x, barRect.y, barRect.width, 1}, fui::Paint::solid(fui::Color::Black));
+
+  fui::TabBarProps props;
+  props.tabs = tabs;
+  props.count = static_cast<uint16_t>(count);
+  props.action = ACTION_PAGE;
+  props.inputMask = fui::InputTouch;
+  props.iconSize = 32;
+  const auto side = static_cast<int16_t>(metrics.contentSidePadding);
+  const fui::Rect slots{static_cast<int16_t>(barRect.x + side), static_cast<int16_t>(barRect.y + 1),
+                        static_cast<int16_t>(barRect.width - 2 * side), static_cast<int16_t>(barRect.height - 1)};
+  fui::tabBar(screen.frame(), slots, props);
+}
+
 void OpdsBookBrowserActivity::buildBrowsingScreen(UiScreen& screen) {
   screenHeader(screen, true);
+
+  // Reserve the pagination band before the list claims the remaining height.
+  if (hasPagination()) buildPaginationBar(screen);
 
   if (entries.empty()) {
     screen.centeredText(tr(STR_NO_ENTRIES), screen.theme().bodyText);
@@ -480,21 +580,9 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   listNav.reset();
   entries = parser.takeEntries();
 
+  // Pagination is a bottom tab bar (buildPaginationBar), not list rows.
   auto facetRows = parser.takeFacetEntries();
-  entries.reserve(entries.size() + (prevUrl.empty() ? 0 : 1) + (nextUrl.empty() ? 0 : 1) +
-                  (pageFirstHref.empty() ? 0 : 1) + (pageLastHref.empty() ? 0 : 1) + facetRows.size());
-  if (!prevUrl.empty()) {
-    entries.insert(entries.begin(), OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_PREV_PAGE), "", prevUrl, ""});
-  }
-  if (!pageFirstHref.empty()) {
-    entries.insert(entries.begin(), OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_FIRST_PAGE), "", pageFirstHref, ""});
-  }
-  if (!nextUrl.empty()) {
-    entries.push_back(OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_NEXT_PAGE), "", nextUrl, ""});
-  }
-  if (!pageLastHref.empty()) {
-    entries.push_back(OpdsEntry{OpdsEntryType::NAVIGATION, tr(STR_LAST_PAGE), "", pageLastHref, ""});
-  }
+  entries.reserve(entries.size() + facetRows.size());
   // Facet groups (sort orders, filters) come after the catalog content, each
   // under its own section heading.
   for (auto& facet : facetRows) {
