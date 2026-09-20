@@ -63,7 +63,8 @@ void onString(void* ud, const char* value, size_t len) {
 void onObjectStart(void* ud) {
   auto& ctx = *static_cast<PubDocCtx*>(ud);
   ++ctx.depth;
-  if (ctx.inLinksArray && ctx.linkObjectDepth == 0 && ctx.depth == 2) {
+  // root object (1) > "links" array (2) > link object (3).
+  if (ctx.inLinksArray && ctx.linkObjectDepth == 0 && ctx.depth == 3) {
     ctx.linkObjectDepth = ctx.depth;
     ctx.link = {};
   }
@@ -93,7 +94,7 @@ void onArrayStart(void* ud) {
   auto& ctx = *static_cast<PubDocCtx*>(ud);
   ++ctx.depth;
   if (ctx.depth == 2 && strcmp(ctx.pendingKey, "links") == 0) ctx.inLinksArray = true;
-  ctx.pendingKey[0] = '\0';
+  // Keep pendingKey: a "rel" array's element strings need to see their key.
 }
 
 void onArrayEnd(void* ud) {
