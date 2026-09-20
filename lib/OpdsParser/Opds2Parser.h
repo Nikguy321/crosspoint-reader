@@ -155,6 +155,7 @@ class Opds2Parser final : public Print {
     bool relHistory = false;
     int acqRank = -1;
     bool typeEpub = false;
+    bool typeIndirect = false;  // application/opds-publication+json acquisition
     bool templated = false;
     int32_t numberOfItems = -1;
     std::string priceValue;     // raw decimal from the price object

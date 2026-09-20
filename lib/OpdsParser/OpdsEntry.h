@@ -28,6 +28,10 @@ struct OpdsEntry {
   // The chosen acquisition is a purchase (rel buy): the UI labels the action
   // accordingly, and the download is verified to actually be a book.
   bool purchase = false;
+  // The acquisition is indirect (type application/opds-publication+json): href
+  // points at a publication document that must be fetched to find the real
+  // download link, rather than at the EPUB itself. See OPDS 2.0 5.3.
+  bool indirect = false;
 };
 
 // Entry id marking a group's "see all" link; the UI supplies the label.

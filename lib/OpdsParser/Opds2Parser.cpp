@@ -78,6 +78,7 @@ void Opds2Parser::resetLink() {
   link.relShelf = link.relWishlist = link.relHistory = false;
   link.acqRank = -1;
   link.typeEpub = false;
+  link.typeIndirect = false;
   link.templated = false;
   link.numberOfItems = -1;
   link.priceValue.clear();
@@ -288,6 +289,7 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
         applyRel(value);
       } else if (strcmp(pendingKey, "type") == 0) {
         if (strcmp(value, "application/epub+zip") == 0) link.typeEpub = true;
+        if (strcmp(value, "application/opds-publication+json") == 0) link.typeIndirect = true;
       }
       break;
     case Scope::LINK_REL:
@@ -406,28 +408,41 @@ void Opds2Parser::commitFacetLink() {
 }
 
 void Opds2Parser::commitPubLink() {
-  if (link.href.empty() || !link.typeEpub || link.acqRank < 0) return;
-  // Prefer higher-ranked acquisitions (open-access over borrow); at equal
-  // rank prefer a plain EPUB path over derived formats (kepub etc.).
+  // Accept a direct EPUB or an indirect acquisition (a publication document
+  // resolved at download time). Library feeds (Lirtuel) only offer the latter.
+  if (link.href.empty() || link.acqRank < 0 || !(link.typeEpub || link.typeIndirect)) return;
+
   const bool isPlainEpub =
-      link.href.find(".epub") != std::string::npos || link.href.find("/epub/") != std::string::npos;
-  if (currentEntry.href.empty() || link.acqRank > pubAcqRank ||
-      (link.acqRank == pubAcqRank && isPlainEpub && !pubHasPlainEpub)) {
-    currentEntry.href = std::move(link.href);
-    pubAcqRank = link.acqRank;
-    pubHasPlainEpub = isPlainEpub;
-    currentEntry.purchase = link.acqRank == 0;
-    currentEntry.detail.clear();
-    if (currentEntry.purchase && !link.priceValue.empty()) {
-      currentEntry.detail = link.priceValue;
-      if (!link.priceCurrency.empty()) {
-        currentEntry.detail += ' ';
-        currentEntry.detail += link.priceCurrency;
-      }
+      link.typeEpub &&
+      (link.href.find(".epub") != std::string::npos || link.href.find("/epub/") != std::string::npos);
+
+  // Preference order: higher acquisition rank (open-access > acquisition >
+  // borrow > buy); at equal rank a direct EPUB beats an indirect link; among
+  // direct EPUBs a plain .epub path beats a derived format (kepub etc.).
+  bool better = currentEntry.href.empty() || link.acqRank > pubAcqRank;
+  if (!better && link.acqRank == pubAcqRank) {
+    if (link.typeEpub && currentEntry.indirect) {
+      better = true;
+    } else if (link.typeEpub && !currentEntry.indirect && isPlainEpub && !pubHasPlainEpub) {
+      better = true;
+    }
+  }
+  if (!better) return;
+
+  currentEntry.href = std::move(link.href);
+  currentEntry.indirect = !link.typeEpub;
+  pubAcqRank = link.acqRank;
+  pubHasPlainEpub = isPlainEpub;
+  currentEntry.purchase = link.acqRank == 0;
+  currentEntry.detail.clear();
+  if (currentEntry.purchase && !link.priceValue.empty()) {
+    currentEntry.detail = link.priceValue;
+    if (!link.priceCurrency.empty()) {
+      currentEntry.detail += ' ';
+      currentEntry.detail += link.priceCurrency;
     }
   }
 }
-
 void Opds2Parser::commitPublication() {
   if (currentEntry.title.empty() || currentEntry.href.empty()) return;
   if (entries.size() >= MAX_ENTRIES) {

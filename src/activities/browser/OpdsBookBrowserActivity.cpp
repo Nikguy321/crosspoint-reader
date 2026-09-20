@@ -9,6 +9,7 @@
 #include <Logging.h>
 #include <OpdsAuthDoc.h>
 #include <OpdsFeedParser.h>
+#include <OpdsPublicationDoc.h>
 #include <OpdsSearchTemplate.h>
 #include <OpenSearchDescParser.h>
 #include <WiFi.h>
@@ -705,6 +706,41 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
   // Build full download URL relative to the current feed, not the root server URL
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   std::string downloadUrl = UrlUtils::buildUrl(feedUrl, book.href);
+
+  // Indirect acquisition (OPDS 2.0 5.3): the link points at a publication
+  // document, not the EPUB. Fetch it and follow to the real download link.
+  // Library loans behind this are usually LCP-encrypted, which the reader
+  // can't open; the post-download EPUB check reports that cleanly.
+  if (book.indirect) {
+    std::string doc;
+    doc.reserve(4096);
+    HttpDownloader::FetchOptions options;
+    if (useBasicAuth) {
+      options.username = server.username;
+      options.password = server.password;
+    }
+    options.bearer = bearerToken;
+    const bool fetched = HttpDownloader::fetchUrl(
+        downloadUrl,
+        [&doc](const uint8_t* data, const size_t len) {
+          constexpr size_t MAX_PUB_DOC = 16 * 1024;
+          const size_t room = doc.size() < MAX_PUB_DOC ? MAX_PUB_DOC - doc.size() : 0;
+          doc.append(reinterpret_cast<const char*>(data), len < room ? len : room);
+          return true;
+        },
+        options);
+    std::string resolved;
+    bool resolvedEpub = false;
+    if (!fetched || !resolveOpdsIndirectAcquisition(doc.data(), doc.size(), resolved, resolvedEpub)) {
+      LOG_ERR("OPDS", "Could not resolve indirect acquisition");
+      state = BrowserState::ERROR;
+      errorMessage = tr(STR_OPDS_NOT_A_BOOK);
+      requestUpdate();
+      return;
+    }
+    downloadUrl = UrlUtils::buildUrl(downloadUrl, resolved);
+    LOG_DBG("OPDS", "Resolved indirect acquisition -> %s (epub=%d)", downloadUrl.c_str(), resolvedEpub);
+  }
   // opdsDownloadFolder is already a null-terminated char[64]; use it directly —
   // no std::string copy. exists()/mkdir() take const char*.
   const char* folder = SETTINGS.opdsDownloadFolder;  // "" => SD root
