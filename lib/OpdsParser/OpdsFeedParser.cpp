@@ -160,21 +160,3 @@ const std::string& OpdsFeedParser::getHistoryUrl() const {
   if (xmlParser) return xmlParser->getHistoryUrl();
   return kNoValue;
 }
-
-uint32_t OpdsFeedParser::getNumberOfItems() const {
-  if (jsonParser) return jsonParser->getNumberOfItems();
-  if (xmlParser) return xmlParser->getNumberOfItems();
-  return 0;
-}
-
-uint32_t OpdsFeedParser::getItemsPerPage() const {
-  if (jsonParser) return jsonParser->getItemsPerPage();
-  if (xmlParser) return xmlParser->getItemsPerPage();
-  return 0;
-}
-
-uint32_t OpdsFeedParser::getCurrentPage() const {
-  if (jsonParser) return jsonParser->getCurrentPage();
-  if (xmlParser) return xmlParser->getCurrentPage();
-  return 0;
-}

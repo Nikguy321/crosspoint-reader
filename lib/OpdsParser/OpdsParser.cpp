@@ -79,8 +79,6 @@ void OpdsParser::clear() {
   wishlistUrl.clear();
   historyUrl.clear();
   feedTitle.clear();
-  totalResults = startIndex = itemsPerPage = 0;
-  metaField = MetaField::NONE;
   inFeedTitle = false;
   entryAcqRank = -1;
   entryHasPlainEpub = false;
@@ -243,15 +241,6 @@ void XMLCALL OpdsParser::startElement(void* userData, const XML_Char* name, cons
     if (strcmp(name, "title") == 0 || strstr(name, ":title") != nullptr) {
       self->inFeedTitle = true;
       self->currentText.clear();
-    } else if (strstr(name, "totalResults") != nullptr) {
-      self->metaField = MetaField::TOTAL_RESULTS;
-      self->currentText.clear();
-    } else if (strstr(name, "startIndex") != nullptr) {
-      self->metaField = MetaField::START_INDEX;
-      self->currentText.clear();
-    } else if (strstr(name, "itemsPerPage") != nullptr) {
-      self->metaField = MetaField::ITEMS_PER_PAGE;
-      self->currentText.clear();
     }
     return;
   }
@@ -283,22 +272,6 @@ void XMLCALL OpdsParser::endElement(void* userData, const XML_Char* name) {
   } else if (!self->inEntry && self->inFeedTitle && (strcmp(name, "title") == 0 || strstr(name, ":title") != nullptr)) {
     self->feedTitle = self->currentText;
     self->inFeedTitle = false;
-  } else if (!self->inEntry && self->metaField != MetaField::NONE) {
-    const uint32_t parsed = static_cast<uint32_t>(strtoul(self->currentText.c_str(), nullptr, 10));
-    switch (self->metaField) {
-      case MetaField::TOTAL_RESULTS:
-        self->totalResults = parsed;
-        break;
-      case MetaField::START_INDEX:
-        self->startIndex = parsed;
-        break;
-      case MetaField::ITEMS_PER_PAGE:
-        self->itemsPerPage = parsed;
-        break;
-      case MetaField::NONE:
-        break;
-    }
-    self->metaField = MetaField::NONE;
   } else if (self->inEntry) {
     if (self->inPrice && (strcmp(name, "price") == 0 || strstr(name, ":price") != nullptr)) {
       if (self->chosenLinkIsPurchase && !self->currentText.empty()) {
@@ -336,8 +309,6 @@ void XMLCALL OpdsParser::characterData(void* userData, const XML_Char* s, const 
   if (!self->inEntry) {
     if (self->inFeedTitle) {
       appendBounded(self->currentText, s, len, MAX_TITLE_CHARS);
-    } else if (self->metaField != MetaField::NONE) {
-      appendBounded(self->currentText, s, len, 16);
     }
     return;
   }

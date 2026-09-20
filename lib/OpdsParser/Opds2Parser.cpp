@@ -338,15 +338,6 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
 
 void Opds2Parser::onNumberValue(const char* value) {
   switch (current()) {
-    case Scope::FEED_META:
-      if (strcmp(pendingKey, "numberOfItems") == 0) {
-        numberOfItems = static_cast<uint32_t>(strtoul(value, nullptr, 10));
-      } else if (strcmp(pendingKey, "itemsPerPage") == 0) {
-        itemsPerPage = static_cast<uint32_t>(strtoul(value, nullptr, 10));
-      } else if (strcmp(pendingKey, "currentPage") == 0) {
-        currentPage = static_cast<uint32_t>(strtoul(value, nullptr, 10));
-      }
-      break;
     case Scope::FACET_PROPS:
       if (strcmp(pendingKey, "numberOfItems") == 0) {
         link.numberOfItems = static_cast<int32_t>(strtol(value, nullptr, 10));

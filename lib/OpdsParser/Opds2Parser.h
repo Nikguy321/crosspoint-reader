@@ -56,10 +56,6 @@ class Opds2Parser final : public Print {
   const std::string& getShelfUrl() const { return shelfUrl; }
   const std::string& getWishlistUrl() const { return wishlistUrl; }
   const std::string& getHistoryUrl() const { return historyUrl; }
-  // Pagination metadata; 0 when the feed doesn't provide it.
-  uint32_t getNumberOfItems() const { return numberOfItems; }
-  uint32_t getItemsPerPage() const { return itemsPerPage; }
-  uint32_t getCurrentPage() const { return currentPage; }
 
  private:
   // Semantic role of each open JSON container, decided from the parent scope
@@ -190,7 +186,4 @@ class Opds2Parser final : public Print {
   std::string shelfUrl;
   std::string wishlistUrl;
   std::string historyUrl;
-  uint32_t numberOfItems = 0;
-  uint32_t itemsPerPage = 0;
-  uint32_t currentPage = 0;
 };

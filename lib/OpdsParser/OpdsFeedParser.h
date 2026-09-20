@@ -47,10 +47,6 @@ class OpdsFeedParser final : public Print {
   const std::string& getShelfUrl() const;
   const std::string& getWishlistUrl() const;
   const std::string& getHistoryUrl() const;
-  // Pagination metadata; 0 when the feed doesn't provide it.
-  uint32_t getNumberOfItems() const;
-  uint32_t getItemsPerPage() const;
-  uint32_t getCurrentPage() const;
 
  private:
   bool selectBackend(uint8_t firstByte);
