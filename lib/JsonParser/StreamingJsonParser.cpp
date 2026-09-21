@@ -135,11 +135,11 @@ void StreamingJsonParser::handleStringChar(char c) {
     } else if (c >= 'A' && c <= 'F') {
       digit = c - 'A' + 10;
     } else {
-      // Malformed escape: drop it (and any pending surrogate half), then
-      // reprocess this character normally.
-      unicodeDigitsLeft = 0;
-      flushPendingSurrogate();
-      handleStringChar(c);
+      // A \u escape must be followed by exactly four hex digits (RFC 8259); a
+      // non-hex character (including a closing quote before the fourth digit)
+      // makes the document malformed. Reject it instead of emitting a partial
+      // string.
+      error = true;
       return;
     }
     unicodeValue = static_cast<uint16_t>(unicodeValue << 4 | digit);

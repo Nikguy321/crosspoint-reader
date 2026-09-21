@@ -8,6 +8,15 @@
 
 using namespace OpdsLimits;
 
+// The JSON tokenizer drops any string longer than its buffer (tokenOverflow
+// skips the onString callback), so every field the parser stores must fit
+// within the buffer's effective capacity or long values would vanish before
+// assignBounded() truncates them. The URL limits are the largest fields.
+static_assert(MAX_HREF_CHARS < StreamingJsonParser::TOKEN_BUF_SIZE - 1 &&
+                  MAX_SEARCH_TEMPLATE_CHARS < StreamingJsonParser::TOKEN_BUF_SIZE - 1 &&
+                  MAX_PAGE_URL_CHARS < StreamingJsonParser::TOKEN_BUF_SIZE - 1,
+              "OPDS field limits must fit the JSON token buffer or values are dropped by tokenOverflow");
+
 Opds2Parser::Opds2Parser()
     : parser(JsonCallbacks{this, &sOnKey, &sOnString, &sOnNumber, &sOnBool, nullptr, &sOnObjectStart, &sOnObjectEnd,
                            &sOnArrayStart, &sOnArrayEnd}) {

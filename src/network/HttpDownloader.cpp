@@ -181,7 +181,9 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink
       // "Location: http://www.lirtuel.be". Re-apply the original path when
       // the target has none.
       const std::string requestPath = pathAndQueryOf(url);
-      if (pathAndQueryOf(next).size() <= 1 && requestPath.size() > 1) {
+      // Only re-apply when the redirect target carries no path at all. An
+      // explicit "/" is a deliberate redirect to the root and is preserved.
+      if (pathAndQueryOf(next).empty() && requestPath.size() > 1) {
         if (!next.empty() && next.back() == '/') next.pop_back();
         next += requestPath;
         LOG_DBG("HTTP", "redirect dropped the path; retrying with %s", next.c_str());
