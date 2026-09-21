@@ -17,6 +17,30 @@ constexpr int MAX_STEPS = 10;
 constexpr size_t MAX_PAGE_BYTES = 16 * 1024;
 constexpr int AUTH_TIMEOUT_MS = 30000;
 
+// Add the OAuth parameters an implicit grant needs to the authorize URL.
+// Authentication for OPDS 1.0 (3.4/3.5) defines a shared client identifier
+// (http://opds-spec.org/auth/client) and callback (opds://authorize/) so a
+// browserless client can complete the flow; standard OAuth servers (e.g.
+// ebooks.com's IdentityServer) return 400 on the authorize endpoint without
+// them. Parameters the server already put in the link are preserved.
+void ensureImplicitAuthParams(std::string& url) {
+  const auto hasParam = [&url](const char* name) {
+    const std::string needle = std::string(name) + "=";
+    for (size_t pos = url.find(needle); pos != std::string::npos; pos = url.find(needle, pos + 1)) {
+      const char before = pos == 0 ? '?' : url[pos - 1];
+      if (before == '?' || before == '&') return true;
+    }
+    return false;
+  };
+  const auto add = [&url](const char* nameValue) {
+    url += url.find('?') == std::string::npos ? '?' : '&';
+    url += nameValue;
+  };
+  if (!hasParam("response_type")) add("response_type=token");
+  if (!hasParam("client_id")) add("client_id=http%3A%2F%2Fopds-spec.org%2Fauth%2Fclient");
+  if (!hasParam("redirect_uri")) add("redirect_uri=opds%3A%2F%2Fauthorize%2F");
+}
+
 // Bare host of a URL (no scheme, no port) for cookie domain matching.
 std::string hostOf(const std::string& url) {
   size_t start = url.find("://");
@@ -34,9 +58,10 @@ bool opdsImplicitAuthenticate(const std::string& authenticateUrl, const std::str
                               const std::string& password, std::string& outToken) {
   OpdsCookieJar jar;
   std::string url = authenticateUrl;
+  ensureImplicitAuthParams(url);
   std::string postBody;
   bool isPost = false;
-  bool formSubmitted = false;
+  bool passwordSubmitted = false;
 
   for (int step = 0; step < MAX_STEPS; ++step) {
     freeink::SecureHttpClient http;
@@ -87,24 +112,25 @@ bool opdsImplicitAuthenticate(const std::string& authenticateUrl, const std::str
     }
 
     if (status == 200) {
-      if (formSubmitted) {
-        // A second login page after posting credentials means they were
-        // rejected.
-        LOG_ERR("OPDS", "Implicit auth: credentials rejected");
-        return false;
-      }
       const OpdsLoginForm form = buildOpdsLoginForm(page.data(), page.size(), username, password);
       if (!form.found) {
         LOG_ERR("OPDS", "Implicit auth: no login form found");
+        return false;
+      }
+      if (form.hasPassword && passwordSubmitted) {
+        // The password page reappears after we submitted it: bad credentials.
+        LOG_ERR("OPDS", "Implicit auth: credentials rejected");
         return false;
       }
       if (!form.action.empty() && !freeink::SecureHttpClient::resolveUrl(url, form.action, url)) {
         LOG_ERR("OPDS", "Implicit auth: bad form action");
         return false;
       }
+      // Identifier-first logins (ebooks.com) show an email page, then a
+      // password page; submit each in turn until the opds:// callback.
+      if (form.hasPassword) passwordSubmitted = true;
       postBody = form.body;
       isPost = true;
-      formSubmitted = true;
       continue;
     }
 

@@ -88,6 +88,7 @@ void Opds2Parser::resetLink() {
   link.acqRank = -1;
   link.typeEpub = false;
   link.typeIndirect = false;
+  link.typePubDoc = false;
   link.templated = false;
   link.numberOfItems = -1;
   link.priceValue.clear();
@@ -298,7 +299,10 @@ void Opds2Parser::onStringValue(const char* value, const size_t len) {
         applyRel(value);
       } else if (strcmp(pendingKey, "type") == 0) {
         if (strcmp(value, "application/epub+zip") == 0) link.typeEpub = true;
-        if (strcmp(value, "application/opds-publication+json") == 0) link.typeIndirect = true;
+        if (strcmp(value, "application/opds-publication+json") == 0) {
+          link.typeIndirect = true;
+          link.typePubDoc = true;
+        }
       }
       break;
     case Scope::LINK_REL:
@@ -417,6 +421,12 @@ void Opds2Parser::commitFacetLink() {
 }
 
 void Opds2Parser::commitPubLink() {
+  // A rel="self" publication document is the detail-page source, not an
+  // acquisition.
+  if (link.relSelf && link.typePubDoc && !link.href.empty() && currentEntry.selfHref.empty()) {
+    currentEntry.selfHref = link.href;
+    return;
+  }
   // Accept a direct EPUB or an indirect acquisition (a publication document
   // resolved at download time). Library feeds (Lirtuel) only offer the latter.
   if (link.href.empty() || link.acqRank < 0 || !(link.typeEpub || link.typeIndirect)) return;

@@ -41,6 +41,7 @@ constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_SEARCH = 2;
 constexpr fui::ActionId ACTION_CANCEL = 3;
 constexpr fui::ActionId ACTION_PAGE = 4;
+constexpr fui::ActionId ACTION_DETAIL = 5;
 // ACTION_PAGE values: which pagination link a tab follows.
 constexpr int16_t PAGE_FIRST = 0;
 constexpr int16_t PAGE_PREV = 1;
@@ -50,6 +51,19 @@ constexpr int DOWNLOAD_PROGRESS_STEP_PERCENT = 5;
 constexpr unsigned long DOWNLOAD_PROGRESS_MIN_UPDATE_MS = 5000;
 // OPDS authentication documents are small; cap the 401-body capture.
 constexpr size_t MAX_AUTH_DOC_BYTES = 8192;
+
+// Accept-Language from the reader's UI language, so servers that localize the
+// catalog (e.g. Lirtuel) return it translated. Primary subtag plus an English
+// fallback; derived from the exposed LANGUAGE_CODES table (e.g. "FR" -> "fr").
+std::string uiAcceptLanguage() {
+  const char* code = LANGUAGE_CODES[static_cast<int>(SETTINGS.language)];
+  std::string lang;
+  for (const char* p = code; *p && *p != '_'; ++p) {
+    lang += (*p >= 'A' && *p <= 'Z') ? static_cast<char>(*p + 32) : *p;
+  }
+  if (lang.empty() || lang == "en") return "en";
+  return lang + ",en;q=0.8";
+}
 
 }  // namespace
 
@@ -96,6 +110,7 @@ void OpdsBookBrowserActivity::onEnter() {
   app.on(ACTION_SEARCH, &OpdsBookBrowserActivity::onSearchEvent, this);
   app.on(ACTION_CANCEL, &OpdsBookBrowserActivity::onCancelEvent, this);
   app.on(ACTION_PAGE, &OpdsBookBrowserActivity::onPageEvent, this);
+  app.on(ACTION_DETAIL, &OpdsBookBrowserActivity::onDetailEvent, this);
   app.setScreen(&OpdsBookBrowserActivity::rootScreen, this);
   requestUpdate();
 
@@ -117,7 +132,7 @@ void OpdsBookBrowserActivity::onExit() {
 void OpdsBookBrowserActivity::activateSelected() {
   if (entries.empty() || selectorIndex < 0 || selectorIndex >= static_cast<int>(entries.size())) return;
   const auto& entry = entries[selectorIndex];
-  entry.type == OpdsEntryType::BOOK ? downloadBook(entry) : navigateToEntry(entry);
+  entry.type == OpdsEntryType::BOOK ? openPublicationDetail(entry) : navigateToEntry(entry);
 }
 
 void OpdsBookBrowserActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
@@ -213,6 +228,47 @@ void OpdsBookBrowserActivity::loop() {
     return;
   }
 
+  if (state == BrowserState::DETAIL) {
+    if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+      // Entries were released for heap; rebuild the catalog we came from.
+      releaseEntries();
+      state = BrowserState::LOADING;
+      statusMessage = tr(STR_LOADING);
+      requestUpdate();
+      fetchFeed(currentPath);
+      return;
+    }
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      downloadBook(detailBook);
+      return;
+    }
+    const auto route = routeTouch(mappedInput);
+    if (route.routed) {
+      if (app.invalidated()) requestUpdate();
+      if (route) return;  // dispatched to onDetailEvent (the action button)
+      if (state != BrowserState::DETAIL) return;
+    }
+    if (!detailRows.empty()) {
+      const auto swipe = mappedInput.wasSwipe();
+      if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
+        detailNav.requestScroll(swipe == MappedInputManager::SwipeDir::Up ? detailNav.inputPageRows()
+                                                                          : -detailNav.inputPageRows());
+        requestUpdate();
+        return;
+      }
+      // Side buttons page the info list.
+      buttonNavigator.onNextRelease([this] {
+        detailNav.requestScroll(detailNav.inputPageRows());
+        requestUpdate();
+      });
+      buttonNavigator.onPreviousRelease([this] {
+        detailNav.requestScroll(-detailNav.inputPageRows());
+        requestUpdate();
+      });
+    }
+    return;
+  }
+
   if (state == BrowserState::DOWNLOADING) return;
 
   if (state == BrowserState::BROWSING) {
@@ -294,6 +350,7 @@ bool OpdsBookBrowserActivity::preventAutoSleep() {
     case BrowserState::SEARCH_INPUT:
       return true;
     case BrowserState::BROWSING:
+    case BrowserState::DETAIL:
     case BrowserState::ERROR:
       return false;
   }
@@ -305,6 +362,9 @@ void OpdsBookBrowserActivity::rootScreen(UiScreen& screen, void* user) {
   switch (self->state) {
     case BrowserState::BROWSING:
       self->buildBrowsingScreen(screen);
+      break;
+    case BrowserState::DETAIL:
+      self->buildDetailScreen(screen);
       break;
     case BrowserState::DOWNLOADING:
       self->buildDownloadScreen(screen);
@@ -481,6 +541,13 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
       labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, searchLabel, tr(STR_DIR_DOWN));
       break;
     }
+    case BrowserState::DETAIL: {
+      const char* actionLabel = detailBook.purchase   ? tr(STR_OPDS_BUY)
+                                : detailBook.indirect ? tr(STR_OPDS_BORROW)
+                                                      : tr(STR_DOWNLOAD);
+      labels = mappedInput.mapLabels(tr(STR_BACK), actionLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+      break;
+    }
     case BrowserState::DOWNLOADING:
       labels = mappedInput.mapLabels(tr(STR_CANCEL), "", "", "");
       break;
@@ -519,6 +586,7 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
     // Prefer OPDS 2.0 JSON from servers that content-negotiate (e.g.
     // Mayberry); Atom-only servers ignore this and serve their usual feed.
     options.accept = "application/opds+json,application/atom+xml;q=0.9,*/*;q=0.8";
+    options.acceptLanguage = uiAcceptLanguage();
     options.statusOut = &status;
     const bool fetched = HttpDownloader::fetchUrl(
         url,
@@ -881,6 +949,164 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
     errorMessage = tr(STR_DOWNLOAD_FAILED);
   }
   requestUpdate();
+}
+
+void OpdsBookBrowserActivity::onDetailEvent(const fui::ActionEvent&, void* user) {
+  auto* self = static_cast<OpdsBookBrowserActivity*>(user);
+  if (self->state != BrowserState::DETAIL) return;
+  self->app.clearTapFlash();
+  self->downloadBook(self->detailBook);
+}
+
+// Open the publication detail page: fetch the publication's self-document for
+// full metadata + availability, then show it with an acquire button. The
+// catalog list and SD font caches are released first (rebuilt on Back) to keep
+// the most heap free for the TLS fetch, exactly like a download.
+void OpdsBookBrowserActivity::openPublicationDetail(const OpdsEntry& entry) {
+  detailBook = entry;
+  currentPublication = OpdsPublication{};
+  detailNav.reset();
+
+  const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
+  const bool haveSelf = !entry.selfHref.empty();
+  const std::string docUrl = UrlUtils::buildUrl(feedUrl, haveSelf ? entry.selfHref : entry.href);
+
+  state = BrowserState::LOADING;
+  statusMessage = tr(STR_LOADING);
+  requestUpdate(true);
+
+  releaseEntries();
+  if (auto* fcm = renderer.getFontCacheManager()) fcm->releaseSdFontCaches();
+
+  if (haveSelf) {
+    std::string doc;
+    doc.reserve(4096);
+    HttpDownloader::FetchOptions options;
+    if (useBasicAuth) {
+      options.username = server.username;
+      options.password = server.password;
+    }
+    options.bearer = bearerToken;
+    options.accept = "application/opds-publication+json,application/opds+json";
+    options.acceptLanguage = uiAcceptLanguage();
+    HttpDownloader::fetchUrl(
+        docUrl,
+        [&doc](const uint8_t* data, const size_t len) {
+          constexpr size_t MAX_PUB_DOC = 16 * 1024;
+          const size_t room = doc.size() < MAX_PUB_DOC ? MAX_PUB_DOC - doc.size() : 0;
+          doc.append(reinterpret_cast<const char*>(data), len < room ? len : room);
+          return true;
+        },
+        options);
+    parseOpdsPublicationDoc(doc.data(), doc.size(), currentPublication);
+  }
+
+  if (!currentPublication.valid) {
+    // No self link, or the fetch/parse failed: show what the list row had.
+    currentPublication = OpdsPublication{};
+    currentPublication.title = entry.title;
+    currentPublication.author = entry.author;
+    currentPublication.acquisitionHref = entry.href;
+    currentPublication.indirect = entry.indirect;
+    currentPublication.purchase = entry.purchase;
+    if (entry.purchase) currentPublication.price = entry.detail;
+    currentPublication.valid = !entry.title.empty();
+  }
+
+  // Resolve the acquisition to an absolute URL against the document it came
+  // from; downloadBook() resolves against the feed, so an absolute URL is used
+  // verbatim.
+  if (!currentPublication.acquisitionHref.empty()) {
+    detailBook.href = UrlUtils::buildUrl(docUrl, currentPublication.acquisitionHref);
+    detailBook.indirect = currentPublication.indirect;
+    detailBook.purchase = currentPublication.purchase;
+  }
+
+  rebuildDetailRows();
+  state = BrowserState::DETAIL;
+  requestUpdate();
+}
+
+// Builds the scrollable info rows from the parsed publication. detailStrings
+// owns the formatted text; detailRows point into it, so reserve enough to
+// avoid a reallocation that would dangle those pointers.
+void OpdsBookBrowserActivity::rebuildDetailRows() {
+  detailStrings.clear();
+  detailRows.clear();
+  detailStrings.reserve(16);
+  const auto addRow = [this](std::string text) {
+    detailStrings.push_back(std::move(text));
+    fui::ListItem item;
+    item.label = detailStrings.back().c_str();
+    detailRows.push_back(item);
+  };
+
+  if (!currentPublication.author.empty()) {
+    char buf[192];
+    snprintf(buf, sizeof(buf), tr(STR_OPDS_BY_AUTHOR), currentPublication.author.c_str());
+    addRow(buf);
+  }
+
+  const OpdsAvailability& av = currentPublication.availability;
+  if (av.present()) {
+    const char* stateStr = av.state == "available"     ? tr(STR_OPDS_AVAILABLE)
+                           : av.state == "ready"       ? tr(STR_OPDS_READY)
+                           : av.state == "reserved"    ? tr(STR_OPDS_RESERVED)
+                           : av.state == "unavailable" ? tr(STR_OPDS_UNAVAILABLE)
+                                                       : nullptr;
+    if (stateStr) addRow(stateStr);
+    if (av.copiesTotal >= 0) {
+      char b[64];
+      snprintf(b, sizeof(b), tr(STR_OPDS_COPIES), av.copiesAvailable < 0 ? 0 : av.copiesAvailable, av.copiesTotal);
+      addRow(b);
+    }
+    if (av.holdsTotal >= 0) {
+      char b[48];
+      snprintf(b, sizeof(b), tr(STR_OPDS_HOLDS), av.holdsTotal);
+      addRow(b);
+    }
+    if (av.holdsPosition >= 0) {
+      char b[48];
+      snprintf(b, sizeof(b), tr(STR_OPDS_HOLD_POSITION), av.holdsPosition);
+      addRow(b);
+    }
+  }
+
+  if (!currentPublication.purchase && !currentPublication.price.empty()) addRow(currentPublication.price);
+  if (!currentPublication.publisher.empty()) addRow(currentPublication.publisher);
+  if (!currentPublication.description.empty()) addRow(currentPublication.description);
+}
+
+void OpdsBookBrowserActivity::buildDetailScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  screen.takeBottom(static_cast<int16_t>(metrics.buttonHintsHeight));
+  screen.spacer(static_cast<int16_t>(metrics.topPadding));
+  fui::HeaderProps header;
+  header.title = currentPublication.title.empty() ? tr(STR_OPDS_BROWSER) : currentPublication.title.c_str();
+  header.borderEdges = fui::EdgeBottom;
+  screen.header(header);
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+
+  // Bottom acquire button (Borrow / Download / Buy).
+  const int16_t btnH = screen.theme().rowHeight;
+  const fui::Rect btnArea = screen.takeBottom(static_cast<int16_t>(btnH + metrics.verticalSpacing));
+  const char* actionLabel = detailBook.purchase   ? tr(STR_OPDS_BUY)
+                            : detailBook.indirect ? tr(STR_OPDS_BORROW)
+                                                  : tr(STR_DOWNLOAD);
+  fui::ButtonProps action;
+  action.label = actionLabel;
+  action.action = ACTION_DETAIL;
+  const int16_t btnW = static_cast<int16_t>(btnArea.width / 2);
+  screen.button(action, fui::Rect{static_cast<int16_t>(btnArea.x + (btnArea.width - btnW) / 2), btnArea.y, btnW, btnH});
+
+  if (detailRows.empty()) return;
+  fui::ListProps props;
+  props.items = detailRows.data();
+  props.count = static_cast<uint16_t>(detailRows.size());
+  props.inputMask = fui::InputTouch;  // rows are info only; action is NO_ACTION
+  props.partialTrailingRow = true;
+  screen.syncListViewport(detailNav, props, static_cast<int>(detailRows.size()));
+  screen.list(props);
 }
 
 void OpdsBookBrowserActivity::launchSearch() {

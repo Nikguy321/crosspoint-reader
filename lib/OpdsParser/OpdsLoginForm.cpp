@@ -129,20 +129,32 @@ void appendField(std::string& body, const std::string& name, const std::string& 
   body += opdsPercentEncode(value);
 }
 
+bool looksLikeLogin(const std::string& s) {
+  std::string l = s;
+  for (auto& c : l) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+  return l.find("email") != std::string::npos || l.find("user") != std::string::npos ||
+         l.find("login") != std::string::npos || l.find("ident") != std::string::npos ||
+         l.find("account") != std::string::npos || l.find("signin") != std::string::npos;
+}
+
 }  // namespace
 
 OpdsLoginForm buildOpdsLoginForm(const char* html, const size_t len, const std::string& username,
                                  const std::string& password) {
   OpdsLoginForm form;
+  // First identifier-only form (email page of a two-step login), used only if
+  // the document has no password form.
+  OpdsLoginForm identityStep;
   size_t searchFrom = 0;
 
-  // Walk the document's forms until one contains a password input; pages
-  // often carry a search form before the login form.
+  // Walk every form. A form with a password input is the login form. Pages may
+  // carry a search form first, and identifier-first logins (e.g. ebooks.com)
+  // show an email-only page before the password page.
   while (true) {
     const size_t formStart = findTag(html, len, searchFrom, "<form");
-    if (formStart == std::string::npos) return form;
+    if (formStart == std::string::npos) break;
     const size_t formTagEnd = std::string(html + formStart, std::min<size_t>(len - formStart, 2048)).find('>');
-    if (formTagEnd == std::string::npos) return form;
+    if (formTagEnd == std::string::npos) break;
     const std::string formTag(html + formStart, formTagEnd + 1);
 
     size_t formEnd = findTag(html, len, formStart + 1, "</form");
@@ -152,6 +164,7 @@ OpdsLoginForm buildOpdsLoginForm(const char* html, const size_t len, const std::
     std::string body;
     bool haveUser = false;
     bool havePassword = false;
+    bool strongIdentity = false;  // the username field is clearly a login field
     size_t pos = formStart;
     while (true) {
       const size_t inputStart = findTag(html, len, pos, "<input");
@@ -173,6 +186,8 @@ OpdsLoginForm buildOpdsLoginForm(const char* html, const size_t len, const std::
         if (!haveUser) {
           appendField(body, name, username);
           haveUser = true;
+          strongIdentity = iequals(type, "email") || looksLikeLogin(name) || looksLikeLogin(attrValue(tag, "id")) ||
+                           iequals(attrValue(tag, "autocomplete"), "username");
         }
       } else if (iequals(type, "hidden")) {
         appendField(body, name, attrValue(tag, "value"));
@@ -185,11 +200,22 @@ OpdsLoginForm buildOpdsLoginForm(const char* html, const size_t len, const std::
 
     if (havePassword) {
       form.found = true;
+      form.hasPassword = true;
       form.action = attrValue(formTag, "action");
       form.body = std::move(body);
-      return form;
+      return form;  // a password form always wins
+    }
+    // Remember the first credible identifier-only page (gated on a strong
+    // login signal so a plain search box is not mistaken for a login step).
+    if (haveUser && strongIdentity && !identityStep.found) {
+      identityStep.found = true;
+      identityStep.hasPassword = false;
+      identityStep.action = attrValue(formTag, "action");
+      identityStep.body = std::move(body);
     }
   }
+
+  return identityStep.found ? identityStep : form;
 }
 
 void OpdsCookieJar::store(const std::string& host, const std::string& setCookieHeader) {

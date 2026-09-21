@@ -60,6 +60,9 @@ class HttpDownloader {
     // Accept header for content negotiation (e.g. preferring OPDS 2.0 JSON
     // from servers that also speak Atom); empty sends none.
     std::string accept;
+    // Accept-Language header, so servers that localize the catalog return it
+    // in the reader's UI language; empty sends none.
+    std::string acceptLanguage;
     int* statusOut = nullptr;
     bool captureErrorBody = false;
   };

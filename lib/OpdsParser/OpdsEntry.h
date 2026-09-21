@@ -32,6 +32,9 @@ struct OpdsEntry {
   // points at a publication document that must be fetched to find the real
   // download link, rather than at the EPUB itself. See OPDS 2.0 5.3.
   bool indirect = false;
+  // Publication "self" link (application/opds-publication+json): fetched to
+  // build the detail page. Empty when the feed offers none.
+  std::string selfHref;
 };
 
 // Entry id marking a group's "see all" link; the UI supplies the label.

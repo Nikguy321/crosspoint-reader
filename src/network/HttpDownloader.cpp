@@ -57,6 +57,8 @@ struct Sink {
   std::string authorization;
   // Accept header for content negotiation; empty sends none.
   std::string accept;
+  // Accept-Language header; empty sends none.
+  std::string acceptLanguage;
   // Non-null turns the request into a form-urlencoded POST of this body.
   const std::string* postBody = nullptr;
   // Also stream a 401 body to `write` (OPDS auth documents are 401 bodies).
@@ -126,6 +128,9 @@ HttpDownloader::DownloadError runGetWolf(const std::string& startUrl, Sink& sink
     }
     if (!sink.accept.empty()) {
       http.addHeader("Accept", sink.accept);
+    }
+    if (!sink.acceptLanguage.empty()) {
+      http.addHeader("Accept-Language", sink.acceptLanguage);
     }
     if (sink.resumeOffset > 0) {
       char range[48];
@@ -255,6 +260,9 @@ HttpDownloader::DownloadError runGet(const std::string& url, Sink& sink) {
   }
   if (!sink.accept.empty()) {
     esp_http_client_set_header(client, "Accept", sink.accept.c_str());
+  }
+  if (!sink.acceptLanguage.empty()) {
+    esp_http_client_set_header(client, "Accept-Language", sink.acceptLanguage.c_str());
   }
   if (sink.resumeOffset > 0) {
     char range[48];
@@ -411,6 +419,7 @@ bool HttpDownloader::fetchUrl(const std::string& url, const DataCallback& onData
   sink.write = onData;
   sink.authorization = buildAuthHeader(options.username, options.password, options.bearer);
   sink.accept = options.accept;
+  sink.acceptLanguage = options.acceptLanguage;
   sink.captureErrorBody = options.captureErrorBody;
   const bool ok = runGetSecure(url, sink) == OK;
   if (options.statusOut) *options.statusOut = sink.status;

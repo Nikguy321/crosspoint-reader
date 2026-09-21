@@ -1,5 +1,6 @@
 #pragma once
 #include <OpdsEntry.h>
+#include <OpdsPublicationDoc.h>
 
 #include <string>
 #include <utility>
@@ -16,7 +17,7 @@
  */
 class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
  public:
-  enum class BrowserState { CHECK_WIFI, WIFI_SELECTION, LOADING, BROWSING, DOWNLOADING, ERROR, SEARCH_INPUT };
+  enum class BrowserState { CHECK_WIFI, WIFI_SELECTION, LOADING, BROWSING, DETAIL, DOWNLOADING, ERROR, SEARCH_INPUT };
 
   explicit OpdsBookBrowserActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, OpdsServer server);
 
@@ -58,6 +59,13 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // Title of the current feed (shown in the header when no search is active).
   std::string feedTitle;
   void setSearchQuery(const std::string& query);
+  // Publication detail page (DETAIL state): the parsed self-document, the book
+  // to acquire, and the scrollable info rows built from it.
+  OpdsPublication currentPublication;
+  OpdsEntry detailBook;
+  std::vector<std::string> detailStrings;  // owns the strings detailRows point to
+  std::vector<freeink::ui::ListItem> detailRows;
+  freeink::ui::ListNav detailNav;
   // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
   // either inlined in the feed or fetched from an OpenSearch description.
   std::string searchTemplate;
@@ -129,6 +137,10 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void navigateToEntry(const OpdsEntry& entry);
   void navigateBack();
   void downloadBook(const OpdsEntry& book);
+  void openPublicationDetail(const OpdsEntry& entry);
+  void buildDetailScreen(UiScreen& screen);
+  void rebuildDetailRows();
+  static void onDetailEvent(const freeink::ui::ActionEvent& event, void* user);
   bool hasSearch() const { return !searchTemplate.empty() || !searchDescriptionUrl.empty(); }
   bool ensureSearchTemplate();
   bool authenticateWithServer(const std::string& resourceUrl);

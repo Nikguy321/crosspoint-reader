@@ -12,8 +12,9 @@
 
 struct OpdsLoginForm {
   bool found = false;
-  std::string action;  // raw action attribute; empty means "post to the same URL"
-  std::string body;    // x-www-form-urlencoded fields with credentials filled in
+  bool hasPassword = false;  // false for an identifier-first step (email page)
+  std::string action;        // raw action attribute; empty means "post to the same URL"
+  std::string body;          // x-www-form-urlencoded fields with credentials filled in
 };
 
 /**
