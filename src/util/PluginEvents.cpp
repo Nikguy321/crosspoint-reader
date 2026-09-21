@@ -323,8 +323,25 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
           drainSubstituted(handler->req.body, tok, config, meta, vars, ts, id), headers, tmp.c_str(),
           MAX_EVENT_DOWNLOAD);
       if (st >= 200 && st < 300) {
-        Storage.remove(dest.c_str());  // rename won't overwrite an existing file
-        if (!Storage.rename(tmp.c_str(), dest.c_str())) Storage.remove(tmp.c_str());
+        // rename won't overwrite an existing file, so park the old dest as a
+        // backup and restore it if the swap fails: a failed commit must not
+        // lose both the old file and the fresh download. -1 (local failure,
+        // same convention as pluginhttp) keeps the line queued for retry.
+        const std::string bak = dest + ".bak";
+        Storage.remove(bak.c_str());
+        const bool hadDest = Storage.exists(dest.c_str());
+        if (hadDest && !Storage.rename(dest.c_str(), bak.c_str())) {
+          Storage.remove(tmp.c_str());
+          return -1;
+        }
+        if (!Storage.rename(tmp.c_str(), dest.c_str())) {
+          Storage.remove(tmp.c_str());
+          if (hadDest && !Storage.rename(bak.c_str(), dest.c_str())) {
+            LOG_ERR("PEVT", "restore of %s failed", dest.c_str());
+          }
+          return -1;
+        }
+        Storage.remove(bak.c_str());
       } else {
         Storage.remove(tmp.c_str());
       }
