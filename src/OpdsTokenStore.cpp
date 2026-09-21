@@ -33,7 +33,8 @@ bool OpdsTokenStore::fromJson(JsonVariantConst doc) {
     if (entry.url.empty()) continue;
     bool ok = false;
     bool tooLong = false;
-    entry.tokens.accessToken = obfuscation::deobfuscateFromBase64(obj["access_obf"] | "", MAX_TOKEN_CHARS, &ok, &tooLong);
+    entry.tokens.accessToken =
+        obfuscation::deobfuscateFromBase64(obj["access_obf"] | "", MAX_TOKEN_CHARS, &ok, &tooLong);
     entry.tokens.refreshToken =
         obfuscation::deobfuscateFromBase64(obj["refresh_obf"] | "", MAX_TOKEN_CHARS, &ok, &tooLong);
     entry.tokens.refreshUrl = obj["refresh_url"] | "";
