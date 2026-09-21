@@ -21,11 +21,12 @@ Plugin event handlers need the network, and most events fire with WiFi down
 (leaving a book, entering sleep). So `emit` only appends one JSON line to the
 plugin's outbox (`<plugin dir>/events.jsonl`) — an SD append, nothing more —
 and the queue is drained through the declared requests whenever the device is
-already online: when the File Transfer web server comes up in Join Network
-mode, or on the way into sleep. Delivery is at-least-once and in order; every
-queued line carries a unique `id` (a per-boot nonce plus a counter, so it never
-repeats across queued events or reboots) — dedupe on `{event.id}` server-side
-if it matters.
+already online: on any WiFi connection (the selection/auto-connect completion
+in `WifiSelectionActivity`), when the File Transfer web server comes up in Join
+Network mode, or on the way into sleep. Delivery is at-least-once and in order;
+every queued line carries a unique `id` (a per-boot nonce plus a counter, so it
+never repeats across queued events or reboots) — dedupe on `{event.id}`
+server-side if it matters.
 
 `sleep.enter` gets special timing: it exists to act before the chip powers
 down (a fresh sleep image, a pre-sleep progress push), so the sleep path
