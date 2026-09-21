@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <esp_random.h>
 #include <time.h>
 
 #include <cstdio>
@@ -134,9 +135,18 @@ bool wantsConnectAny() {
 void emit(const Event e, const Var* vars, const size_t varCount) {
   if (!anySubscriber(e)) return;
 
-  // One line: {"e":"reader.exit","ts":1734212345,"vars":{"book":"...","percent":"74"}}
+  // One line: {"e":"reader.exit","id":"3fa9c21b-7","ts":1734212345,"vars":{"book":"...","percent":"74"}}
   JsonDocument doc;
   doc["e"] = kEventNames[static_cast<size_t>(e)];
+  // Unique id for server-side dedupe of at-least-once delivery: a per-boot
+  // nonce plus an in-session counter, unique across queued events and reboots
+  // without an SD read-modify-write per event. ts alone repeats (1-second
+  // resolution, and 0 whenever the clock was never set).
+  static const uint32_t bootNonce = esp_random();
+  static uint32_t seq = 0;
+  char id[24];
+  snprintf(id, sizeof(id), "%08lx-%lu", static_cast<unsigned long>(bootNonce), static_cast<unsigned long>(++seq));
+  doc["id"] = id;
   // Best-effort unix time: 0 when the clock was never set (no RTC, no NTP yet).
   doc["ts"] = static_cast<long long>(time(nullptr));
   JsonObject varsObj = doc["vars"].to<JsonObject>();
@@ -239,13 +249,15 @@ bool loadDrainManifest(const Subscriber& sub, DrainManifest& out) {
 // object. `config` and `meta` hold pre-built patterns ("{cfg.KEY}" /
 // "{meta.KEY}") so the keys are not re-concatenated for every template.
 std::string drainSubstituted(std::string tpl, const std::string& token, const pluginhttp::Headers& config,
-                             const pluginhttp::Headers& meta, JsonVariantConst vars, const long long ts) {
+                             const pluginhttp::Headers& meta, JsonVariantConst vars, const long long ts,
+                             const char* id) {
   pluginhttp::substituteAll(tpl, "{token}", token);
   for (const auto& kv : config) pluginhttp::substituteAll(tpl, kv.first.c_str(), kv.second);
   for (const auto& kv : meta) pluginhttp::substituteAll(tpl, kv.first.c_str(), kv.second);
   char tsBuf[16];
   snprintf(tsBuf, sizeof(tsBuf), "%lld", ts);
   pluginhttp::substituteAll(tpl, "{event.ts}", tsBuf);
+  pluginhttp::substituteAll(tpl, "{event.id}", id);
   for (JsonPairConst kv : vars.as<JsonObjectConst>()) {
     pluginhttp::substituteAll(tpl, (std::string("{event.") + kv.key().c_str() + "}").c_str(),
                               pluginhttp::variantToString(kv.value()));
@@ -274,6 +286,8 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
 
   JsonVariantConst vars = doc["vars"];
   const long long ts = doc["ts"] | 0LL;
+  // Lines queued by pre-id firmware substitute {event.id} as empty.
+  const char* id = doc["id"] | "";
 
   // Book-scoped events expose the book's plugin sidecar ("<book>.meta.json",
   // flat fields written at download time) as {meta.*} variables, e.g. a
@@ -289,10 +303,10 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
     pluginhttp::Headers headers;
     headers.reserve(handler->req.headers.size());
     for (const auto& h : handler->req.headers) {
-      headers.emplace_back(h.first, drainSubstituted(h.second, tok, config, meta, vars, ts));
+      headers.emplace_back(h.first, drainSubstituted(h.second, tok, config, meta, vars, ts, id));
     }
     if (handler->isDownload()) {
-      const std::string dest = drainSubstituted(handler->dest, tok, config, meta, vars, ts);
+      const std::string dest = drainSubstituted(handler->dest, tok, config, meta, vars, ts, id);
       // Substituted fields must not climb out of the tree (same guard as the
       // catalog sidecar writer).
       if (dest.empty() || dest[0] != '/' || dest.find("..") != std::string::npos) {
@@ -305,8 +319,9 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
       // 404/500 error body can never replace an existing dest (e.g. /sleep.bmp).
       const std::string tmp = dest + ".part";
       const int st = pluginhttp::requestToFile(
-          nullptr, drainSubstituted(handler->req.url, tok, config, meta, vars, ts), handler->req.method,
-          drainSubstituted(handler->req.body, tok, config, meta, vars, ts), headers, tmp.c_str(), MAX_EVENT_DOWNLOAD);
+          nullptr, drainSubstituted(handler->req.url, tok, config, meta, vars, ts, id), handler->req.method,
+          drainSubstituted(handler->req.body, tok, config, meta, vars, ts, id), headers, tmp.c_str(),
+          MAX_EVENT_DOWNLOAD);
       if (st >= 200 && st < 300) {
         Storage.remove(dest.c_str());  // rename won't overwrite an existing file
         if (!Storage.rename(tmp.c_str(), dest.c_str())) Storage.remove(tmp.c_str());
@@ -316,18 +331,18 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
       return st;
     }
     String response;
-    return pluginhttp::request(nullptr, drainSubstituted(handler->req.url, tok, config, meta, vars, ts),
-                               handler->req.method, drainSubstituted(handler->req.body, tok, config, meta, vars, ts),
-                               headers, response, MAX_EVENT_RESPONSE);
+    return pluginhttp::request(
+        nullptr, drainSubstituted(handler->req.url, tok, config, meta, vars, ts, id), handler->req.method,
+        drainSubstituted(handler->req.body, tok, config, meta, vars, ts, id), headers, response, MAX_EVENT_RESPONSE);
   };
 
   int status = run(token);
   // A password-grant token expires; on 401/403 mint a fresh one and retry once.
   if ((status == 401 || status == 403) && mf.hasPasswordGrant()) {
     std::string minted;
-    if (pluginhttp::mintPasswordToken(nullptr, drainSubstituted(mf.authReq.url, token, config, meta, vars, ts),
+    if (pluginhttp::mintPasswordToken(nullptr, drainSubstituted(mf.authReq.url, token, config, meta, vars, ts, id),
                                       mf.authReq.method,
-                                      drainSubstituted(mf.authReq.body, token, config, meta, vars, ts),
+                                      drainSubstituted(mf.authReq.body, token, config, meta, vars, ts, id),
                                       mf.authReq.headers, mf.authTokenPath, minted)) {
       pluginhttp::saveTokenToFile(mf.tokenFile, mf.tokenPath, minted);
       token = minted;
@@ -337,7 +352,7 @@ bool deliverLine(const DrainManifest& mf, const std::string& lineText, std::stri
   if (status < 200 || status >= 300) return false;
 
   if (renderer && !handler->toast.empty()) {
-    GUI.drawPopup(*renderer, drainSubstituted(handler->toast, token, config, meta, vars, ts).c_str());
+    GUI.drawPopup(*renderer, drainSubstituted(handler->toast, token, config, meta, vars, ts, id).c_str());
   }
   return true;
 }

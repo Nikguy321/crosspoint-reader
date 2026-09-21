@@ -22,8 +22,10 @@ Plugin event handlers need the network, and most events fire with WiFi down
 plugin's outbox (`<plugin dir>/events.jsonl`) — an SD append, nothing more —
 and the queue is drained through the declared requests whenever the device is
 already online: when the File Transfer web server comes up in Join Network
-mode, or on the way into sleep. Delivery is at-least-once and in order; dedupe
-on `ts` server-side if it matters.
+mode, or on the way into sleep. Delivery is at-least-once and in order; every
+queued line carries a unique `id` (a per-boot nonce plus a counter, so it never
+repeats across queued events or reboots) — dedupe on `{event.id}` server-side
+if it matters.
 
 `sleep.enter` gets special timing: it exists to act before the chip powers
 down (a fresh sleep image, a pre-sleep progress push), so the sleep path
@@ -170,6 +172,7 @@ Templates in `url`, `headers`, `body`, `dest`, and `toast` substitute:
 | `{cfg.KEY}`    | The plugin's flat config file (`config` section)                 |
 | `{event.NAME}` | The event's variables (see the whitelist table)                  |
 | `{event.ts}`   | Unix time when the event fired; 0 if the clock was never set     |
+| `{event.id}`   | Unique event id, stable across delivery retries (dedupe key)     |
 | `{meta.KEY}`   | The book's metadata sidecar, for events that carry a `book`      |
 
 Unmatched variables substitute as nothing was replaced (the literal `{...}`
