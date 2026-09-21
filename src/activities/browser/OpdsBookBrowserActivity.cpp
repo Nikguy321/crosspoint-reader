@@ -1097,12 +1097,18 @@ void OpdsBookBrowserActivity::onClientStatus(void* ctx, const freeink::opds::Cli
   self->requestUpdate(true);
 }
 
-void OpdsBookBrowserActivity::persistTokens() {
+bool OpdsBookBrowserActivity::persistTokens() {
   OpdsTokens tokens;
   tokens.accessToken = opdsClient.accessToken();
   tokens.refreshToken = opdsClient.refreshToken();
   tokens.refreshUrl = opdsClient.refreshUrl();
-  OPDS_TOKENS.put(tokenKey(), tokens);
+  const bool persisted = OPDS_TOKENS.put(tokenKey(), tokens);
+  if (!persisted) {
+    // Best-effort cache: on failure the reader just re-authenticates next
+    // session. Report it so the caller can detect it, rather than swallowing it.
+    LOG_ERR("OPDS", "Failed to persist OPDS tokens for %s", server.url.c_str());
+  }
+  return persisted;
 }
 
 // Resolves the search template lazily: OPDS 1.x servers such as calibre-web,

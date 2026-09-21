@@ -158,7 +158,8 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // Client status hook: reflect the login phase in the status line.
   static void onClientStatus(void* ctx, freeink::opds::ClientPhase phase);
   // Persist the client's current token state (or clear it) for this server.
-  void persistTokens();
+  // Returns false (and logs) if the SD write failed, so callers can detect it.
+  bool persistTokens();
   // Token-store key: URL plus username, so two accounts on the same server
   // keep separate tokens. \x1f (unit separator) can't appear in either field.
   std::string tokenKey() const { return server.url + '\x1f' + server.username; }
