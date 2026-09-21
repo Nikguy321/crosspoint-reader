@@ -1,4 +1,5 @@
 #pragma once
+#include <OpdsClient.h>
 #include <OpdsEntry.h>
 #include <OpdsPublicationDoc.h>
 
@@ -9,6 +10,7 @@
 #include "OpdsServerStore.h"
 #include "activities/Activity.h"
 #include "components/UiAppHost.h"
+#include "network/OpdsHttpTransport.h"
 #include "util/ButtonNavigator.h"
 
 /**
@@ -60,12 +62,21 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   std::string feedTitle;
   void setSearchQuery(const std::string& query);
   // Publication detail page (DETAIL state): the parsed self-document, the book
-  // to acquire, and the scrollable info rows built from it.
+  // to acquire, and the availability/metadata lines the publication-page
+  // component renders (owned here so its borrowed const char* stay valid).
   OpdsPublication currentPublication;
   OpdsEntry detailBook;
-  std::vector<std::string> detailStrings;  // owns the strings detailRows point to
-  std::vector<freeink::ui::ListItem> detailRows;
-  freeink::ui::ListNav detailNav;
+  std::string detailStatus;    // availability status ("Available", "On hold"...)
+  std::string detailCopies;    // "N of M copies available"
+  std::string detailHolds;     // holds total or the reader's queue position
+  std::string detailMetadata;  // publisher / price, when present
+  // Book cover for the detail page: downloaded to an SD temp in
+  // openPublicationDetail, its rect captured by detailCoverPainter during
+  // layout, then decoded into the framebuffer at the end of render() (kept off
+  // the deep component call chain).
+  std::string detailCoverPath;
+  bool detailCoverReady = false;
+  freeink::ui::Rect detailCoverRect{};
   // Raw search URL template ({searchTerms} or RFC 6570 {?query} style),
   // either inlined in the feed or fetched from an OpenSearch description.
   std::string searchTemplate;
@@ -75,22 +86,6 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   // Base URL the template is relative to: the OpenSearch description URL, or
   // empty when the template came from the feed itself (resolve against feed).
   std::string searchTemplateBase;
-  // OAuth access token obtained via the OPDS authentication document's
-  // password-grant flow; sent as "Authorization: Bearer" when non-empty.
-  // Loaded from OpdsTokenStore on entry and persisted back when it changes.
-  std::string bearerToken;
-  // OAuth refresh token and its endpoint (password grant only; implicit grant
-  // issues none). Used to renew an expired access token without a full login.
-  std::string refreshToken;
-  std::string tokenRefreshUrl;
-  // Send HTTP Basic auth from the stored credentials. Latched only after a
-  // 401 whose auth document offers Basic (or a bare Basic challenge): sending
-  // Basic preemptively breaks OAuth-only servers, which reject an unknown
-  // Basic header with 401 even on public resources.
-  bool useBasicAuth = false;
-  // Set by authenticateWithServer(): the server demands login but the entry
-  // has no stored credentials (distinct error message).
-  bool credentialsMissing = false;
   int selectorIndex = 0;
   std::string errorMessage;
   std::string statusMessage;
@@ -98,6 +93,13 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   size_t downloadTotal = 0;
 
   OpdsServer server;  // Copied at construction — safe even if the store changes during browsing
+
+  // All OPDS network orchestration (feed fetch, 401 auth, token refresh,
+  // indirect acquisition, OpenSearch, publication docs) lives in the SDK
+  // client; this activity only builds UI and drives file I/O. The transport
+  // must outlive the client, so it is declared first.
+  OpdsHttpTransport opdsTransport;
+  freeink::opds::OpdsClient opdsClient{opdsTransport};
 
   // Viewport memory (top/visibleRows) for the browsing list; `selected` is
   // mirrored from selectorIndex at build/move time.
@@ -139,14 +141,23 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   void downloadBook(const OpdsEntry& book);
   void openPublicationDetail(const OpdsEntry& entry);
   void buildDetailScreen(UiScreen& screen);
-  void rebuildDetailRows();
+  void rebuildDetailInfo();
+  // Download the publication's cover art to an SD temp for the detail page.
+  void loadDetailCover(const std::string& docUrl);
+  // Cover painter passed to the publication component: records the cover rect
+  // (the actual decode runs at the end of render(), not in this deep call).
+  static bool detailCoverPainter(freeink::ui::DrawTarget& target, freeink::ui::Rect rect,
+                                 const freeink::ui::PublicationHeaderProps& props, void* user);
+  // Label for the detail-page acquire button (and its button hint): Buy for a
+  // purchase, Place Hold for a borrowable title with no copies available,
+  // otherwise Borrow (library loan) or Download (direct file).
+  const char* acquireLabel() const;
   static void onDetailEvent(const freeink::ui::ActionEvent& event, void* user);
   bool hasSearch() const { return !searchTemplate.empty() || !searchDescriptionUrl.empty(); }
   bool ensureSearchTemplate();
-  bool authenticateWithServer(const std::string& resourceUrl);
-  // Renew the access token from the refresh token; true on success.
-  bool tryRefreshToken();
-  // Persist the current token state (or clear it) for this server on SD.
+  // Client status hook: reflect the login phase in the status line.
+  static void onClientStatus(void* ctx, freeink::opds::ClientPhase phase);
+  // Persist the client's current token state (or clear it) for this server.
   void persistTokens();
   // Token-store key: URL plus username, so two accounts on the same server
   // keep separate tokens. \x1f (unit separator) can't appear in either field.

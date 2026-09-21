@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "StreamingJsonParser.h"
+#include <StreamingJsonParser.h>
 
 class ReleaseJsonParser {
  public:

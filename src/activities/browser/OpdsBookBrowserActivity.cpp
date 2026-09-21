@@ -1,17 +1,16 @@
 #include "OpdsBookBrowserActivity.h"
 
 #include <Arduino.h>
+#include <Epub/converters/ImageDecoderFactory.h>
 #include <FontCacheManager.h>
 #include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
-#include <OpdsAuthDoc.h>
 #include <OpdsFeedParser.h>
 #include <OpdsPublicationDoc.h>
 #include <OpdsSearchTemplate.h>
-#include <OpenSearchDescParser.h>
 #include <WiFi.h>
 
 #include <iterator>
@@ -28,7 +27,6 @@
 #include "components/icons/search32.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
-#include "network/OpdsImplicitAuth.h"
 #include "util/BookCacheUtils.h"
 #include "util/OpdsFilename.h"
 #include "util/StringUtils.h"
@@ -49,8 +47,6 @@ constexpr int16_t PAGE_NEXT = 2;
 constexpr int16_t PAGE_LAST = 3;
 constexpr int DOWNLOAD_PROGRESS_STEP_PERCENT = 5;
 constexpr unsigned long DOWNLOAD_PROGRESS_MIN_UPDATE_MS = 5000;
-// OPDS authentication documents are small; cap the 401-body capture.
-constexpr size_t MAX_AUTH_DOC_BYTES = 8192;
 
 // Accept-Language from the reader's UI language, so servers that localize the
 // catalog (e.g. Lirtuel) return it translated. Primary subtag plus an English
@@ -83,14 +79,17 @@ void OpdsBookBrowserActivity::onEnter() {
   searchTemplate = "";
   searchDescriptionUrl = "";
   searchTemplateBase = "";
-  // Reuse a persisted access token; only re-authenticate when it 401s.
+  // Configure the OPDS client for this server, restore any persisted token, and
+  // reset the per-session auth latches. Accept-Language localizes the catalog
+  // (both request header and language-map title resolution).
+  opdsClient.setServer(server.url, server.username, server.password);
   {
     const OpdsTokens t = OPDS_TOKENS.get(tokenKey());
-    bearerToken = t.accessToken;
-    refreshToken = t.refreshToken;
-    tokenRefreshUrl = t.refreshUrl;
+    opdsClient.setTokens(t.accessToken, t.refreshToken, t.refreshUrl);
   }
-  useBasicAuth = false;
+  opdsClient.resetAuthState();
+  opdsClient.setAcceptLanguage(uiAcceptLanguage());
+  opdsClient.onStatus(&OpdsBookBrowserActivity::onClientStatus, this);
   currentPath = "";
   searchQuery.clear();
   headerSearchTitle.clear();
@@ -121,6 +120,11 @@ void OpdsBookBrowserActivity::onExit() {
   Activity::onExit();
   entries.clear();
   navigationHistory.clear();
+  if (!detailCoverPath.empty()) {
+    if (Storage.exists(detailCoverPath.c_str())) Storage.remove(detailCoverPath.c_str());
+    detailCoverPath.clear();
+  }
+  detailCoverReady = false;
 
   if (WiFi.getMode() != WIFI_MODE_NULL) {
     WiFi.disconnect(false);
@@ -242,29 +246,13 @@ void OpdsBookBrowserActivity::loop() {
       downloadBook(detailBook);
       return;
     }
+    // The publication page composes to fit (long descriptions are truncated by
+    // priority), so there is nothing to scroll; only the acquire button routes.
     const auto route = routeTouch(mappedInput);
     if (route.routed) {
       if (app.invalidated()) requestUpdate();
       if (route) return;  // dispatched to onDetailEvent (the action button)
       if (state != BrowserState::DETAIL) return;
-    }
-    if (!detailRows.empty()) {
-      const auto swipe = mappedInput.wasSwipe();
-      if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
-        detailNav.requestScroll(swipe == MappedInputManager::SwipeDir::Up ? detailNav.inputPageRows()
-                                                                          : -detailNav.inputPageRows());
-        requestUpdate();
-        return;
-      }
-      // Side buttons page the info list.
-      buttonNavigator.onNextRelease([this] {
-        detailNav.requestScroll(detailNav.inputPageRows());
-        requestUpdate();
-      });
-      buttonNavigator.onPreviousRelease([this] {
-        detailNav.requestScroll(-detailNav.inputPageRows());
-        requestUpdate();
-      });
     }
     return;
   }
@@ -542,10 +530,7 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
       break;
     }
     case BrowserState::DETAIL: {
-      const char* actionLabel = detailBook.purchase   ? tr(STR_OPDS_BUY)
-                                : detailBook.indirect ? tr(STR_OPDS_BORROW)
-                                                      : tr(STR_DOWNLOAD);
-      labels = mappedInput.mapLabels(tr(STR_BACK), actionLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
+      labels = mappedInput.mapLabels(tr(STR_BACK), acquireLabel(), "", "");
       break;
     }
     case BrowserState::DOWNLOADING:
@@ -561,6 +546,15 @@ void OpdsBookBrowserActivity::render(RenderLock&&) {
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderUi();
+  // Decode the book cover into the rect the layout reserved. Done here, at the
+  // top of the render task, rather than inside the component call chain, so the
+  // JPEG decoder's stack cost doesn't stack on the deep FreeInkUI compose path.
+  if (state == BrowserState::DETAIL && detailCoverReady && detailCoverRect.width > 0 && detailCoverRect.height > 0) {
+    if (ImageToFramebufferDecoder* decoder = ImageDecoderFactory::getDecoder(detailCoverPath)) {
+      RenderConfig cfg{detailCoverRect.x, detailCoverRect.y, detailCoverRect.width, detailCoverRect.height};
+      decoder->decodeToFramebuffer(detailCoverPath, renderer, cfg);
+    }
+  }
   renderer.displayBuffer();
 }
 
@@ -572,80 +566,30 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
     return;
   }
 
-  std::string url = UrlUtils::buildUrl(server.url, path);
-  LOG_DBG("OPDS", "Fetching: %s", url.c_str());
+  const std::string url = UrlUtils::buildUrl(server.url, path);
   OpdsFeedParser parser;
-  for (int authAttempt = 0;; ++authAttempt) {
-    int status = 0;
-    HttpDownloader::FetchOptions options;
-    if (useBasicAuth) {
-      options.username = server.username;
-      options.password = server.password;
+  const auto status = opdsClient.fetchFeed(url, parser);
+  // The token state may have changed (renewed, or cleared on failure); persist
+  // only when an auth handshake actually ran.
+  if (opdsClient.tokensDirty()) persistTokens();
+  if (status != freeink::opds::OpdsClient::FetchStatus::Ok) {
+    state = BrowserState::ERROR;
+    switch (status) {
+      case freeink::opds::OpdsClient::FetchStatus::CredentialsMissing:
+        errorMessage = tr(STR_SET_CREDENTIALS_FIRST);
+        break;
+      case freeink::opds::OpdsClient::FetchStatus::AuthFailed:
+        errorMessage = tr(STR_OPDS_AUTH_FAILED);
+        break;
+      case freeink::opds::OpdsClient::FetchStatus::ParseFailed:
+        errorMessage = tr(STR_PARSE_FEED_FAILED);
+        break;
+      default:
+        errorMessage = tr(STR_FETCH_FEED_FAILED);
+        break;
     }
-    options.bearer = bearerToken;
-    // Prefer OPDS 2.0 JSON from servers that content-negotiate (e.g.
-    // Mayberry); Atom-only servers ignore this and serve their usual feed.
-    options.accept = "application/opds+json,application/atom+xml;q=0.9,*/*;q=0.8";
-    options.acceptLanguage = uiAcceptLanguage();
-    options.statusOut = &status;
-    const bool fetched = HttpDownloader::fetchUrl(
-        url,
-        [&parser](const uint8_t* data, const size_t len) {
-          parser.write(data, len);
-          return !parser.error();  // abort the transfer on a parse error
-        },
-        options);
-    parser.flush();
-
-    if (!fetched && status == 401) {
-      // The 401 body is an authentication document describing the server's
-      // flows. First try to renew an expired access token with the refresh
-      // token (cheap); fall back to a full login (which can take several
-      // seconds of TLS handshakes across the catalog and its SSO).
-      credentialsMissing = false;
-      statusMessage = tr(STR_OPDS_SIGNING_IN);
-      requestUpdate(true);
-      bool advanced = false;
-      if (authAttempt == 0 && !refreshToken.empty() && !tokenRefreshUrl.empty()) {
-        if (tryRefreshToken()) {
-          advanced = true;
-        } else {
-          refreshToken.clear();  // dead refresh token; drop it and log in fresh
-          tokenRefreshUrl.clear();
-        }
-      }
-      if (!advanced && authAttempt < 2) {
-        bearerToken.clear();
-        useBasicAuth = false;
-        advanced = authenticateWithServer(url);
-      }
-      if (advanced) {
-        persistTokens();
-        parser.reset();  // drop any finalized backend before the retry
-        statusMessage = tr(STR_LOADING);
-        requestUpdate(true);
-        continue;
-      }
-      // Login failed: the stored token (if any) is worthless now.
-      persistTokens();
-      state = BrowserState::ERROR;
-      errorMessage = credentialsMissing ? tr(STR_SET_CREDENTIALS_FIRST) : tr(STR_OPDS_AUTH_FAILED);
-      requestUpdate();
-      return;
-    }
-    if (parser.error()) {
-      state = BrowserState::ERROR;
-      errorMessage = tr(STR_PARSE_FEED_FAILED);
-      requestUpdate();
-      return;
-    }
-    if (!fetched) {
-      state = BrowserState::ERROR;
-      errorMessage = tr(STR_FETCH_FEED_FAILED);
-      requestUpdate();
-      return;
-    }
-    break;
+    requestUpdate();
+    return;
   }
 
   searchTemplate = parser.getSearchTemplate();
@@ -797,38 +741,19 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
   std::string downloadUrl = UrlUtils::buildUrl(feedUrl, book.href);
 
   // Indirect acquisition (OPDS 2.0 5.3): the link points at a publication
-  // document, not the EPUB. Fetch it and follow to the real download link.
-  // Library loans behind this are usually LCP-encrypted, which the reader
-  // can't open; the post-download EPUB check reports that cleanly.
+  // document, not the EPUB. The client fetches it and resolves the real
+  // download link. Library loans behind this are usually LCP-encrypted, which
+  // the reader can't open; the post-download EPUB check reports that cleanly.
   if (book.indirect) {
-    std::string doc;
-    doc.reserve(4096);
-    HttpDownloader::FetchOptions options;
-    if (useBasicAuth) {
-      options.username = server.username;
-      options.password = server.password;
-    }
-    options.bearer = bearerToken;
-    const bool fetched = HttpDownloader::fetchUrl(
-        downloadUrl,
-        [&doc](const uint8_t* data, const size_t len) {
-          constexpr size_t MAX_PUB_DOC = 16 * 1024;
-          const size_t room = doc.size() < MAX_PUB_DOC ? MAX_PUB_DOC - doc.size() : 0;
-          doc.append(reinterpret_cast<const char*>(data), len < room ? len : room);
-          return true;
-        },
-        options);
     std::string resolved;
     bool resolvedEpub = false;
-    if (!fetched || !resolveOpdsIndirectAcquisition(doc.data(), doc.size(), resolved, resolvedEpub)) {
-      LOG_ERR("OPDS", "Could not resolve indirect acquisition");
+    if (!opdsClient.resolveIndirect(downloadUrl, resolved, resolvedEpub)) {
       state = BrowserState::ERROR;
       errorMessage = tr(STR_OPDS_NOT_A_BOOK);
       requestUpdate();
       return;
     }
-    downloadUrl = UrlUtils::buildUrl(downloadUrl, resolved);
-    LOG_DBG("OPDS", "Resolved indirect acquisition -> %s (epub=%d)", downloadUrl.c_str(), resolvedEpub);
+    downloadUrl = resolved;
   }
   // opdsDownloadFolder is already a null-terminated char[64]; use it directly —
   // no std::string copy. exists()/mkdir() take const char*.
@@ -876,6 +801,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
 
   int lastRenderedPercent = -1;
   unsigned long lastProgressUpdateMs = 0;
+  const freeink::opds::HttpAuth dlAuth = opdsClient.downloadAuth();
   const auto result = HttpDownloader::downloadToFile(
       downloadUrl, filename,
       [this, &lastRenderedPercent, &lastProgressUpdateMs](const size_t downloaded, const size_t total) {
@@ -902,8 +828,7 @@ void OpdsBookBrowserActivity::downloadBook(const OpdsEntry& book) {
           requestUpdate(true);
         }
       },
-      &cancelDownload, useBasicAuth ? server.username : std::string(), useBasicAuth ? server.password : std::string(),
-      false, bearerToken);
+      &cancelDownload, dlAuth.username, dlAuth.password, false, dlAuth.bearer);
 
   if (result == HttpDownloader::OK) {
     // A purchase link (or any misbehaving endpoint) can answer 200 with an
@@ -965,7 +890,6 @@ void OpdsBookBrowserActivity::onDetailEvent(const fui::ActionEvent&, void* user)
 void OpdsBookBrowserActivity::openPublicationDetail(const OpdsEntry& entry) {
   detailBook = entry;
   currentPublication = OpdsPublication{};
-  detailNav.reset();
 
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   const bool haveSelf = !entry.selfHref.empty();
@@ -979,26 +903,7 @@ void OpdsBookBrowserActivity::openPublicationDetail(const OpdsEntry& entry) {
   if (auto* fcm = renderer.getFontCacheManager()) fcm->releaseSdFontCaches();
 
   if (haveSelf) {
-    std::string doc;
-    doc.reserve(4096);
-    HttpDownloader::FetchOptions options;
-    if (useBasicAuth) {
-      options.username = server.username;
-      options.password = server.password;
-    }
-    options.bearer = bearerToken;
-    options.accept = "application/opds-publication+json,application/opds+json";
-    options.acceptLanguage = uiAcceptLanguage();
-    HttpDownloader::fetchUrl(
-        docUrl,
-        [&doc](const uint8_t* data, const size_t len) {
-          constexpr size_t MAX_PUB_DOC = 16 * 1024;
-          const size_t room = doc.size() < MAX_PUB_DOC ? MAX_PUB_DOC - doc.size() : 0;
-          doc.append(reinterpret_cast<const char*>(data), len < room ? len : room);
-          return true;
-        },
-        options);
-    parseOpdsPublicationDoc(doc.data(), doc.size(), currentPublication);
+    opdsClient.fetchPublication(docUrl, currentPublication);
   }
 
   if (!currentPublication.valid) {
@@ -1022,30 +927,72 @@ void OpdsBookBrowserActivity::openPublicationDetail(const OpdsEntry& entry) {
     detailBook.purchase = currentPublication.purchase;
   }
 
-  rebuildDetailRows();
+  // Fetch the cover art (best-effort) while entries and font caches are still
+  // released, so the TLS transfer has maximum heap. Resolved against the
+  // document the cover href came from.
+  loadDetailCover(haveSelf ? docUrl : feedUrl);
+
+  rebuildDetailInfo();
   state = BrowserState::DETAIL;
   requestUpdate();
 }
 
-// Builds the scrollable info rows from the parsed publication. detailStrings
-// owns the formatted text; detailRows point into it, so reserve enough to
-// avoid a reallocation that would dangle those pointers.
-void OpdsBookBrowserActivity::rebuildDetailRows() {
-  detailStrings.clear();
-  detailRows.clear();
-  detailStrings.reserve(16);
-  const auto addRow = [this](std::string text) {
-    detailStrings.push_back(std::move(text));
-    fui::ListItem item;
-    item.label = detailStrings.back().c_str();
-    detailRows.push_back(item);
-  };
-
-  if (!currentPublication.author.empty()) {
-    char buf[192];
-    snprintf(buf, sizeof(buf), tr(STR_OPDS_BY_AUTHOR), currentPublication.author.c_str());
-    addRow(buf);
+// Downloads the publication's cover art to an SD temp file for the detail page.
+// A cover is optional chrome: any failure just leaves the placeholder, never
+// blocks the page.
+void OpdsBookBrowserActivity::loadDetailCover(const std::string& docUrl) {
+  detailCoverReady = false;
+  detailCoverRect = fui::Rect{};
+  if (!detailCoverPath.empty()) {
+    if (Storage.exists(detailCoverPath.c_str())) Storage.remove(detailCoverPath.c_str());
+    detailCoverPath.clear();
   }
+  if (currentPublication.coverHref.empty()) return;
+
+  const std::string url = UrlUtils::buildUrl(docUrl, currentPublication.coverHref);
+  // The decoder factory picks JPEG vs PNG by file extension; name the temp to
+  // match. Default to JPEG (the common case, and content-negotiated URLs with
+  // no extension).
+  std::string lower;
+  lower.reserve(url.size());
+  for (const char c : url) lower += static_cast<char>((c >= 'A' && c <= 'Z') ? c + 32 : c);
+  const bool isPng = lower.find(".png") != std::string::npos;
+  std::string tmp = "/.crosspoint/opds_cover";
+  tmp += isPng ? ".png" : ".jpg";
+
+  if (ESP.getFreeHeap() < HttpDownloader::MIN_TLS_FREE_HEAP) {
+    LOG_INF("OPDS", "Skipping cover: low heap");
+    return;
+  }
+  const freeink::opds::HttpAuth auth = opdsClient.downloadAuth();
+  const auto result =
+      HttpDownloader::downloadToFile(url, tmp, nullptr, nullptr, auth.username, auth.password, false, auth.bearer);
+  if (result != HttpDownloader::OK) {
+    LOG_ERR("OPDS", "Cover download failed: %d", static_cast<int>(result));
+    if (Storage.exists(tmp.c_str())) Storage.remove(tmp.c_str());
+    return;
+  }
+  detailCoverPath = std::move(tmp);
+  detailCoverReady = true;
+}
+
+bool OpdsBookBrowserActivity::detailCoverPainter(fui::DrawTarget&, fui::Rect rect, const fui::PublicationHeaderProps&,
+                                                 void* user) {
+  auto* self = static_cast<OpdsBookBrowserActivity*>(user);
+  // Record the rect only; the decode runs at the end of render() to keep the
+  // JPEG decoder off this deep component call chain.
+  self->detailCoverRect = rect;
+  return true;
+}
+
+// Formats the availability and metadata lines the publication-page component
+// draws. Owned by the activity so the component's borrowed const char* stay
+// valid across repaints; rebuilt once per opened publication.
+void OpdsBookBrowserActivity::rebuildDetailInfo() {
+  detailStatus.clear();
+  detailCopies.clear();
+  detailHolds.clear();
+  detailMetadata.clear();
 
   const OpdsAvailability& av = currentPublication.availability;
   if (av.present()) {
@@ -1054,59 +1001,76 @@ void OpdsBookBrowserActivity::rebuildDetailRows() {
                            : av.state == "reserved"    ? tr(STR_OPDS_RESERVED)
                            : av.state == "unavailable" ? tr(STR_OPDS_UNAVAILABLE)
                                                        : nullptr;
-    if (stateStr) addRow(stateStr);
+    if (stateStr) detailStatus = stateStr;
     if (av.copiesTotal >= 0) {
       char b[64];
       snprintf(b, sizeof(b), tr(STR_OPDS_COPIES), av.copiesAvailable < 0 ? 0 : av.copiesAvailable, av.copiesTotal);
-      addRow(b);
+      detailCopies = b;
     }
-    if (av.holdsTotal >= 0) {
-      char b[48];
-      snprintf(b, sizeof(b), tr(STR_OPDS_HOLDS), av.holdsTotal);
-      addRow(b);
-    }
+    // The reader's own queue position is more useful than the raw holds count.
     if (av.holdsPosition >= 0) {
       char b[48];
       snprintf(b, sizeof(b), tr(STR_OPDS_HOLD_POSITION), av.holdsPosition);
-      addRow(b);
+      detailHolds = b;
+    } else if (av.holdsTotal >= 0) {
+      char b[48];
+      snprintf(b, sizeof(b), tr(STR_OPDS_HOLDS), av.holdsTotal);
+      detailHolds = b;
     }
   }
 
-  if (!currentPublication.purchase && !currentPublication.price.empty()) addRow(currentPublication.price);
-  if (!currentPublication.publisher.empty()) addRow(currentPublication.publisher);
-  if (!currentPublication.description.empty()) addRow(currentPublication.description);
+  if (!currentPublication.purchase && !currentPublication.price.empty()) {
+    detailMetadata = currentPublication.price;
+  } else if (!currentPublication.publisher.empty()) {
+    detailMetadata = currentPublication.publisher;
+  }
+}
+
+const char* OpdsBookBrowserActivity::acquireLabel() const {
+  if (detailBook.purchase) return tr(STR_OPDS_BUY);
+  if (!detailBook.indirect) return tr(STR_DOWNLOAD);
+  // Borrowable (library loan): offer to place a hold when no copy is free.
+  const OpdsAvailability& av = currentPublication.availability;
+  const bool noCopies = av.state == "unavailable" || (av.copiesAvailable == 0 && av.copiesTotal > 0);
+  return noCopies ? tr(STR_OPDS_PLACE_HOLD) : tr(STR_OPDS_BORROW);
 }
 
 void OpdsBookBrowserActivity::buildDetailScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  // No header: the publication component leads with the book's own title and
+  // cover, so a separate title bar adds nothing. Reserve only the hardware
+  // button-hint band so the acquire button clears it.
   screen.takeBottom(static_cast<int16_t>(metrics.buttonHintsHeight));
-  screen.spacer(static_cast<int16_t>(metrics.topPadding));
-  fui::HeaderProps header;
-  header.title = currentPublication.title.empty() ? tr(STR_OPDS_BROWSER) : currentPublication.title.c_str();
-  header.borderEdges = fui::EdgeBottom;
-  screen.header(header);
-  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
-  // Bottom acquire button (Borrow / Download / Buy).
-  const int16_t btnH = screen.theme().rowHeight;
-  const fui::Rect btnArea = screen.takeBottom(static_cast<int16_t>(btnH + metrics.verticalSpacing));
-  const char* actionLabel = detailBook.purchase   ? tr(STR_OPDS_BUY)
-                            : detailBook.indirect ? tr(STR_OPDS_BORROW)
-                                                  : tr(STR_DOWNLOAD);
-  fui::ButtonProps action;
-  action.label = actionLabel;
-  action.action = ACTION_DETAIL;
-  const int16_t btnW = static_cast<int16_t>(btnArea.width / 2);
-  screen.button(action, fui::Rect{static_cast<int16_t>(btnArea.x + (btnArea.width - btnW) / 2), btnArea.y, btnW, btnH});
+  const auto& theme = screen.theme();
+  const auto asPtr = [](const std::string& s) { return s.empty() ? nullptr : s.c_str(); };
 
-  if (detailRows.empty()) return;
-  fui::ListProps props;
-  props.items = detailRows.data();
-  props.count = static_cast<uint16_t>(detailRows.size());
-  props.inputMask = fui::InputTouch;  // rows are info only; action is NO_ACTION
-  props.partialTrailingRow = true;
-  screen.syncListViewport(detailNav, props, static_cast<int>(detailRows.size()));
-  screen.list(props);
+  fui::PublicationPageProps props;
+  props.book.title = asPtr(currentPublication.title);
+  props.book.author = asPtr(currentPublication.author);
+  // When a cover was downloaded, the painter reserves its rect and render()
+  // decodes into it; otherwise the component draws its typeset placeholder.
+  if (detailCoverReady) {
+    props.book.coverPainter = &OpdsBookBrowserActivity::detailCoverPainter;
+    props.book.coverPainterUserData = this;
+  }
+  props.book.titleText = theme.bodyText;
+  props.book.detailText = theme.bodyText;
+  props.availability.status = asPtr(detailStatus);
+  props.availability.copies = asPtr(detailCopies);
+  props.availability.holds = asPtr(detailHolds);
+  props.availability.headingText = theme.bodyText;
+  props.availability.detailText = theme.bodyText;
+  props.descriptionHeading = tr(STR_OPDS_ABOUT_BOOK);
+  props.description = asPtr(currentPublication.description);
+  props.metadata = asPtr(detailMetadata);
+  props.headingText = theme.bodyText;
+  props.bodyText = theme.bodyText;
+  props.primary.label = acquireLabel();
+  props.primary.action = ACTION_DETAIL;
+  props.actionHeight = theme.rowHeight;
+
+  fui::publicationPage(screen.frame(), screen.body(), props);
 }
 
 void OpdsBookBrowserActivity::launchSearch() {
@@ -1124,130 +1088,20 @@ void OpdsBookBrowserActivity::launchSearch() {
   });
 }
 
-// Authentication for OPDS 1.0: re-request the resource capturing the 401 body
-// (the authentication document), pick a flow the device can drive, and obtain
-// credentials for retrying.
-//  - basic: already sent preemptively when credentials are stored, so landing
-//    here means they are missing or wrong.
-//  - oauth/password: POST the stored credentials to the "authenticate" link
-//    and keep the returned access token as a Bearer header.
-//  - oauth/implicit: needs a browser; cannot be driven from the device.
-bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resourceUrl) {
-  std::string body;
-  body.reserve(1024);
-  int status = 0;
-  HttpDownloader::FetchOptions options;
-  options.statusOut = &status;
-  options.captureErrorBody = true;
-  HttpDownloader::fetchUrl(
-      resourceUrl,
-      [&body](const uint8_t* data, const size_t len) {
-        const size_t room = MAX_AUTH_DOC_BYTES - body.size();
-        body.append(reinterpret_cast<const char*>(data), len < room ? len : room);
-        return true;
-      },
-      options);
-  if (status != 401) return false;  // not an auth challenge
-
-  // An empty 401 body is a bare Basic challenge; a JSON body is an OPDS auth
-  // document. Either way we proceed to pick a flow below.
-  OpdsAuthDoc doc;
-  const bool haveAuthDoc = parseOpdsAuthDocument(body.data(), body.size(), doc);
-  LOG_DBG("OPDS", "Auth flows: doc=%d basic=%d password=%d implicit=%d", haveAuthDoc, doc.hasBasic,
-          doc.hasOauthPassword, doc.hasOauthImplicit);
-  if (server.username.empty() || server.password.empty()) {
-    // Every flow needs the stored credentials; surface the real problem
-    // instead of a generic auth failure.
-    LOG_ERR("OPDS", "Server requires login but no credentials are configured");
-    credentialsMissing = true;
-    return false;
-  }
-
-  if (doc.hasOauthPassword && !doc.tokenUrl.empty() && !server.username.empty() && !server.password.empty()) {
-    const std::string tokenUrl = UrlUtils::buildUrl(resourceUrl, doc.tokenUrl);
-    const std::string form = "grant_type=password&username=" + opdsPercentEncode(server.username) +
-                             "&password=" + opdsPercentEncode(server.password);
-    std::string response;
-    int tokenStatus = 0;
-    if (HttpDownloader::postForm(tokenUrl, form, response, &tokenStatus)) {
-      std::string token;
-      if (extractJsonStringField(response.data(), response.size(), "access_token", token) && !token.empty()) {
-        bearerToken = std::move(token);
-        // Capture a refresh token so the next expiry renews without a full
-        // login. Refresh goes to the auth document's `refresh` link when
-        // present, otherwise back to the token endpoint (RFC 6749 6).
-        refreshToken.clear();
-        extractJsonStringField(response.data(), response.size(), "refresh_token", refreshToken);
-        tokenRefreshUrl = refreshToken.empty()     ? std::string()
-                          : doc.refreshUrl.empty() ? tokenUrl
-                                                   : UrlUtils::buildUrl(resourceUrl, doc.refreshUrl);
-        LOG_INF("OPDS", "OAuth password grant succeeded");
-        return true;
-      }
-    }
-    LOG_ERR("OPDS", "OAuth token request failed (status %d)", tokenStatus);
-    return false;
-  }
-
-  // Implicit grant: the server's login is an HTML form (possibly a federated
-  // SSO on another host). Drive it headlessly with the stored credentials and
-  // capture the opds://authorize callback token.
-  if (doc.hasOauthImplicit && !doc.implicitUrl.empty()) {
-    const std::string implicitUrl = UrlUtils::buildUrl(resourceUrl, doc.implicitUrl);
-    std::string token;
-    if (opdsImplicitAuthenticate(implicitUrl, server.username, server.password, token)) {
-      bearerToken = std::move(token);
-      // Implicit grant issues no refresh token; re-login on expiry.
-      refreshToken.clear();
-      tokenRefreshUrl.clear();
-      LOG_INF("OPDS", "Implicit OAuth login succeeded");
-      return true;
-    }
-    return false;
-  }
-
-  // HTTP Basic: either the auth document offers it, or the 401 wasn't an OPDS
-  // auth document at all (a plain Basic-protected server, e.g. calibre-web).
-  // Latch it so subsequent requests send the credentials.
-  if (doc.hasBasic || !haveAuthDoc) {
-    LOG_INF("OPDS", "Using HTTP Basic authentication");
-    useBasicAuth = true;
-    bearerToken.clear();  // Basic uses stored credentials, not a token
-    refreshToken.clear();
-    tokenRefreshUrl.clear();
-    return true;
-  }
-  return false;
-}
-
-bool OpdsBookBrowserActivity::tryRefreshToken() {
-  const std::string form = "grant_type=refresh_token&refresh_token=" + opdsPercentEncode(refreshToken);
-  std::string response;
-  int tokenStatus = 0;
-  if (!HttpDownloader::postForm(tokenRefreshUrl, form, response, &tokenStatus)) {
-    LOG_ERR("OPDS", "Token refresh failed (status %d)", tokenStatus);
-    return false;
-  }
-  std::string token;
-  if (!extractJsonStringField(response.data(), response.size(), "access_token", token) || token.empty()) {
-    LOG_ERR("OPDS", "Token refresh response had no access_token");
-    return false;
-  }
-  bearerToken = std::move(token);
-  // A rotated refresh token replaces the old one; otherwise keep reusing it.
-  std::string rotated;
-  if (extractJsonStringField(response.data(), response.size(), "refresh_token", rotated) && !rotated.empty()) {
-    refreshToken = std::move(rotated);
-  }
-  LOG_INF("OPDS", "Access token refreshed");
-  return true;
+// Login can take several seconds (TLS handshakes across the catalog and its
+// SSO); reflect the client's phase in the status line so the screen isn't
+// frozen on the previous message.
+void OpdsBookBrowserActivity::onClientStatus(void* ctx, const freeink::opds::ClientPhase phase) {
+  auto* self = static_cast<OpdsBookBrowserActivity*>(ctx);
+  self->statusMessage = phase == freeink::opds::ClientPhase::SigningIn ? tr(STR_OPDS_SIGNING_IN) : tr(STR_LOADING);
+  self->requestUpdate(true);
 }
 
 void OpdsBookBrowserActivity::persistTokens() {
   OpdsTokens tokens;
-  tokens.accessToken = bearerToken;
-  tokens.refreshToken = refreshToken;
-  tokens.refreshUrl = tokenRefreshUrl;
+  tokens.accessToken = opdsClient.accessToken();
+  tokens.refreshToken = opdsClient.refreshToken();
+  tokens.refreshUrl = opdsClient.refreshUrl();
   OPDS_TOKENS.put(tokenKey(), tokens);
 }
 
@@ -1260,27 +1114,9 @@ bool OpdsBookBrowserActivity::ensureSearchTemplate() {
 
   const std::string feedUrl = UrlUtils::buildUrl(server.url, currentPath);
   const std::string descUrl = UrlUtils::buildUrl(feedUrl, searchDescriptionUrl);
-  LOG_DBG("OPDS", "Fetching OpenSearch description: %s", descUrl.c_str());
-  OpenSearchDescParser parser;
-  HttpDownloader::FetchOptions options;
-  if (useBasicAuth) {
-    options.username = server.username;
-    options.password = server.password;
-  }
-  options.bearer = bearerToken;
-  const bool fetched = HttpDownloader::fetchUrl(
-      descUrl,
-      [&parser](const uint8_t* data, const size_t len) {
-        parser.write(data, len);
-        return !parser.error();
-      },
-      options);
-  parser.flush();
-  if (!fetched || parser.error() || parser.getTemplate().empty()) {
-    LOG_ERR("OPDS", "OpenSearch description unusable");
-    return false;
-  }
-  searchTemplate = parser.getTemplate();
+  std::string tmpl;
+  if (!opdsClient.fetchSearchTemplate(descUrl, tmpl)) return false;
+  searchTemplate = std::move(tmpl);
   searchTemplateBase = descUrl;  // relative templates resolve against the description doc
   return true;
 }
