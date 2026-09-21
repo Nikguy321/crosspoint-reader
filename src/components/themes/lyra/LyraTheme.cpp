@@ -58,6 +58,8 @@ const uint8_t* iconForName(UIIcon icon) {
       return HotspotIcon;
     case UIIcon::Bookmark:
       return BookmarkIcon;
+    case UIIcon::Blocks:
+      return BlocksIcon;
     default:
       return nullptr;
   }

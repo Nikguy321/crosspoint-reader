@@ -44,7 +44,9 @@ class CatalogActivity : public UiListActivity {
   virtual void downloadFinished(bool cancelled) = 0;
 
   bool handleCustomInput() override;
-  bool preventAutoSleep() override { return true; }
+  // Idle screens (browsing a fetched feed, a settled error) may auto-sleep;
+  // anything with a connection, transfer, or child flow in progress must not.
+  bool preventAutoSleep() override { return state != State::BROWSING && state != State::ERROR; }
   static bool wifiConnected();
   void fail(StrId message);
   void beginLoading();
