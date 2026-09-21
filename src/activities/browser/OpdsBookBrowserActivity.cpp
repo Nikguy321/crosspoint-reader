@@ -14,6 +14,8 @@
 #include <OpenSearchDescParser.h>
 #include <WiFi.h>
 
+#include <iterator>
+
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "SilentRestart.h"
@@ -586,9 +588,7 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
   entries.reserve(entries.size() + facetRows.size());
   // Facet groups (sort orders, filters) come after the catalog content, each
   // under its own section heading.
-  for (auto& facet : facetRows) {
-    entries.push_back(std::move(facet));
-  }
+  entries.insert(entries.end(), std::make_move_iterator(facetRows.begin()), std::make_move_iterator(facetRows.end()));
 
   // Standard OPDS user collections (loans, reading list, history), advertised
   // as feed-level links, become navigation rows under a "My Account" heading
