@@ -116,7 +116,10 @@ bool resolveOpdsIndirectAcquisition(const char* json, const size_t len, std::str
                           nullptr, &onObjectStart, &onObjectEnd, &onArrayStart, &onArrayEnd};
   StreamingJsonParser parser(callbacks);
   parser.feed(json, len);
-  if (parser.hasError()) return false;
+  // Reject a truncated document: every container the parser opened must have
+  // closed (depth back to 0, no link object or links array still open), or a
+  // partial response could yield a half-read acquisition link.
+  if (parser.hasError() || ctx.depth != 0 || ctx.linkObjectDepth != 0 || ctx.inLinksArray) return false;
   outIsEpub = ctx.bestIsEpub;
   return !outHref.empty();
 }
