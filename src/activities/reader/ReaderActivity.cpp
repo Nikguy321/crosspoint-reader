@@ -229,7 +229,7 @@ void ReaderActivity::loop() {
   } else {
     if (skip) {
       const bool succeeded = skipPages(10);
-      notePageTurn(false, succeeded);
+      notePageTurn(true, succeeded);
     } else {
       const bool succeeded = pageTurn(true);
       notePageTurn(true, succeeded);

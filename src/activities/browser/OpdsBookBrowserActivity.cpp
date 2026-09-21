@@ -63,7 +63,7 @@ void OpdsBookBrowserActivity::buildBrowsingScreen(UiScreen& screen) {
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
   props.valueInset = 8;               // air between the nav chevron and the row edge
-  syncListViewport(screen, props, /*hasSubtitle=*/true);
+  syncListViewport(screen, props);
   screen.list(props);
 }
 
