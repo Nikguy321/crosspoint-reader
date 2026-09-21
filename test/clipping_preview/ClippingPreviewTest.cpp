@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <string>
 
@@ -19,30 +20,40 @@ struct Reader {
     return static_cast<int>(count);
   }
 };
+struct PreviewOutput {
+  std::array<char, clippingPreview::BUFFER_BYTES> buffer{};
+  size_t length = 0;
+
+  std::string text() const { return std::string(buffer.data(), length); }
+};
+
+bool readPreview(Reader& reader, const size_t remaining, PreviewOutput& out) {
+  return clippingPreview::read(reader, remaining, out.buffer.data(), out.buffer.size(), out.length);
+}
 constexpr const char* ELLIPSIS = "\xe2\x80\xa6";
 }  // namespace
 
 TEST(ClippingPreview, ShortTextNormalizesWithoutEllipsis) {
   Reader reader{" \t\r\nhello\r\nworld\t "};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, "hello world");
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), "hello world");
 }
 
 TEST(ClippingPreview, LongTextUsesBoundedReadsAndMarksOmission) {
   Reader reader{std::string(4096, 'x')};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, std::string(256, 'x') + ELLIPSIS);
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), std::string(256, 'x') + ELLIPSIS);
   EXPECT_LE(reader.pos, 320u);
   EXPECT_LE(reader.maxRequest, 64u);
 }
 
 TEST(ClippingPreview, ExactLimitDoesNotClaimOmission) {
   Reader reader{std::string(256, 'x')};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, reader.text);
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), reader.text);
 }
 
 TEST(ClippingPreview, Utf8CodepointsAreNeverSplitAtLimit) {
@@ -50,85 +61,91 @@ TEST(ClippingPreview, Utf8CodepointsAreNeverSplitAtLimit) {
     for (size_t space = 0; space < codepoint.size(); ++space) {
       const std::string prefix(256 - space, 'a');
       Reader reader{prefix + codepoint + "tail"};
-      std::string out;
-      ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-      EXPECT_EQ(out, prefix + ELLIPSIS);
+      PreviewOutput out;
+      ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+      EXPECT_EQ(out.text(), prefix + ELLIPSIS);
     }
   }
 }
 
 TEST(ClippingPreview, Utf8CrossesReadChunkBoundary) {
   Reader reader{std::string(63, 'a') + "😀" + "é中"};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, reader.text);
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), reader.text);
 }
 
 TEST(ClippingPreview, LeadingWhitespaceDoesNotConsumePreviewBudget) {
   Reader reader{std::string(600, ' ') + "\xc2\xa0\xe2\x80\x83\xe2\x80\xaf" + std::string(300, 'x')};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, std::string(256, 'x') + ELLIPSIS);
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), std::string(256, 'x') + ELLIPSIS);
   EXPECT_LE(reader.maxRequest, 64u);
 }
 
 TEST(ClippingPreview, UnicodeWhitespaceCollapsesAndTrailingWhitespaceIsDropped) {
   Reader reader{"hello\xc2\xa0\xe2\x80\x83\xe2\x80\xafworld \t"};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, "hello world");
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), "hello world");
 }
 
 TEST(ClippingPreview, AllWhitespaceAndEmptyTextStayEmpty) {
   for (const auto& text : {std::string(), std::string(4096, ' ')}) {
     Reader reader{text};
-    std::string out = "stale";
-    ASSERT_TRUE(clippingPreview::read(reader, text.size(), out));
-    EXPECT_TRUE(out.empty());
+    PreviewOutput out;
+    std::memcpy(out.buffer.data(), "stale", 6);
+    out.length = 5;
+    ASSERT_TRUE(readPreview(reader, text.size(), out));
+    EXPECT_EQ(out.length, 0u);
+    EXPECT_EQ(out.buffer[0], '\0');
     EXPECT_EQ(reader.pos, text.size());
   }
 }
 
 TEST(ClippingPreview, DoesNotReadFollowingRecord) {
   Reader reader{"oneNEXT_RECORD"};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, 3, out));
-  EXPECT_EQ(out, "one");
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, 3, out));
+  EXPECT_EQ(out.text(), "one");
   EXPECT_EQ(reader.pos, 3u);
 }
 
 TEST(ClippingPreview, ShortReadClearsOldAndPartialOutput) {
   Reader reader{std::string(70, 'a')};
-  std::string out = "stale";
-  EXPECT_FALSE(clippingPreview::read(reader, 128, out));
-  EXPECT_TRUE(out.empty());
+  PreviewOutput out;
+  std::memcpy(out.buffer.data(), "stale", 6);
+  out.length = 5;
+  EXPECT_FALSE(readPreview(reader, 128, out));
+  EXPECT_EQ(out.length, 0u);
+  EXPECT_EQ(out.buffer[0], '\0');
 }
 
 TEST(ClippingPreview, InvalidOrIncompleteUtf8FailsWithoutPartialOutput) {
   for (const auto& text : {std::string("a\xff"), std::string("a\xc2"), std::string("a\xc2x")}) {
     Reader reader{text};
-    std::string out;
-    EXPECT_FALSE(clippingPreview::read(reader, text.size(), out));
-    EXPECT_TRUE(out.empty());
+    PreviewOutput out;
+    EXPECT_FALSE(readPreview(reader, text.size(), out));
+    EXPECT_EQ(out.length, 0u);
+    EXPECT_EQ(out.buffer[0], '\0');
   }
 }
 
-TEST(ClippingPreview, RepeatedReadsReuseReservedStorage) {
+TEST(ClippingPreview, RepeatedReadsReuseFixedStorage) {
   Reader reader{std::string(4096, 'x')};
-  std::string out;
-  out.reserve(clippingPreview::MAX_BYTES + clippingPreview::ELLIPSIS_BYTES);
-  const char* buffer = out.data();
+  PreviewOutput out;
+  const char* buffer = out.buffer.data();
   for (int i = 0; i < 3; ++i) {
     reader.pos = 0;
-    ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-    EXPECT_EQ(out.data(), buffer);
+    ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+    EXPECT_EQ(out.buffer.data(), buffer);
   }
 }
 
 TEST(ClippingPreview, InternalWhitespaceStillCountsAgainstReadBudget) {
   Reader reader{"hello" + std::string(4000, ' ') + "world"};
-  std::string out;
-  ASSERT_TRUE(clippingPreview::read(reader, reader.text.size(), out));
-  EXPECT_EQ(out, std::string("hello") + ELLIPSIS);
+  PreviewOutput out;
+  ASSERT_TRUE(readPreview(reader, reader.text.size(), out));
+  EXPECT_EQ(out.text(), std::string("hello") + ELLIPSIS);
   EXPECT_LE(reader.pos, 320u);
 }

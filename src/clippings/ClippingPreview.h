@@ -2,11 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <string>
+#include <cstring>
 
 namespace clippingPreview {
 constexpr size_t MAX_BYTES = 256;
 constexpr size_t ELLIPSIS_BYTES = 3;
+constexpr size_t BUFFER_BYTES = MAX_BYTES + ELLIPSIS_BYTES + 1;
 
 inline size_t utf8SpaceLength(const char* text, const size_t size) {
   if (size >= 2 && static_cast<unsigned char>(text[0]) == 0xC2 && static_cast<unsigned char>(text[1]) == 0xA0) return 2;
@@ -19,9 +20,10 @@ inline size_t utf8SpaceLength(const char* text, const size_t size) {
 // Reader is a HalFile in firmware, or a byte reader in host tests. A small
 // buffer bounds stack use and SD reads; no read can cross the stored text length.
 template <typename Reader>
-bool read(Reader& reader, size_t remaining, std::string& out) {
-  out.clear();
-  out.reserve(MAX_BYTES + ELLIPSIS_BYTES);
+bool read(Reader& reader, size_t remaining, char* out, const size_t outSize, size_t& outLength) {
+  outLength = 0;
+  if (!out || outSize < BUFFER_BYTES) return false;
+  out[0] = '\0';
   char buffer[64];
   size_t pos = 0;
   size_t size = 0;
@@ -41,7 +43,8 @@ bool read(Reader& reader, size_t remaining, std::string& out) {
   while (remaining > 0 || pos < size) {
     const int first = nextByte();
     if (first < 0) {
-      out.clear();
+      outLength = 0;
+      out[0] = '\0';
       return false;
     }
     const size_t length = first < 0x80                     ? 1
@@ -51,13 +54,15 @@ bool read(Reader& reader, size_t remaining, std::string& out) {
                                                            : 0;
     char codepoint[4] = {static_cast<char>(first)};
     if (length == 0) {
-      out.clear();
+      outLength = 0;
+      out[0] = '\0';
       return false;
     }
     for (size_t i = 1; i < length; ++i) {
       const int byte = nextByte();
       if (byte < 0 || (byte & 0xC0) != 0x80) {
-        out.clear();
+        outLength = 0;
+        out[0] = '\0';
         return false;
       }
       codepoint[i] = static_cast<char>(byte);
@@ -66,21 +71,25 @@ bool read(Reader& reader, size_t remaining, std::string& out) {
                        utf8SpaceLength(codepoint, length) != 0;
     // Leading whitespace is exempt from the preview budget. Whitespace inside
     // the preview still counts so a long run cannot force a full-file scan.
-    if (!space || !out.empty()) {
+    if (!space || outLength > 0) {
       if (prefixBytes + length > MAX_BYTES) {
-        out += "\xe2\x80\xa6";
+        std::memcpy(out + outLength, "\xe2\x80\xa6", ELLIPSIS_BYTES);
+        outLength += ELLIPSIS_BYTES;
+        out[outLength] = '\0';
         return true;
       }
       prefixBytes += length;
     }
     if (space) {
-      spacePending = !out.empty();
+      spacePending = outLength > 0;
       continue;
     }
-    if (spacePending) out += ' ';
-    out.append(codepoint, length);
+    if (spacePending) out[outLength++] = ' ';
+    std::memcpy(out + outLength, codepoint, length);
+    outLength += length;
     spacePending = false;
   }
+  out[outLength] = '\0';
   return true;
 }
 }  // namespace clippingPreview

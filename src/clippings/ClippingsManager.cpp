@@ -3,6 +3,7 @@
 #include <HalClock.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Utf8.h>
 #include <common/FsApiConstants.h>
 
 #include <algorithm>
@@ -68,6 +69,7 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
     LOG_ERR("CLIP", "Failed to open %s for append", CLIPPINGS_PATH);
     return false;
   }
+  const size_t originalSize = file.fileSize();
 
   std::string location = "- Your Highlight on Page " + std::to_string(pageNumber);
   if (!chapterTitle.empty()) {
@@ -81,7 +83,8 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
   location += "\n";
 
   static constexpr size_t MAX_TEXT_BYTES = 2000;
-  const size_t textLen = std::min(selectedText.size(), MAX_TEXT_BYTES);
+  const size_t rawTextLen = std::min(selectedText.size(), MAX_TEXT_BYTES);
+  const size_t textLen = static_cast<size_t>(utf8SafeTruncateBuffer(selectedText.data(), rawTextLen));
   static constexpr char separator[] = "\n==========\n";
 
   std::string buffer;
@@ -96,10 +99,12 @@ bool ClippingsManager::saveClipping(const std::string& bookTitle, const std::str
   buffer += separator;
 
   const bool ok = file.write(buffer.data(), buffer.size()) == buffer.size();
+  const bool rolledBack = ok || file.truncate(originalSize);
   file.flush();
   file.close();
 
   if (!ok) {
+    if (!rolledBack) LOG_ERR("CLIP", "Failed to roll back partial write to %s", CLIPPINGS_PATH);
     LOG_ERR("CLIP", "Failed to write clipping to %s", CLIPPINGS_PATH);
     return false;
   }

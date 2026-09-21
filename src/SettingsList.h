@@ -213,6 +213,35 @@ inline SettingInfo buildLongPressMenuSetting() {
                                   setLongPressMenuFromDisplayValue, "longPressMenuFunction", StrId::STR_CAT_CONTROLS);
 }
 
+inline std::vector<StrId> buildShortPowerButtonValues() {
+  std::vector<StrId> values = {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
+                               StrId::STR_FOOTNOTES};
+  if (BoardConfig::hasTouch()) values.push_back(StrId::STR_CONFIRM);
+  values.push_back(StrId::STR_SAVE_CLIPPING);
+  return values;
+}
+
+inline uint8_t shortPowerButtonDisplayValue() {
+  const uint8_t raw = SETTINGS.shortPwrBtn;
+  if (raw <= CrossPointSettings::FOOTNOTES) return raw;
+  if (raw == CrossPointSettings::CREATE_CLIPPING) return BoardConfig::hasTouch() ? 6 : 5;
+  if (raw == CrossPointSettings::PWR_CONFIRM && BoardConfig::hasTouch()) return 5;
+  return CrossPointSettings::IGNORE;
+}
+
+inline void setShortPowerButtonFromDisplayValue(const uint8_t displayValue) {
+  if (!BoardConfig::hasTouch() && displayValue == 5) {
+    SETTINGS.shortPwrBtn = CrossPointSettings::CREATE_CLIPPING;
+    return;
+  }
+  SETTINGS.shortPwrBtn = displayValue;
+}
+
+inline SettingInfo buildShortPowerButtonSetting() {
+  return SettingInfo::DynamicEnum(StrId::STR_SHORT_PWR_BTN, buildShortPowerButtonValues(), shortPowerButtonDisplayValue,
+                                  setShortPowerButtonFromDisplayValue, "shortPwrBtn", StrId::STR_CAT_CONTROLS);
+}
+
 // Shared settings list used by both the device settings UI and the web settings API.
 // Each entry has a key (for JSON API) and category (for grouping).
 // ACTION-type entries and entries without a key are device-only.
@@ -349,17 +378,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         // Erased below unless the board is an X4 Pro.
         SettingInfo::Toggle(StrId::STR_DBL_CLICK_PWR_LIGHT, &CrossPointSettings::doubleClickPwrLight,
                             "doubleClickPwrLight", StrId::STR_CAT_CONTROLS),
-#if FREEINK_CAP_TOUCH
-        SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
-                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
-                           StrId::STR_FOOTNOTES, StrId::STR_CONFIRM, StrId::STR_SAVE_CLIPPING},
-                          "shortPwrBtn", StrId::STR_CAT_CONTROLS),
-#else
-        SettingInfo::Enum(StrId::STR_SHORT_PWR_BTN, &CrossPointSettings::shortPwrBtn,
-                          {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH,
-                           StrId::STR_FOOTNOTES, StrId::STR_SAVE_CLIPPING},
-                          "shortPwrBtn", StrId::STR_CAT_CONTROLS),
-#endif
+        buildShortPowerButtonSetting(),
         // Erased below unless the QMI8658 IMU is present (X3).
         SettingInfo::Enum(StrId::STR_TILT_PAGE_TURN, &CrossPointSettings::tiltPageTurn,
                           {StrId::STR_STATE_OFF, StrId::STR_NORMAL, StrId::STR_INVERTED}, "tiltPageTurn",

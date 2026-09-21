@@ -1,9 +1,9 @@
 #pragma once
 
 #include <array>
-#include <string>
 
 #include "activities/UiListActivity.h"
+#include "clippings/ClippingPreview.h"
 #include "components/OptionPopup.h"
 
 class EpubReaderClippingListActivity final : public UiListActivity {
@@ -29,7 +29,8 @@ class EpubReaderClippingListActivity final : public UiListActivity {
   const char* headerTitle() const override;
 
   static constexpr int ROW_WINDOW = 8;
-  std::array<std::string, ROW_WINDOW> previews;
+  std::array<std::array<char, clippingPreview::BUFFER_BYTES>, ROW_WINDOW> previews{};
+  std::array<size_t, ROW_WINDOW> previewLengths{};
   std::array<freeink::ui::ListItem, ROW_WINDOW> rowItems;
   int windowStart = -1;
   int windowCount = 0;

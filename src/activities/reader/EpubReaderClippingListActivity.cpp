@@ -29,9 +29,6 @@ EpubReaderClippingListActivity::EpubReaderClippingListActivity(GfxRenderer& rend
 void EpubReaderClippingListActivity::onEnter() {
   UiListActivity::onEnter();
   initialListRender = true;
-  for (auto& preview : previews) {
-    preview.reserve(clippingPreview::MAX_BYTES + clippingPreview::ELLIPSIS_BYTES);
-  }
   rebuildRows();
 }
 
@@ -54,14 +51,16 @@ void EpubReaderClippingListActivity::refreshRowWindow(const int start) {
   for (int slot = 0; slot < windowCount; ++slot) {
     const size_t clippingIndex = static_cast<size_t>(clamped + slot);
     const Clipping* clipping = CLIPPINGS.clippingAt(clippingIndex);
-    previews[slot].clear();
-    if (!clipping || !CLIPPINGS.readClippingPreview(clippingIndex, previews[slot])) {
+    previewLengths[slot] = 0;
+    previews[slot][0] = '\0';
+    if (!clipping || !CLIPPINGS.readClippingPreview(clippingIndex, previews[slot].data(), previews[slot].size(),
+                                                    previewLengths[slot])) {
       LOG_ERR("CLIP", "Failed to read clipping %u", static_cast<unsigned>(clippingIndex));
     }
 
     fui::ListItem item;
     item.label = clipping && clipping->chapterTitle[0] != '\0' ? clipping->chapterTitle : tr(STR_CLIPPINGS);
-    item.subtitle = previews[slot].c_str();
+    item.subtitle = previews[slot].data();
     item.icon = listIconFor(UIIcon::Bookmark, 32);
     item.actionValue = static_cast<int16_t>(clippingIndex);
     rowItems[slot] = item;

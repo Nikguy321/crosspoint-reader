@@ -66,10 +66,13 @@ inline void readString(HalFile& file, std::string& s) {
   file.read(&s[0], len);
 }
 
-inline bool tryReadString(HalFile& file, std::string& s) {
+inline bool tryReadString(HalFile& file, std::string& s, const size_t maxLength) {
   uint32_t len = 0;
   if (!tryReadPod(file, len)) return false;
-  if (static_cast<size_t>(len) > s.max_size() || len > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
+  const int remaining = file.available();
+  if (static_cast<size_t>(len) > maxLength || static_cast<size_t>(len) > s.max_size() ||
+      len > static_cast<uint32_t>(std::numeric_limits<int>::max()) || remaining < 0 ||
+      len > static_cast<uint32_t>(remaining)) {
     return false;
   }
   s.resize(len);

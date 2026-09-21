@@ -40,26 +40,56 @@ bool hasEmSpacePrefix(const char* text) {
          static_cast<uint8_t>(text[2]) == 0x83;
 }
 
-std::string cleanWord(const char* text) {
-  if (!text) return {};
+const char* cleanWordStart(const char* text) {
+  if (!text) return "";
   if (hasEmSpacePrefix(text)) text += 3;
-  std::string result;
+  while (*text != '\0' && (*text == ' ' || *text == '\r' || *text == '\n' || *text == '\t' ||
+                           (static_cast<uint8_t>(text[0]) == 0xC2 && static_cast<uint8_t>(text[1]) == 0xA0))) {
+    text += static_cast<uint8_t>(text[0]) == 0xC2 ? 2 : 1;
+  }
+  return text;
+}
+
+size_t utf8SequenceLength(const uint8_t lead) {
+  if (lead < 0x80) return 1;
+  if (lead >= 0xC2 && lead <= 0xDF) return 2;
+  if (lead >= 0xE0 && lead <= 0xEF) return 3;
+  if (lead >= 0xF0 && lead <= 0xF4) return 4;
+  return 1;
+}
+
+void appendCleanWord(std::string& result, const char* text) {
+  text = cleanWordStart(text);
+  const size_t wordStart = result.size();
   for (const auto* p = reinterpret_cast<const uint8_t*>(text); *p != 0;) {
     if (*p == '\r' || *p == '\n' || *p == '\t') {
-      if (!result.empty() && result.back() != ' ') result.push_back(' ');
+      if (result.size() > wordStart && result.back() != ' ' && result.size() < CLIPPING_TEXT_MAX) {
+        result.push_back(' ');
+      }
       ++p;
       continue;
     }
     if (*p == 0xC2 && p[1] == 0xA0) {
-      if (!result.empty() && result.back() != ' ') result.push_back(' ');
+      if (result.size() > wordStart && result.back() != ' ' && result.size() < CLIPPING_TEXT_MAX) {
+        result.push_back(' ');
+      }
       p += 2;
       continue;
     }
-    result.push_back(static_cast<char>(*p++));
+    const size_t length = utf8SequenceLength(*p);
+    bool complete = true;
+    for (size_t i = 1; i < length; ++i) {
+      if (p[i] == 0 || (p[i] & 0xC0) != 0x80) {
+        complete = false;
+        break;
+      }
+    }
+    const size_t appendLength = complete ? length : 1;
+    if (result.size() + appendLength > CLIPPING_TEXT_MAX) break;
+    result.append(reinterpret_cast<const char*>(p), appendLength);
+    p += appendLength;
   }
-  while (!result.empty() && result.front() == ' ') result.erase(result.begin());
-  while (!result.empty() && result.back() == ' ') result.pop_back();
-  return result;
+  while (result.size() > wordStart && result.back() == ' ') result.pop_back();
 }
 
 }  // namespace
@@ -265,25 +295,40 @@ void ClipSelectionActivity::moveToPage(const int pageOffset) {
 
 std::string ClipSelectionActivity::buildSelectedText(const int first, const int last) const {
   std::string text;
-  text.reserve(256);
+  text.reserve(CLIPPING_TEXT_MAX);
   for (int i = first; i <= last; ++i) {
-    std::string word = cleanWord(words[i].text);
-    if (word.empty()) continue;
+    const char* word = cleanWordStart(words[i].text);
+    if (*word == '\0') continue;
+    const size_t checkpoint = text.size();
+    bool removedHyphen = false;
     if (!text.empty()) {
       const WordBox& previous = words[i - 1];
-      if (!text.empty() && text.back() == '-' && word.front() != '-' &&
-          std::isalnum(static_cast<unsigned char>(word.front()))) {
+      if (text.back() == '-' && *word != '-' && std::isalnum(static_cast<unsigned char>(*word))) {
         text.pop_back();
+        removedHyphen = true;
       } else if (words[i].paragraphStart) {
+        if (text.size() == CLIPPING_TEXT_MAX) break;
         text.push_back('\n');
       } else {
         const bool visuallyAttached =
             words[i].row == previous.row && std::abs(words[i].x - (previous.x + previous.width)) <= 2;
-        if (!visuallyAttached) text.push_back(' ');
+        if (!visuallyAttached) {
+          if (text.size() == CLIPPING_TEXT_MAX) break;
+          text.push_back(' ');
+        }
       }
     }
-    if (text.size() >= CLIPPING_TEXT_MAX) break;
-    text.append(word, 0, CLIPPING_TEXT_MAX - text.size());
+    const size_t wordStart = text.size();
+    appendCleanWord(text, word);
+    if (text.size() == wordStart) {
+      if (removedHyphen) {
+        text.push_back('-');
+      } else {
+        text.resize(checkpoint);
+      }
+      break;
+    }
+    if (text.size() == CLIPPING_TEXT_MAX) break;
   }
   return text;
 }

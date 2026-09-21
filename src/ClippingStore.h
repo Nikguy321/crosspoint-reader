@@ -64,15 +64,17 @@ class ClippingStore {
   size_t clippingCount() const { return clippings.size(); }
   const Clipping* clippingAt(size_t index) const;
   const std::vector<Clipping>& getClippings() const { return clippings; }
-  bool readClippingPreview(size_t index, std::string& out) const;
+  bool readClippingPreview(size_t index, char* out, size_t outSize, size_t& outLength) const;
   bool readClippingText(size_t index, std::string& out) const;
   bool readClippingText(const Clipping& clipping, std::string& out) const;
 
   static bool hasAnyClippings();
+  static bool hasForFilePath(const std::string& filePath, const std::string& bookType);
   static bool getAllClippedBooks(std::vector<ClippedBookEntry>& out);
   static void deleteForFilePath(const std::string& filePath, const std::string& bookType);
   static bool migrateForFilePath(const std::string& oldFilePath, const std::string& newFilePath,
-                                 const std::string& title, const std::string& author, const std::string& bookType);
+                                 const std::string& title, const std::string& author, const std::string& bookType,
+                                 bool preserveSource = false);
 
  private:
   static ClippingStore instance;
@@ -86,7 +88,8 @@ class ClippingStore {
 
   bool readFromFile();
   bool readFromFile(const std::string& path, std::vector<Clipping>& out) const;
-  bool writeToFile(const std::string* replacementText = nullptr, size_t replacementIndex = SIZE_MAX);
+  bool writeToFile(const std::string* replacementText = nullptr, size_t replacementIndex = SIZE_MAX,
+                   const std::string* textSourcePath = nullptr);
 };
 
 inline bool clippingStoredRangeMatchesLayout(const Clipping& clipping, const uint16_t currentPageCount,

@@ -19,6 +19,7 @@ constexpr uint8_t VERSION = 3;
 constexpr size_t INITIAL_CLIPPING_RESERVE = 4;
 constexpr char CLIPPINGS_DIR[] = "/.crosspoint/clippings";
 constexpr size_t TEXT_COPY_BUFFER_SIZE = 128;
+constexpr size_t HEADER_STRING_MAX = CLIPPING_TEXT_MAX;
 
 struct ClippingFileHeader {
   std::string title;
@@ -49,8 +50,9 @@ bool readClippingFileHeader(const std::string& fullPath, const char* name, Clipp
   uint16_t count = 0;
   if (!serialization::tryReadPod(f, version) ||
       (version != LEGACY_VERSION && version != TEXT_OFFSET_VERSION && version != VERSION) ||
-      !serialization::tryReadPod(f, count) || !serialization::tryReadString(f, header.title) ||
-      !serialization::tryReadString(f, header.author) || !serialization::tryReadString(f, header.path)) {
+      !serialization::tryReadPod(f, count) || !serialization::tryReadString(f, header.title, HEADER_STRING_MAX) ||
+      !serialization::tryReadString(f, header.author, HEADER_STRING_MAX) ||
+      !serialization::tryReadString(f, header.path, HEADER_STRING_MAX)) {
     f.close();
     return false;
   }
@@ -201,10 +203,11 @@ const Clipping* ClippingStore::clippingAt(const size_t index) const {
   return &clippings[index];
 }
 
-bool ClippingStore::readClippingPreview(const size_t index, std::string& out) const {
-  out.clear();
+bool ClippingStore::readClippingPreview(const size_t index, char* out, const size_t outSize, size_t& outLength) const {
+  outLength = 0;
+  if (out && outSize > 0) out[0] = '\0';
   const Clipping* clipping = clippingAt(index);
-  if (!clipping || storeFilePath.empty()) {
+  if (!out || outSize == 0 || !clipping || storeFilePath.empty()) {
     LOG_ERR("CLIP", "Invalid clipping preview index: %u", static_cast<unsigned>(index));
     return false;
   }
@@ -216,7 +219,7 @@ bool ClippingStore::readClippingPreview(const size_t index, std::string& out) co
     LOG_ERR("CLIP", "Failed to seek clipping preview at %u", clipping->textOffset);
     return false;
   }
-  const bool ok = clippingPreview::read(f, clipping->textLength, out);
+  const bool ok = clippingPreview::read(f, clipping->textLength, out, outSize, outLength);
   if (!ok) LOG_ERR("CLIP", "Failed to read clipping preview at %u", clipping->textOffset);
   return ok;
 }
@@ -285,8 +288,9 @@ bool ClippingStore::readFromFile(const std::string& path, std::vector<Clipping>&
   std::string storedPath;
   if (!serialization::tryReadPod(f, version) ||
       (version != LEGACY_VERSION && version != TEXT_OFFSET_VERSION && version != VERSION) ||
-      !serialization::tryReadPod(f, count) || !serialization::tryReadString(f, title) ||
-      !serialization::tryReadString(f, author) || !serialization::tryReadString(f, storedPath)) {
+      !serialization::tryReadPod(f, count) || !serialization::tryReadString(f, title, HEADER_STRING_MAX) ||
+      !serialization::tryReadString(f, author, HEADER_STRING_MAX) ||
+      !serialization::tryReadString(f, storedPath, HEADER_STRING_MAX)) {
     f.close();
     LOG_ERR("CLIP", "Failed to read clipping header: %s", path.c_str());
     return false;
@@ -361,7 +365,8 @@ bool ClippingStore::readFromFile(const std::string& path, std::vector<Clipping>&
   return true;
 }
 
-bool ClippingStore::writeToFile(const std::string* replacementText, const size_t replacementIndex) {
+bool ClippingStore::writeToFile(const std::string* replacementText, const size_t replacementIndex,
+                                const std::string* textSourcePath) {
   Storage.mkdir("/.crosspoint");
   Storage.mkdir(CLIPPINGS_DIR);
 
@@ -378,9 +383,11 @@ bool ClippingStore::writeToFile(const std::string* replacementText, const size_t
   if (Storage.exists(backupPath.c_str()) && Storage.exists(storeFilePath.c_str())) Storage.remove(backupPath.c_str());
 
   HalFile source;
-  const bool hasSource = Storage.exists(storeFilePath.c_str());
-  if (hasSource && !Storage.openFileForRead("CLIP", storeFilePath, source)) {
-    LOG_ERR("CLIP", "Failed to open clipping source for rewrite: %s", storeFilePath.c_str());
+  const std::string& sourcePath = textSourcePath ? *textSourcePath : storeFilePath;
+  const bool hasTextSource = Storage.exists(sourcePath.c_str());
+  const bool hasDestination = Storage.exists(storeFilePath.c_str());
+  if (hasTextSource && !Storage.openFileForRead("CLIP", sourcePath, source)) {
+    LOG_ERR("CLIP", "Failed to open clipping source for rewrite: %s", sourcePath.c_str());
     return false;
   }
 
@@ -457,7 +464,7 @@ bool ClippingStore::writeToFile(const std::string* replacementText, const size_t
   f.close();
   if (source) source.close();
 
-  if (hasSource && !Storage.rename(storeFilePath.c_str(), backupPath.c_str())) {
+  if (hasDestination && !Storage.rename(storeFilePath.c_str(), backupPath.c_str())) {
     LOG_ERR("CLIP", "Failed to back up clipping file: %s", storeFilePath.c_str());
     Storage.remove(tmpPath.c_str());
     return false;
@@ -465,10 +472,10 @@ bool ClippingStore::writeToFile(const std::string* replacementText, const size_t
   if (!Storage.rename(tmpPath.c_str(), storeFilePath.c_str())) {
     LOG_ERR("CLIP", "Failed to replace clipping file: %s", storeFilePath.c_str());
     Storage.remove(tmpPath.c_str());
-    if (hasSource) Storage.rename(backupPath.c_str(), storeFilePath.c_str());
+    if (hasDestination) Storage.rename(backupPath.c_str(), storeFilePath.c_str());
     return false;
   }
-  if (hasSource && Storage.exists(backupPath.c_str())) {
+  if (hasDestination && Storage.exists(backupPath.c_str())) {
     Storage.remove(backupPath.c_str());
   }
   for (uint16_t i = 0; i < count; ++i) {
@@ -481,6 +488,10 @@ bool ClippingStore::writeToFile(const std::string* replacementText, const size_t
 bool ClippingStore::hasAnyClippings() {
   if (!Storage.exists(CLIPPINGS_DIR)) return false;
   return !Storage.listFiles(CLIPPINGS_DIR).empty();
+}
+
+bool ClippingStore::hasForFilePath(const std::string& filePath, const std::string& bookType) {
+  return Storage.exists(storeFilePathForBook(filePath, bookType).c_str());
 }
 
 bool ClippingStore::getAllClippedBooks(std::vector<ClippedBookEntry>& out) {
@@ -514,8 +525,8 @@ void ClippingStore::deleteForFilePath(const std::string& filePath, const std::st
 }
 
 bool ClippingStore::migrateForFilePath(const std::string& oldFilePath, const std::string& newFilePath,
-                                       const std::string& title, const std::string& author,
-                                       const std::string& bookType) {
+                                       const std::string& title, const std::string& author, const std::string& bookType,
+                                       const bool preserveSource) {
   const std::string oldStorePath = storeFilePathForBook(oldFilePath, bookType);
   if (!Storage.exists(oldStorePath.c_str())) {
     return true;
@@ -527,22 +538,30 @@ bool ClippingStore::migrateForFilePath(const std::string& oldFilePath, const std
     return false;
   }
 
+  const std::string newStorePath = storeFilePathForBook(newFilePath, bookType);
   ClippingStore writer;
   writer.bookFilePath = newFilePath;
   writer.bookTitle = title;
   writer.bookAuthor = author;
-  writer.storeFilePath = oldStorePath;
+  writer.storeFilePath = newStorePath;
   writer.clippings = std::move(migratedClippings);
-  if (!writer.writeToFile()) {
+  if (oldStorePath == newStorePath) {
+    return writer.writeToFile();
+  }
+
+  const std::string rewriteBackupPath = newStorePath + ".bak";
+  if (!Storage.exists(newStorePath.c_str()) && Storage.exists(rewriteBackupPath.c_str())) {
+    if (!Storage.rename(rewriteBackupPath.c_str(), newStorePath.c_str())) {
+      LOG_ERR("CLIP", "Failed to recover destination clipping backup: %s", rewriteBackupPath.c_str());
+      return false;
+    }
+  } else if (Storage.exists(newStorePath.c_str()) && Storage.exists(rewriteBackupPath.c_str()) &&
+             !Storage.remove(rewriteBackupPath.c_str())) {
+    LOG_ERR("CLIP", "Failed to remove stale destination clipping backup: %s", rewriteBackupPath.c_str());
     return false;
   }
 
-  const std::string newStorePath = storeFilePathForBook(newFilePath, bookType);
-  if (oldStorePath == newStorePath) {
-    return true;
-  }
-
-  const std::string backupPath = newStorePath + ".bak";
+  const std::string backupPath = newStorePath + ".migrate.bak";
   const bool hasDestination = Storage.exists(newStorePath.c_str());
   if (hasDestination) {
     if (Storage.exists(backupPath.c_str()) && !Storage.remove(backupPath.c_str())) {
@@ -554,12 +573,15 @@ bool ClippingStore::migrateForFilePath(const std::string& oldFilePath, const std
       return false;
     }
   }
-  if (!Storage.rename(oldStorePath.c_str(), newStorePath.c_str())) {
-    LOG_ERR("CLIP", "Failed to rename migrated clippings: %s -> %s", oldStorePath.c_str(), newStorePath.c_str());
+  if (!writer.writeToFile(nullptr, SIZE_MAX, &oldStorePath)) {
+    LOG_ERR("CLIP", "Failed to write migrated clippings: %s", newStorePath.c_str());
     if (hasDestination && !Storage.rename(backupPath.c_str(), newStorePath.c_str())) {
       LOG_ERR("CLIP", "Failed to restore destination clipping backup: %s", backupPath.c_str());
     }
     return false;
+  }
+  if (!preserveSource && !Storage.remove(oldStorePath.c_str())) {
+    LOG_ERR("CLIP", "Failed to remove migrated source clippings (non-fatal): %s", oldStorePath.c_str());
   }
   if (hasDestination && Storage.exists(backupPath.c_str())) {
     Storage.remove(backupPath.c_str());

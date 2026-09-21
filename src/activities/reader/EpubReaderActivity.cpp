@@ -149,22 +149,29 @@ void moveFinishedBookToReadFolder(const std::string& srcPath, const std::string&
                                   const std::string& oldCachePath, const std::string& title,
                                   const std::string& author) {
   LOG_INF("ERS", "Moving finished epub: %s -> %s", srcPath.c_str(), dstPath.c_str());
-  if (!Storage.rename(srcPath.c_str(), dstPath.c_str())) {
-    LOG_ERR("ERS", "Failed to move finished book to '/Read' folder");
+  const bool hasClippings = ClippingStore::hasForFilePath(srcPath, "epub");
+  if (hasClippings && !ClippingStore::migrateForFilePath(srcPath, dstPath, title, author, "epub", true)) {
+    LOG_ERR("CLIP", "Failed to prepare clippings before moving book to read folder");
     return;
   }
 
+  if (!Storage.rename(srcPath.c_str(), dstPath.c_str())) {
+    LOG_ERR("ERS", "Failed to move finished book to '/Read' folder");
+    if (hasClippings) ClippingStore::deleteForFilePath(dstPath, "epub");
+    return;
+  }
+  if (hasClippings) ClippingStore::deleteForFilePath(srcPath, "epub");
+
   const std::string newCachePath = "/.crosspoint/epub_" + std::to_string(std::hash<std::string>{}(dstPath));
+  bool cacheMoved = false;
   if (!oldCachePath.empty() && Storage.exists(oldCachePath.c_str())) {
-    if (!Storage.rename(oldCachePath.c_str(), newCachePath.c_str())) {
+    cacheMoved = Storage.rename(oldCachePath.c_str(), newCachePath.c_str());
+    if (!cacheMoved) {
       LOG_ERR("ERS", "Failed to rename cache dir %s -> %s (non-fatal)", oldCachePath.c_str(), newCachePath.c_str());
     }
   }
 
-  RECENT_BOOKS.updatePath(srcPath, dstPath, oldCachePath, newCachePath);
-  if (!ClippingStore::migrateForFilePath(srcPath, dstPath, title, author, "epub")) {
-    LOG_ERR("CLIP", "Failed to migrate clippings after moving book to read folder");
-  }
+  RECENT_BOOKS.updatePath(srcPath, dstPath, oldCachePath, cacheMoved ? newCachePath : oldCachePath);
   if (APP_STATE.openEpubPath == srcPath) {
     APP_STATE.openEpubPath = dstPath;
     APP_STATE.saveToFile();
