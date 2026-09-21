@@ -1488,6 +1488,15 @@ void PluginCatalogActivity::releaseRows() {
 void PluginCatalogActivity::render(RenderLock&&) {
   renderer.clearScreen();
   renderUi();
+  // Same layout-feedback passes as UiListActivity::render(), which this
+  // override otherwise bypasses: subtitle rows wrap, so fewer rows fit than
+  // the fixed-height estimate and the nav advances the viewport after layout
+  // (ListNav::onListRendered). Without the rebuild the selection can sit on
+  // a clipped trailing row, drawn without focus and unreachable by touch.
+  for (int pass = 0; activeNav().consumeRebuildNeeded() && pass < 8; ++pass) {
+    renderer.clearScreen();
+    renderUi();
+  }
   // The QR is a raw-renderer overlay: FreeInkUI has no QR component, and
   // QrUtils draws straight into the framebuffer the app just painted.
   if (state == State::AUTH && authQrRect.width > 0) {
