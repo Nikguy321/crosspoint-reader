@@ -413,8 +413,7 @@ void Opds2Parser::commitPubLink() {
   if (link.href.empty() || link.acqRank < 0 || !(link.typeEpub || link.typeIndirect)) return;
 
   const bool isPlainEpub =
-      link.typeEpub &&
-      (link.href.find(".epub") != std::string::npos || link.href.find("/epub/") != std::string::npos);
+      link.typeEpub && (link.href.find(".epub") != std::string::npos || link.href.find("/epub/") != std::string::npos);
 
   // Preference order: higher acquisition rank (open-access > acquisition >
   // borrow > buy); at equal rank a direct EPUB beats an indirect link; among

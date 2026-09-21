@@ -1,9 +1,9 @@
 #include "OpdsLoginForm.h"
 
-#include "OpdsSearchTemplate.h"
-
 #include <cctype>
 #include <cstring>
+
+#include "OpdsSearchTemplate.h"
 
 namespace {
 
