@@ -18,6 +18,7 @@
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
+#include "OpdsTokenStore.h"
 #include "SilentRestart.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -68,7 +69,13 @@ void OpdsBookBrowserActivity::onEnter() {
   searchTemplate = "";
   searchDescriptionUrl = "";
   searchTemplateBase = "";
-  bearerToken = "";
+  // Reuse a persisted access token; only re-authenticate when it 401s.
+  {
+    const OpdsTokens t = OPDS_TOKENS.get(tokenKey());
+    bearerToken = t.accessToken;
+    refreshToken = t.refreshToken;
+    tokenRefreshUrl = t.refreshUrl;
+  }
   useBasicAuth = false;
   currentPath = "";
   searchQuery.clear();
@@ -523,22 +530,36 @@ void OpdsBookBrowserActivity::fetchFeed(const std::string& path) {
     parser.flush();
 
     if (!fetched && status == 401) {
-      // Authentication for OPDS: the 401 body is an authentication document
-      // describing the server's flows. One re-auth attempt (covers both a
-      // missing and an expired token), then give up.
-      bearerToken.clear();
-      useBasicAuth = false;
+      // The 401 body is an authentication document describing the server's
+      // flows. First try to renew an expired access token with the refresh
+      // token (cheap); fall back to a full login (which can take several
+      // seconds of TLS handshakes across the catalog and its SSO).
       credentialsMissing = false;
-      // The login can take several seconds (multiple TLS handshakes across the
-      // catalog and its SSO); show progress instead of a frozen "Loading".
       statusMessage = tr(STR_OPDS_SIGNING_IN);
       requestUpdate(true);
-      if (authAttempt == 0 && authenticateWithServer(url)) {
+      bool advanced = false;
+      if (authAttempt == 0 && !refreshToken.empty() && !tokenRefreshUrl.empty()) {
+        if (tryRefreshToken()) {
+          advanced = true;
+        } else {
+          refreshToken.clear();  // dead refresh token; drop it and log in fresh
+          tokenRefreshUrl.clear();
+        }
+      }
+      if (!advanced && authAttempt < 2) {
+        bearerToken.clear();
+        useBasicAuth = false;
+        advanced = authenticateWithServer(url);
+      }
+      if (advanced) {
+        persistTokens();
         parser.reset();  // drop any finalized backend before the retry
         statusMessage = tr(STR_LOADING);
         requestUpdate(true);
         continue;
       }
+      // Login failed: the stored token (if any) is worthless now.
+      persistTokens();
       state = BrowserState::ERROR;
       errorMessage = credentialsMissing ? tr(STR_SET_CREDENTIALS_FIRST) : tr(STR_OPDS_AUTH_FAILED);
       requestUpdate();
@@ -926,6 +947,14 @@ bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resource
       std::string token;
       if (extractJsonStringField(response.data(), response.size(), "access_token", token) && !token.empty()) {
         bearerToken = std::move(token);
+        // Capture a refresh token so the next expiry renews without a full
+        // login. Refresh goes to the auth document's `refresh` link when
+        // present, otherwise back to the token endpoint (RFC 6749 6).
+        refreshToken.clear();
+        extractJsonStringField(response.data(), response.size(), "refresh_token", refreshToken);
+        tokenRefreshUrl = refreshToken.empty()     ? std::string()
+                          : doc.refreshUrl.empty() ? tokenUrl
+                                                   : UrlUtils::buildUrl(resourceUrl, doc.refreshUrl);
         LOG_INF("OPDS", "OAuth password grant succeeded");
         return true;
       }
@@ -942,6 +971,9 @@ bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resource
     std::string token;
     if (opdsImplicitAuthenticate(implicitUrl, server.username, server.password, token)) {
       bearerToken = std::move(token);
+      // Implicit grant issues no refresh token; re-login on expiry.
+      refreshToken.clear();
+      tokenRefreshUrl.clear();
       LOG_INF("OPDS", "Implicit OAuth login succeeded");
       return true;
     }
@@ -954,9 +986,43 @@ bool OpdsBookBrowserActivity::authenticateWithServer(const std::string& resource
   if (doc.hasBasic || !haveAuthDoc) {
     LOG_INF("OPDS", "Using HTTP Basic authentication");
     useBasicAuth = true;
+    bearerToken.clear();  // Basic uses stored credentials, not a token
+    refreshToken.clear();
+    tokenRefreshUrl.clear();
     return true;
   }
   return false;
+}
+
+bool OpdsBookBrowserActivity::tryRefreshToken() {
+  const std::string form = "grant_type=refresh_token&refresh_token=" + opdsPercentEncode(refreshToken);
+  std::string response;
+  int tokenStatus = 0;
+  if (!HttpDownloader::postForm(tokenRefreshUrl, form, response, &tokenStatus)) {
+    LOG_ERR("OPDS", "Token refresh failed (status %d)", tokenStatus);
+    return false;
+  }
+  std::string token;
+  if (!extractJsonStringField(response.data(), response.size(), "access_token", token) || token.empty()) {
+    LOG_ERR("OPDS", "Token refresh response had no access_token");
+    return false;
+  }
+  bearerToken = std::move(token);
+  // A rotated refresh token replaces the old one; otherwise keep reusing it.
+  std::string rotated;
+  if (extractJsonStringField(response.data(), response.size(), "refresh_token", rotated) && !rotated.empty()) {
+    refreshToken = std::move(rotated);
+  }
+  LOG_INF("OPDS", "Access token refreshed");
+  return true;
+}
+
+void OpdsBookBrowserActivity::persistTokens() {
+  OpdsTokens tokens;
+  tokens.accessToken = bearerToken;
+  tokens.refreshToken = refreshToken;
+  tokens.refreshUrl = tokenRefreshUrl;
+  OPDS_TOKENS.put(tokenKey(), tokens);
 }
 
 // Resolves the search template lazily: OPDS 1.x servers such as calibre-web,

@@ -69,7 +69,12 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   std::string searchTemplateBase;
   // OAuth access token obtained via the OPDS authentication document's
   // password-grant flow; sent as "Authorization: Bearer" when non-empty.
+  // Loaded from OpdsTokenStore on entry and persisted back when it changes.
   std::string bearerToken;
+  // OAuth refresh token and its endpoint (password grant only; implicit grant
+  // issues none). Used to renew an expired access token without a full login.
+  std::string refreshToken;
+  std::string tokenRefreshUrl;
   // Send HTTP Basic auth from the stored credentials. Latched only after a
   // 401 whose auth document offers Basic (or a bare Basic challenge): sending
   // Basic preemptively breaks OAuth-only servers, which reject an unknown
@@ -127,6 +132,13 @@ class OpdsBookBrowserActivity final : public Activity, private UiAppHost {
   bool hasSearch() const { return !searchTemplate.empty() || !searchDescriptionUrl.empty(); }
   bool ensureSearchTemplate();
   bool authenticateWithServer(const std::string& resourceUrl);
+  // Renew the access token from the refresh token; true on success.
+  bool tryRefreshToken();
+  // Persist the current token state (or clear it) for this server on SD.
+  void persistTokens();
+  // Token-store key: URL plus username, so two accounts on the same server
+  // keep separate tokens. \x1f (unit separator) can't appear in either field.
+  std::string tokenKey() const { return server.url + '\x1f' + server.username; }
   void launchSearch();
   void performSearch(const std::string& query);
   bool preventAutoSleep() override;
