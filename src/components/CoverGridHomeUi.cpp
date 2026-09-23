@@ -24,6 +24,7 @@ constexpr fui::ActionId SELECT = 1;
 // Grid cell padding around each cover; also feeds the screen's horizontal
 // inset so the cover columns land on the header chrome's inset line.
 constexpr int16_t COVER_CELL_INSET = 6;
+constexpr int COVER_ROW_EXTRA_HEIGHT = 8;
 }  // namespace
 
 CoverGridHomeUi::CoverGridHomeUi(GfxRenderer& renderer)
@@ -60,11 +61,10 @@ bool CoverGridHomeUi::takeThumbHeightsChanged() { return std::exchange(thumbHeig
 
 void CoverGridHomeUi::noteThumbHeight(int slotHeight) {
   // One shared height for every slot (hero and grid covers are the same
-  // size), generated to overfill the 2:3 slot so covers fill it edge to edge
-  // (full bleed; the paint clips the overflow). A 0.6-aspect cover needs
-  // 10/9 of the slot height to fill its width; the +8 keeps a few px of
-  // surplus so the art's rightward nudge never exposes the left edge.
-  const int height = std::max(1, slotHeight * 10 / 9 + 8);
+  // size). The +8 surplus gives the paint clip a little bleed so the art's
+  // rightward nudge never exposes the left edge; covers narrower than the
+  // 2:3 slot may show a thin sliver at the sides rather than being cropped.
+  const int height = std::max(1, slotHeight + 8);
   if (thumbHeight != height) {
     thumbHeight = height;
     thumbHeightsChanged = true;
@@ -125,7 +125,7 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   const fui::Rect body = screen.body();
   const int rowGap = std::max<int>(4, body.width / 100);
   grid.gap = grid.rowGap = rowGap;
-  const int coverRowHeight = std::max(1, (body.height - theme.spaceSm - 2 * rowGap) / 3);
+  const int coverRowHeight = std::max(1, (body.height - theme.spaceSm - 2 * rowGap) / 3 + COVER_ROW_EXTRA_HEIGHT);
   const int16_t featuredHeight = std::min<int>(
       body.height, std::max<int>(coverRowHeight, screen.target().lineHeight(theme.bodyText.font) * (landscape ? 1 : 2) +
                                                      screen.target().lineHeight(theme.smallText.font) * 2 + 32));
@@ -197,12 +197,11 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect, const int co
   card.progressHeight = 6;
   card.padding = fui::Insets{6, 6, 6, 6};
   card.gap = theme.spaceLg + theme.spaceSm;
-  // Fixed 2:3 hero box sized from the shared cover row, NOT the featured
-  // rect: when the metadata floor makes the hero section taller than a row,
-  // the extra height pads the card instead of inflating the cover past the
-  // grid covers (which copy this size).
-  card.coverSize.height = std::max(1, std::min<int>(rect.height, coverRowHeight) - 12);
-  card.coverSize.width = std::max(1, card.coverSize.height * 2 / 3);
+  // Fit the shared 2:3 cover box within both the row and a grid column.
+  const int maxCoverWidth = (rect.width - (GRID_COLUMNS - 1) * grid.gap) / GRID_COLUMNS - 2 * COVER_CELL_INSET;
+  card.coverSize.height = std::max(1, std::min(std::min<int>(rect.height, coverRowHeight) - 12, maxCoverWidth * 3 / 2));
+  // Taller, not wider: width derives from the unstretched height.
+  card.coverSize.width = std::max(1, (card.coverSize.height - COVER_ROW_EXTRA_HEIGHT) * 2 / 3);
   noteThumbHeight(card.coverSize.height);
   gridBounds = layoutGrid(screen.body());
   rect.x = gridBounds.x;
