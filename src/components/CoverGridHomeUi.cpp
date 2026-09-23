@@ -65,9 +65,10 @@ bool CoverGridHomeUi::takeThumbHeightsChanged() { return std::exchange(thumbHeig
 
 void CoverGridHomeUi::noteThumbHeight(size_t index, int slotWidth, int slotHeight) {
   if (index >= thumbHeights.size()) return;
-  // Thumbs cover a (0.6*h, h) target box, so a height of max(h, w*5/3) makes
-  // every cover overfill the slot; the cover renderer crops the overflow (full bleed).
-  const int height = std::max({1, slotHeight, slotWidth * 5 / 3 + 2});
+  // Thumbs target a (0.6*h, h) box. Full bleed would need h = w*5/3 (crop the
+  // overflow); halfway between that and a plain fit shows more of each cover:
+  // a slight crop plus slight side margins inside the frame.
+  const int height = std::max({1, slotHeight, (slotHeight + slotWidth * 5 / 3) / 2 + 2});
   if (thumbHeights[index] != height) {
     thumbHeights[index] = height;
     thumbHeightsChanged = true;
@@ -126,12 +127,6 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   const auto& gridRect = gridBounds;
   tabRect.x = gridRect.x + grid.cellInset.left;
   tabRect.width = gridRect.width - grid.cellInset.left - grid.cellInset.right;
-  // Heading aligns to the outer cover columns. The selection ring extends
-  // left of this line by design — it reads as a frame around the cover, not
-  // as the column edge.
-  headingRect.x = tabRect.x;
-  headingRect.width = tabRect.width;
-  screen.target().text(headingRect, hasContinueReading ? tr(STR_CONTINUE_READING) : tr(STR_START_READING), headingText);
   drawTabs(screen, tabRect);
   drawHeaderBand();
 }
