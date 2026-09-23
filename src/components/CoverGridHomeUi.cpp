@@ -105,9 +105,8 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   screen.insetContent(fui::Insets{theme.spaceSm, hInset, theme.spaceSm, hInset});
   const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
   // Reserve the band's slot in the flow (its content draws at a fixed screen
-  // position in drawHeaderBand); the slot, slightly oversized, doubles as
-  // padding above the heading.
-  screen.takeTop(static_cast<int16_t>(UITheme::getInstance().getMetrics().batteryBarHeight + 4), theme.spaceSm);
+  // position in drawHeaderBand); the slot doubles as padding above the heading.
+  screen.takeTop(UITheme::getInstance().getMetrics().batteryBarHeight, theme.spaceSm);
   auto tabRect = screen.takeBottom(UITheme::getInstance().getMetrics().coverGridTabBarHeight, theme.spaceMd);
   if (books->empty()) {
     drawTabs(screen, tabRect.inset(fui::Insets{0, COVER_CELL_INSET, 0, COVER_CELL_INSET}));
@@ -115,15 +114,6 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
     drawHeaderBand();
     return;
   }
-  auto headingText = theme.titleText;
-  headingText.bold = true;
-  // The heading's line box already carries the font's internal leading below
-  // the glyphs, so the small gap is enough visual air before the cover.
-  // The 4-column grid's short rows free vertical space; spend it above the
-  // heading so the whole content block (label, hero, shelf) drops toward the
-  // tabs instead of pooling empty space at the bottom.
-  screen.spacer(24);
-  auto headingRect = screen.takeTop(screen.target().lineHeight(headingText.font), theme.spaceSm);
   // Bound the featured section while leaving room for its metadata. The hero
   // is the focal point: it takes a generous share and the 4-column grid below
   // packs smaller thumbs with tight gaps.
@@ -244,10 +234,11 @@ fui::Rect CoverGridHomeUi::layoutGrid(UiScreen& screen, fui::Rect rect) {
   grid.cellInset = fui::Insets{COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET};
   const int maxCoverWidth = std::max(1, (rect.width - (GRID_COLUMNS - 1) * grid.gap) / GRID_COLUMNS - 12);
   const int maxCoverHeight = std::max(1, (rect.height - (GRID_ROWS - 1) * grid.rowGap) / GRID_ROWS - 12);
-  // Hero-relative cap at 5/3 (was 3/2): slightly larger thumbs tighten the
-  // SpaceBetween column gaps across the full-width grid.
-  grid.coverSize.height = std::max(1, std::min({maxCoverHeight, maxCoverWidth * 5 / 3, card.coverSize.height * 5 / 3}));
-  grid.coverSize.width = std::max(1, grid.coverSize.height * 3 / 5);
+  // Thumbs use a squarer 2:3 box than the hero's 3:5: the covers crop
+  // full-bleed anyway, and the extra width tightens the SpaceBetween column
+  // gaps without costing any of the height budget.
+  grid.coverSize.height = std::max(1, std::min({maxCoverHeight, maxCoverWidth * 3 / 2, card.coverSize.height * 5 / 3}));
+  grid.coverSize.width = std::max(1, grid.coverSize.height * 2 / 3);
   grid.rowHeight = grid.coverSize.height + 12;
   // Full content width: the SpaceBetween column layout pins the outer covers
   // to the rect edges, so the grid reaches the chrome's inset line instead of
@@ -323,6 +314,13 @@ bool CoverGridHomeUi::paintFramedCover(fui::DrawTarget& target, fui::Rect rect, 
   target.fill(fui::Rect{rect.right(), static_cast<int16_t>(rect.y + SHADOW_OFFSET), SHADOW_OFFSET, rect.height}, ink);
   target.fill(fui::Rect{static_cast<int16_t>(rect.x + SHADOW_OFFSET), rect.bottom(), rect.width, SHADOW_OFFSET}, ink);
   const bool drawn = index < coverPaths.size() && coverCache.paint(rect, index, coverPaths[index]);
+  // False spine: a dark left edge with a dithered crease makes every cover
+  // (hero included) read as a bound book, so the tight column gaps read as
+  // shelf spacing rather than cramped covers.
+  constexpr int16_t SPINE_W = 3;
+  target.fill(fui::Rect{rect.x, rect.y, SPINE_W, rect.height}, ink);
+  target.fill(fui::Rect{static_cast<int16_t>(rect.x + SPINE_W), rect.y, 2, rect.height},
+              fui::Paint::dither(fui::Color::LightGray));
   target.stroke(rect, ink, 1, 0);
   return drawn;
 }
