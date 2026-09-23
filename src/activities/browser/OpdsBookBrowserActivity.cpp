@@ -237,10 +237,8 @@ void OpdsBookBrowserActivity::rootScreen(UiScreen& screen, void* user) {
 // Shared chrome for every state: reserve the firmware's button-hint band and
 // draw the themed header (padding, centering, and rule come from the theme).
 void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSearch) {
-  screen.takeBottom(static_cast<int16_t>(UITheme::getInstance().getMetrics().buttonHintsHeight));
-  // Same top offset as every GUI.drawHeader caller, so the band lines up with
-  // the rest of the firmware's screens.
-  screen.spacer(static_cast<int16_t>(UITheme::getInstance().getMetrics().topPadding));
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto& theme = screen.theme();
   fui::HeaderProps header;
   header.title = server.name.empty() ? tr(STR_OPDS_BROWSER) : server.name.c_str();
   header.borderEdges = fui::EdgeBottom;
@@ -259,9 +257,24 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
     // Vertical placement comes from applyHeaderStatus: buttons center on the
     // unified band.
   }
-  screen.header(header);
-  // Same breathing room between header and content as the legacy screens.
-  screen.spacer(static_cast<int16_t>(UITheme::getInstance().getMetrics().verticalSpacing));
+  header.titleText = theme.titleText;
+  header.titleText.align = theme.headerTitleAlign;
+  header.styles = theme.popup;
+  if (header.styles.normal.border.kind == fui::PaintKind::None && theme.headerUnderline > 0) {
+    header.styles.normal.border = fui::Paint::solid(fui::Color::Black);
+    header.styles.normal.borderWidth = theme.headerUnderline;
+  }
+  header.trailingStyles = fui::plainStyles(fui::Paint::solid(fui::Color::Black));
+  header.sidePadding = theme.headerSidePadding;
+  header.minTouchSize = theme.minTouchSize;
+  const auto frameRect = screen.frame().screen();
+  fui::header(screen.frame(),
+              fui::Rect{frameRect.x, static_cast<int16_t>(metrics.topPadding), frameRect.width,
+                        static_cast<int16_t>(metrics.headerHeight)},
+              header);
+  screen.setContentMarginFromScreen(
+      fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight + metrics.verticalSpacing), 0,
+                  static_cast<int16_t>(metrics.buttonHintsHeight), 0});
 }
 
 void OpdsBookBrowserActivity::buildBrowsingScreen(UiScreen& screen) {
