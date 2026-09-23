@@ -250,7 +250,7 @@ void OpdsBookBrowserActivity::screenHeader(UiScreen& screen, const bool withSear
   // Only the browsing state routes header taps (and only there does back mean
   // anything); the loading/downloading/status headers stay passive.
   if (state == BrowserState::BROWSING && mappedInput.hasTouch()) {
-    header.leadingIcon = fui::bitmapFromIcon(icon_header_back_24);
+    header.leadingIcon = fui::bitmapFromIcon(icon_header_back_32);
     header.leadingAction = ACTION_BACK;
   }
   if (withSearch && !searchTemplate.empty()) {

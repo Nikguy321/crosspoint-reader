@@ -173,6 +173,8 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .headerUnderlineSize = 0,
                                  .headerTitleAlign = 1,  // centered
                                  .headerBatterySide = 0,
+                                 // Corner clock: a centered clock would collide with the centered title.
+                                 .headerClockCentered = false,
                                  .menuRowHeight = 45,
                                  .menuSpacing = 8,
                                  .tabSpacing = 10,

@@ -2,5 +2,5 @@
 #   python3 freeink-sdk/libs/assets/Icons/tools/gen_icons.py \
 #     --manifest src/components/icons/headerIcons.manifest \
 #     --svgdir freeink-sdk/libs/assets/Icons/lucide/icons \
-#     --sizes 24 --out src/components/icons/headerIcons.h
+#     --sizes 32 --out src/components/icons/headerIcons.h
 header-back = arrow-left

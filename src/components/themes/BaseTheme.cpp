@@ -415,7 +415,7 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   const int16_t backBtnSize = props.leadingSize > 0 ? props.leadingSize : static_cast<int16_t>(band.height - 8);
   const bool showBackButton = backButton && title != nullptr && !batteryLeft && gpio.hasTouch();
   if (showBackButton) {
-    props.leadingIcon = fui::bitmapFromIcon(icon_header_back_24);
+    props.leadingIcon = fui::bitmapFromIcon(icon_header_back_32);
     props.leadingAction = 1;  // any non-NO_ACTION id: paints the button, routing is via HeaderBackTapTarget
     HeaderBackTapTarget::set(band.x + 4, band.y + 4 + props.actionOffsetY, backBtnSize, backBtnSize);
   } else {

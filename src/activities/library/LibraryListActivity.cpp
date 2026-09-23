@@ -930,7 +930,7 @@ void LibraryListActivity::buildHeader(UiScreen& screen) {
   // heights are unified across themes, so the buttons derive from the band.
   GUI.applyHeaderStatus(renderer, header);
   if (mappedInput.hasTouch()) {
-    header.leadingIcon = fui::bitmapFromIcon(icon_header_back_24);
+    header.leadingIcon = fui::bitmapFromIcon(icon_header_back_32);
     header.leadingAction = ACTION_BACK;
   }
   if (!degraded) {
