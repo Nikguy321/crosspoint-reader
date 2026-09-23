@@ -197,11 +197,12 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect, const int co
   card.progressHeight = 6;
   card.padding = fui::Insets{6, 6, 6, 6};
   card.gap = theme.spaceLg + theme.spaceSm;
-  // Fit the shared 2:3 cover box within both the row and a grid column.
-  const int maxCoverWidth = (rect.width - (GRID_COLUMNS - 1) * grid.gap) / GRID_COLUMNS - 2 * COVER_CELL_INSET;
+  // Fit the shared 2:3 cover box within both the row and a grid column. No
+  // gap reserve: the cell insets already keep adjacent covers apart, and the
+  // SpaceBetween layout absorbs whatever slack remains.
+  const int maxCoverWidth = rect.width / GRID_COLUMNS - 2 * COVER_CELL_INSET;
   card.coverSize.height = std::max(1, std::min(std::min<int>(rect.height, coverRowHeight) - 12, maxCoverWidth * 3 / 2));
-  // Taller, not wider: width derives from the unstretched height.
-  card.coverSize.width = std::max(1, (card.coverSize.height - COVER_ROW_EXTRA_HEIGHT) * 2 / 3);
+  card.coverSize.width = std::max(1, card.coverSize.height * 2 / 3);
   noteThumbHeight(card.coverSize.height);
   gridBounds = layoutGrid(screen.body());
   rect.x = gridBounds.x;
