@@ -1,4 +1,5 @@
 #pragma once
+#include <BoardConfig.h>
 #include <I18n.h>
 
 #include <functional>
@@ -29,6 +30,9 @@ enum class SettingAction {
   KeyboardLayouts,
   HomeButton,
   About,
+#if FREEINK_CAP_TOUCH
+  TapZones,
+#endif
 };
 
 struct SettingInfo {

@@ -32,6 +32,9 @@
 #include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
+#if FREEINK_CAP_TOUCH
+#include "TapZoneSettingsActivity.h"
+#endif
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
@@ -91,6 +94,11 @@ void SettingsActivity::rebuildSettingsLists() {
     controlsSettings.insert(controlsSettings.begin(),
                             SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   }
+#if FREEINK_CAP_TOUCH
+  if (BoardConfig::hasTouch()) {
+    controlsSettings.push_back(SettingInfo::Action(StrId::STR_TAP_ZONE_LAYOUT, SettingAction::TapZones));
+  }
+#endif
   if (BoardConfig::hasHomeKey()) {
     controlsSettings.insert(controlsSettings.begin(),
                             SettingInfo::Action(StrId::STR_HOME_BUTTON, SettingAction::HomeButton));
@@ -442,6 +450,15 @@ void SettingsActivity::toggleCurrentSetting() {
           LOG_ERR("SETTINGS", "OOM: AboutActivity");
         }
         break;
+#if FREEINK_CAP_TOUCH
+      case SettingAction::TapZones:
+        if (auto activity = makeUniqueNoThrow<TapZoneSettingsActivity>(renderer, mappedInput)) {
+          startActivityForResult(std::move(activity), nullptr);
+        } else {
+          LOG_ERR("SETTINGS", "OOM: TapZoneSettingsActivity");
+        }
+        break;
+#endif
       case SettingAction::None:
         // Do nothing
         break;

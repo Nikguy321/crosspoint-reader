@@ -353,6 +353,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Which gestures turn the page in each direction (PAGE_TURN_GESTURE).
   uint8_t pageTurnGesture = SWIPE_ONLY;
   uint8_t previousPageGesture = SWIPE_ONLY;
+  enum TAP_ZONE_MAP { TAP_ZONE_CURRENT = 0, TAP_ZONE_STEPPED = 1, TAP_ZONE_MAP_COUNT };
+  uint8_t tapZoneMap = TAP_ZONE_CURRENT;
   // Reader menu open gesture (SHOW_READER_MENU: off / center tap / bottom-edge
   // up-swipe). Only surfaced on home-key boards, where Home is the capacitive
   // key and the bottom edge is free; elsewhere it stays at the Tap default.

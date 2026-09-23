@@ -78,6 +78,27 @@ struct TouchPageTurn {
   unsigned long heldMs;
 };
 
+enum class TapZone { Previous, Next, Menu };
+
+inline TapZone tapZoneAt(const int x, const int y, const int width, const int height) {
+  const int left = width / 3;
+  const int right = width - left;
+  const int top = height / 3;
+  const int bottom = height - top;
+  if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_TAP && x >= left && x < right && y >= top &&
+      y < bottom) {
+    return TapZone::Menu;
+  }
+
+  const bool inverted = SETTINGS.pageTurnGesture == CrossPointSettings::INVERTED_TAP ||
+                        SETTINGS.previousPageGesture == CrossPointSettings::INVERTED_TAP;
+  if (SETTINGS.tapZoneMap == CrossPointSettings::TAP_ZONE_STEPPED) {
+    const bool next = !(x < left || (y < top && x < right));
+    return (next != inverted) ? TapZone::Next : TapZone::Previous;
+  }
+  return (inverted ? x < (width * 2) / 3 : x >= left) ? TapZone::Next : TapZone::Previous;
+}
+
 inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input) {
   TouchPageTurn result{false, false, 0};
   if (!SETTINGS.touchReaderControls || !input.hasTouch()) {
@@ -106,41 +127,27 @@ inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const Mapp
 
   const int width = renderer.getScreenWidth();
   const int height = renderer.getScreenHeight();
-  // The centered reader-menu tap target (isTouchMenuTap below) keeps priority
-  // over the page-turn zones.
-  if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_TAP && x >= width / 3 && x < width - width / 3 &&
-      y >= height / 3 && y < height - height / 3) {
+  const TapZone zone = tapZoneAt(x, y, width, height);
+  if (zone == TapZone::Menu) {
     return result;
   }
 
-  // Give the whole page to the sole tap-enabled direction. When both accept
-  // taps, split at the left third; either Inverted Tap setting swaps the
-  // shared zones.
-  const bool inverted = SETTINGS.pageTurnGesture == CrossPointSettings::INVERTED_TAP ||
-                        SETTINGS.previousPageGesture == CrossPointSettings::INVERTED_TAP;
-  const bool nextZone = inverted ? x < (width * 2) / 3 : x >= width / 3;
-  result.next = nextTaps && (!prevTaps || nextZone);
-  result.prev = prevTaps && (!nextTaps || !nextZone);
+  // A sole tap-enabled direction still accepts the entire page outside Menu.
+  result.next = nextTaps && (!prevTaps || zone == TapZone::Next);
+  result.prev = prevTaps && (!nextTaps || zone == TapZone::Previous);
   result.heldMs = gpio.lastTouchHeldMs();
   return result;
 }
 
-// Tap in the center third of the screen: the tap path into the reader menu on
-// every touch board. detectTouchPageTurn() excludes this centered rectangle,
-// so it remains free in tap mode. The Off/Swipe Up
-// alternatives are only surfaced on home-key boards (SettingsList), where the
-// menu stays reachable through the key's long-press function.
+// The menu's center rectangle has priority over either page-turn map when
+// menu taps are enabled. Home-key boards can use Off or Swipe Up instead.
 inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input) {
   if (!input.hasTouch()) return false;
   if (SETTINGS.showReaderMenu != CrossPointSettings::READER_MENU_TAP) return false;
   int x = 0;
   int y = 0;
   if (!input.wasScreenTapped(x, y)) return false;
-  const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
-  const int zoneWidth = width / 3;
-  const int zoneHeight = height / 3;
-  return x >= zoneWidth && x < width - zoneWidth && y >= zoneHeight && y < height - zoneHeight;
+  return tapZoneAt(x, y, renderer.getScreenWidth(), renderer.getScreenHeight()) == TapZone::Menu;
 }
 
 // Reader menu opens on the menu edge-swipe or a center-third tap. Home-key
