@@ -12,16 +12,11 @@
 // list/popup interaction as SettingsActivity.
 class ControlsSubmenuActivity final : public UiListActivity {
  public:
-  struct Row {
-    SettingInfo setting;
-    bool (*visible)() = nullptr;  // nullptr = always shown
-  };
-
-  ControlsSubmenuActivity(GfxRenderer& renderer, MappedInputManager& input, StrId title, std::vector<Row> rows);
+  ControlsSubmenuActivity(GfxRenderer& renderer, MappedInputManager& input, StrId title, std::vector<SettingInfo> rows);
 
  private:
   StrId title_;
-  std::vector<Row> rows_;
+  std::vector<SettingInfo> rows_;
   std::vector<int> visible_;  // indices into rows_, refreshed each buildScreen
   std::vector<std::string> values_;
   std::vector<freeink::ui::ListItem> items_;

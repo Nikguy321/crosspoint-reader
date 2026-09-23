@@ -225,16 +225,7 @@ void SettingsActivity::routeControlsSetting(const SettingInfo& setting) {
 }
 
 void SettingsActivity::openSubmenu(StrId title, const std::vector<SettingInfo>& list) {
-  std::vector<ControlsSubmenuActivity::Row> rows;
-  rows.reserve(list.size());
-  for (const auto& s : list) {
-    ControlsSubmenuActivity::Row row{s, nullptr};
-    if (s.valuePtr == &CrossPointSettings::pwrBtnFootnoteBack) {
-      row.visible = [] { return SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::FOOTNOTES; };
-    }
-    rows.push_back(std::move(row));
-  }
-  auto activity = makeUniqueNoThrow<ControlsSubmenuActivity>(renderer, mappedInput, title, std::move(rows));
+  auto activity = makeUniqueNoThrow<ControlsSubmenuActivity>(renderer, mappedInput, title, list);
   if (!activity) {
     LOG_ERR("SET", "OOM: controls submenu");
     return;

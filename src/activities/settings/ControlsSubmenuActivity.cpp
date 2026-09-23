@@ -8,7 +8,7 @@
 namespace fui = freeink::ui;
 
 ControlsSubmenuActivity::ControlsSubmenuActivity(GfxRenderer& renderer, MappedInputManager& input, StrId title,
-                                                 std::vector<Row> rows)
+                                                 std::vector<SettingInfo> rows)
     : UiListActivity("ControlsSubmenu", renderer, input), title_(title), rows_(std::move(rows)) {
   visible_.reserve(rows_.size());
   items_.reserve(rows_.size());
@@ -19,7 +19,13 @@ ControlsSubmenuActivity::ControlsSubmenuActivity(GfxRenderer& renderer, MappedIn
 void ControlsSubmenuActivity::rebuildVisible() {
   visible_.clear();
   for (int i = 0; i < static_cast<int>(rows_.size()); ++i) {
-    if (!rows_[i].visible || rows_[i].visible()) visible_.push_back(i);
+    // The footnote-back toggle only applies while the power click action is
+    // Footnotes.
+    if (rows_[i].valuePtr == &CrossPointSettings::pwrBtnFootnoteBack &&
+        SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::FOOTNOTES) {
+      continue;
+    }
+    visible_.push_back(i);
   }
 }
 
@@ -32,7 +38,7 @@ void ControlsSubmenuActivity::activateIndex(int index) {
   mappedInput.resetHomeButtonInput();
   app.clearTapFlash();
   nav.selected = index;
-  const auto& setting = rows_[visible_[index]].setting;
+  const auto& setting = rows_[visible_[index]];
 
   if (setting.type == SettingType::ACTION) {
     if (setting.action == SettingAction::RemapFrontButtons) {
@@ -91,7 +97,7 @@ void ControlsSubmenuActivity::buildScreen(UiScreen& screen) {
   items_.clear();
   values_.assign(visible_.size(), std::string());
   for (int i = 0; i < listCount(); ++i) {
-    const auto& setting = rows_[visible_[i]].setting;
+    const auto& setting = rows_[visible_[i]];
     fui::ListItem item;
     item.label = I18N.get(setting.nameId);
     item.actionValue = static_cast<int16_t>(i);
