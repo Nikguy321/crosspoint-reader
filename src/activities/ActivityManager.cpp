@@ -194,6 +194,9 @@ void ActivityManager::loop() {
       } else if (pendingAction == PendingAction::Push) {
         // Move current activity to stack
         stackActivities.push_back(std::move(currentActivity));
+        // The parent's header back rect must not route taps on the pushed
+        // screen (which may draw no header of its own).
+        HeaderBackTapTarget::clear();
         LOG_DBG("ACT", "Pushed to activity stack, new size = %zu", stackActivities.size());
       }
       pendingAction = PendingAction::None;
