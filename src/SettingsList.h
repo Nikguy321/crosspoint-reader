@@ -380,18 +380,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
                             "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM),
 
-        // OPDS download folder: persisted + web-exposed, but category-less so it
-        // is hidden from the on-device Settings screen (edited via OPDS UI).
+        // OPDS entries: persisted + settable by key, but category-less so they
+        // are hidden from both the device Settings screen and the web settings
+        // page (edited via the OPDS UI).
         SettingInfo::String(StrId::STR_OPDS_DOWNLOAD_FOLDER, &SETTINGS.opdsDownloadFolder[0],
                             sizeof(SETTINGS.opdsDownloadFolder), "opdsDownloadFolder"),
-        // OPDS download filename format: persisted + web-exposed, category-less so it
-        // is hidden from the on-device Settings screen (cycled from the OPDS UI).
         SettingInfo::Enum(StrId::STR_OPDS_FILENAME_FORMAT, &CrossPointSettings::opdsFilenameFormat,
                           {StrId::STR_FMT_AUTHOR_TITLE, StrId::STR_FMT_TITLE_AUTHOR, StrId::STR_FMT_TITLE},
                           "opdsFilenameFormat"),
 
-        // Frontlight quick-panel state: persisted and web-exposed, but hidden
-        // from the on-device Settings screen because the swipe panel owns it.
+        // Frontlight quick-panel state: persisted + settable by key, but hidden
+        // from both settings UIs because the swipe panel owns it.
         SettingInfo::Value(StrId::STR_BRIGHTNESS, &CrossPointSettings::frontlightBrightness, {0, 100, 5},
                            "frontlightBrightness"),
 #if FREEINK_CAP_WARMLIGHT
