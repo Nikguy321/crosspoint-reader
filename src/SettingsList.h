@@ -17,6 +17,7 @@
 #include "KOReaderCredentialStore.h"
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
+#include "activities/settings/SpacingLabels.h"
 #include "components/UITheme.h"
 #include "util/DictionaryRegistry.h"
 
@@ -275,10 +276,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                             CrossPointSettings::WORD_SPACING_STEP},
                            "wordSpacing", StrId::STR_CAT_READER)
             .withTextSettings(),
-        SettingInfo::Enum(StrId::STR_CHARACTER_SPACING, &CrossPointSettings::characterSpacing,
-                          {StrId::STR_SPACING_MINUS_2, StrId::STR_SPACING_MINUS_1, StrId::STR_SPACING_ZERO,
-                           StrId::STR_SPACING_PLUS_1, StrId::STR_SPACING_PLUS_2},
-                          "characterSpacing", StrId::STR_CAT_READER)
+        SettingInfo::StaticStringEnum(StrId::STR_CHARACTER_SPACING, &CrossPointSettings::characterSpacing,
+                                      spacing_labels::CHARACTER, "characterSpacing", StrId::STR_CAT_READER)
             .withTextSettings(),
         SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &CrossPointSettings::screenMargin,
                            {CrossPointSettings::SCREEN_MARGIN_MIN, CrossPointSettings::SCREEN_MARGIN_MAX,

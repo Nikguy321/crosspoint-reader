@@ -38,6 +38,7 @@ struct SettingInfo {
   std::vector<StrId> enumValues;
   std::span<const StrId> staticEnumValues;
   std::vector<std::string> enumStringValues;  // runtime alternative to StrId enumValues (for SD card fonts etc.)
+  std::span<const char* const> staticStringValues;
   SettingAction action = SettingAction::None;
 
   struct ValueRange {
@@ -76,6 +77,11 @@ struct SettingInfo {
     return staticEnumValues.empty() ? std::span<const StrId>(enumValues) : staticEnumValues;
   }
 
+  size_t enumCount() const {
+    if (!staticStringValues.empty()) return staticStringValues.size();
+    return enumStringValues.empty() ? enumLabels().size() : enumStringValues.size();
+  }
+
   static SettingInfo Toggle(StrId nameId, uint8_t CrossPointSettings::* ptr, const char* key = nullptr,
                             StrId category = StrId::STR_NONE_OPT) {
     SettingInfo s;
@@ -106,6 +112,19 @@ struct SettingInfo {
     s.type = SettingType::ENUM;
     s.valuePtr = ptr;
     s.staticEnumValues = values;
+    s.key = key;
+    s.category = category;
+    return s;
+  }
+
+  static SettingInfo StaticStringEnum(StrId nameId, uint8_t CrossPointSettings::* ptr,
+                                      std::span<const char* const> values, const char* key = nullptr,
+                                      StrId category = StrId::STR_NONE_OPT) {
+    SettingInfo s;
+    s.nameId = nameId;
+    s.type = SettingType::ENUM;
+    s.valuePtr = ptr;
+    s.staticStringValues = values;
     s.key = key;
     s.category = category;
     return s;

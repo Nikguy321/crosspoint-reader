@@ -14,6 +14,7 @@
 #include "MappedInputManager.h"
 #include "ReaderFontSizes.h"
 #include "SdCardFontSystem.h"
+#include "SpacingLabels.h"
 #include "TextSettingsPreview.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -45,13 +46,6 @@ int findCurrentFontIndex(const SdCardFontRegistry* registry, const char* sdFontF
 }
 
 constexpr StrId LINE_SPACING_IDS[] = {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE, StrId::STR_EXTRA_WIDE};
-constexpr StrId WORD_SPACING_IDS[] = {StrId::STR_SPACING_50_PERCENT,  StrId::STR_SPACING_75_PERCENT,
-                                      StrId::STR_SPACING_100_PERCENT, StrId::STR_SPACING_125_PERCENT,
-                                      StrId::STR_SPACING_150_PERCENT, StrId::STR_SPACING_175_PERCENT,
-                                      StrId::STR_SPACING_200_PERCENT};
-constexpr StrId CHARACTER_SPACING_IDS[] = {StrId::STR_SPACING_MINUS_2, StrId::STR_SPACING_MINUS_1,
-                                           StrId::STR_SPACING_ZERO, StrId::STR_SPACING_PLUS_1,
-                                           StrId::STR_SPACING_PLUS_2};
 constexpr StrId ALIGNMENT_IDS[] = {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT,
                                    StrId::STR_BOOK_S_STYLE};
 constexpr int MARGIN_MIN = CrossPointSettings::SCREEN_MARGIN_MIN;
@@ -60,7 +54,7 @@ constexpr int MARGIN_STEP = CrossPointSettings::SCREEN_MARGIN_STEP;
 constexpr int WORD_SPACING_MIN = CrossPointSettings::WORD_SPACING_MIN;
 constexpr int WORD_SPACING_MAX = CrossPointSettings::WORD_SPACING_MAX;
 constexpr int WORD_SPACING_STEP = CrossPointSettings::WORD_SPACING_STEP;
-static_assert(std::size(WORD_SPACING_IDS) == (WORD_SPACING_MAX - WORD_SPACING_MIN) / WORD_SPACING_STEP + 1);
+static_assert(std::size(spacing_labels::WORD) == (WORD_SPACING_MAX - WORD_SPACING_MIN) / WORD_SPACING_STEP + 1);
 }  // namespace
 
 TextSettingsActivity::TextSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
@@ -404,8 +398,8 @@ void TextSettingsActivity::confirmLayoutRow(int row) {
     case LayoutRow::WordSpacing: {
       const int cur = (std::clamp<int>(SETTINGS.wordSpacing, WORD_SPACING_MIN, WORD_SPACING_MAX) - WORD_SPACING_MIN) /
                       WORD_SPACING_STEP;
-      optionPopup_.show(StrId::STR_WORD_SPACING, WORD_SPACING_IDS, static_cast<int>(std::size(WORD_SPACING_IDS)), cur,
-                        [](int idx) {
+      optionPopup_.show(tr(STR_WORD_SPACING), spacing_labels::WORD, static_cast<int>(std::size(spacing_labels::WORD)),
+                        cur, [](int idx) {
                           SETTINGS.wordSpacing = static_cast<uint8_t>(WORD_SPACING_MIN + idx * WORD_SPACING_STEP);
                           SETTINGS.saveToFile();
                         });
@@ -413,8 +407,8 @@ void TextSettingsActivity::confirmLayoutRow(int row) {
       break;
     }
     case LayoutRow::CharacterSpacing:
-      optionPopup_.show(StrId::STR_CHARACTER_SPACING, CHARACTER_SPACING_IDS,
-                        static_cast<int>(std::size(CHARACTER_SPACING_IDS)), SETTINGS.characterSpacing, [](int idx) {
+      optionPopup_.show(tr(STR_CHARACTER_SPACING), spacing_labels::CHARACTER,
+                        static_cast<int>(std::size(spacing_labels::CHARACTER)), SETTINGS.characterSpacing, [](int idx) {
                           SETTINGS.characterSpacing = static_cast<uint8_t>(idx);
                           SETTINGS.saveToFile();
                         });
@@ -454,8 +448,9 @@ std::string TextSettingsActivity::layoutValueText(int row) const {
       return std::to_string(SETTINGS.wordSpacing) + "%";
     case LayoutRow::CharacterSpacing: {
       const uint8_t v = SETTINGS.characterSpacing;
-      return v < std::size(CHARACTER_SPACING_IDS) ? I18N.get(CHARACTER_SPACING_IDS[v])
-                                                  : I18N.get(StrId::STR_SPACING_ZERO);
+      return v < std::size(spacing_labels::CHARACTER)
+                 ? spacing_labels::CHARACTER[v]
+                 : spacing_labels::CHARACTER[CrossPointSettings::CHARACTER_SPACING_OFFSET];
     }
     case LayoutRow::ScreenMargin:
       return std::to_string(SETTINGS.screenMargin);

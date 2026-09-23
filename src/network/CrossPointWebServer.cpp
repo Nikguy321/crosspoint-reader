@@ -1206,7 +1206,11 @@ void CrossPointWebServer::handleGetSettings() const {
           doc["value"] = static_cast<int>(s.valueGetter());
         }
         JsonArray options = doc["options"].to<JsonArray>();
-        if (!s.enumStringValues.empty()) {
+        if (!s.staticStringValues.empty()) {
+          for (const auto* opt : s.staticStringValues) {
+            options.add(opt);
+          }
+        } else if (!s.enumStringValues.empty()) {
           for (const auto& opt : s.enumStringValues) {
             options.add(opt);
           }
@@ -1293,8 +1297,7 @@ void CrossPointWebServer::handlePostSettings() {
       }
       case SettingType::ENUM: {
         const int val = doc[s.key].as<int>();
-        const int maxVal = s.enumStringValues.empty() ? static_cast<int>(s.enumLabels().size())
-                                                      : static_cast<int>(s.enumStringValues.size());
+        const int maxVal = static_cast<int>(s.enumCount());
         if (val >= 0 && val < maxVal) {
           if (s.valuePtr) {
             SETTINGS.*(s.valuePtr) = static_cast<uint8_t>(val);
