@@ -731,7 +731,6 @@ bool LibraryListActivity::handleCustomInput() {
 
 bool LibraryListActivity::handleButtons() {
   const int count = listCount();
-  auto& nav = activeNav();
 
   // Every hold action fires at the threshold, mid-hold, including the ones
   // that open a dialog (remove-recent, delete). The release that follows is

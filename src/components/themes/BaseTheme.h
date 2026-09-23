@@ -261,7 +261,7 @@ class BaseTheme {
   // FONT_LABEL slot (bound to the fixed small font by makeUiTarget and
   // drawHeader). The label strings point at internal static buffers refreshed
   // per call (headers draw on the single render task).
-  void applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props) const;
+  static void applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props);
   // Edge inset drawHeader uses for the clock/battery status line (detached
   // layouts hug the corner with a legacy 12px inset instead of the padding).
   static int headerStatusInset();

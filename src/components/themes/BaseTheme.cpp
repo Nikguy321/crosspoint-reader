@@ -310,7 +310,7 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
 // looks like it overhangs the content columns.
 int BaseTheme::headerStatusInset() { return UITheme::getInstance().getMetrics().headerSidePadding + 4; }
 
-void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props) const {
+void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props) {
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
   auto& status = props.status;
 
