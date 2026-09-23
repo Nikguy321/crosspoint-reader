@@ -405,15 +405,14 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
     // centers on the band, clear of the band's bottom edge.
     props.titleOffsetY = 0;
   }
-  const bool batteryLeft = props.status.batteryLeft;
   // Tappable back button leading the band on touch boards, so every pushed
   // screen offers a visible way out beside the edge-swipe gesture. This frame
   // registers no hit rects, so the rect is recorded in HeaderBackTapTarget and
   // MappedInputManager folds taps on it into Button::Back. Same geometry as
   // the FUI header's leading slot (applyHeaderStatus set the size/offset) so
   // the recorded rect matches the drawn button.
-  const int16_t backBtnSize = props.leadingSize > 0 ? props.leadingSize : static_cast<int16_t>(band.height - 8);
-  const bool showBackButton = backButton && title != nullptr && !batteryLeft && gpio.hasTouch();
+  const int16_t backBtnSize = props.leadingSize;
+  const bool showBackButton = backButton && title != nullptr && !props.status.batteryLeft && gpio.hasTouch();
   if (showBackButton) {
     props.leadingIcon = fui::bitmapFromIcon(icon_header_back_32);
     props.leadingAction = 1;  // any non-NO_ACTION id: paints the button, routing is via HeaderBackTapTarget

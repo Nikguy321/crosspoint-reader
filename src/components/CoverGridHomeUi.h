@@ -27,7 +27,7 @@ class CoverGridHomeUi final : public UiAppHost {
   // Thumbs must be generated at the drawn size: rescaling a dithered 1-bit
   // image aliases badly.
   int thumbHeightFor() const;
-  bool takeThumbHeightsChanged();
+  bool takeThumbHeightChanged();
 
  private:
   static void screenFn(UiScreen& screen, void* user);
@@ -48,7 +48,7 @@ class CoverGridHomeUi final : public UiAppHost {
   const std::vector<RecentBook>* books = nullptr;
   std::array<std::string, MAX_BOOKS> coverPaths;
   int thumbHeight = 0;
-  bool thumbHeightsChanged = false;
+  bool thumbHeightChanged = false;
   int selected = 0;
   int pending = -1;
   int progress = -1;

@@ -469,7 +469,7 @@ void HomeActivity::render(RenderLock&&) {
     // pass, orientation switch) means the paths must point at those sizes and
     // any missing thumbs must be generated. Refreshing the paths right away
     // lets the next pass draw already-cached thumbs before generation runs.
-    const bool coverSpecChanged = coverGridUi->takeThumbHeightsChanged();
+    const bool coverSpecChanged = coverGridUi->takeThumbHeightChanged();
     if (coverSpecChanged) {
       coverGridUi->refreshCoverPaths();
       recentsLoaded = false;

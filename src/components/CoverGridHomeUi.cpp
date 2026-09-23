@@ -57,7 +57,7 @@ void CoverGridHomeUi::refreshCoverPath(size_t index) {
 
 int CoverGridHomeUi::thumbHeightFor() const { return thumbHeight > 0 ? thumbHeight : THUMB_HEIGHT; }
 
-bool CoverGridHomeUi::takeThumbHeightsChanged() { return std::exchange(thumbHeightsChanged, false); }
+bool CoverGridHomeUi::takeThumbHeightChanged() { return std::exchange(thumbHeightChanged, false); }
 
 void CoverGridHomeUi::noteThumbHeight(int slotHeight) {
   // One shared height for every slot (hero and grid covers are the same
@@ -67,7 +67,7 @@ void CoverGridHomeUi::noteThumbHeight(int slotHeight) {
   const int height = std::max(1, slotHeight + 8);
   if (thumbHeight != height) {
     thumbHeight = height;
-    thumbHeightsChanged = true;
+    thumbHeightChanged = true;
     refreshCoverPaths();
   }
 }
@@ -131,9 +131,8 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
                                                      screen.target().lineHeight(theme.smallText.font) * 2 + 32));
   drawCurrent(screen, screen.takeTop(featuredHeight, theme.spaceSm), coverRowHeight);
   drawGrid(screen);
-  const auto& gridRect = gridBounds;
-  tabRect.x = gridRect.x + grid.cellInset.left;
-  tabRect.width = gridRect.width - grid.cellInset.left - grid.cellInset.right;
+  tabRect.x = gridBounds.x + grid.cellInset.left;
+  tabRect.width = gridBounds.width - grid.cellInset.left - grid.cellInset.right;
   drawTabs(screen, tabRect);
   drawHeaderBand();
 }
