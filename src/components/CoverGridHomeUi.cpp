@@ -21,6 +21,9 @@
 namespace fui = freeink::ui;
 namespace {
 constexpr fui::ActionId SELECT = 1;
+// Grid cell padding around each cover; also feeds the screen's horizontal
+// inset so the cover columns land on the header chrome's inset line.
+constexpr int16_t COVER_CELL_INSET = 6;
 }  // namespace
 
 CoverGridHomeUi::CoverGridHomeUi(GfxRenderer& renderer)
@@ -93,24 +96,39 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   screen.setContentMarginFromScreen(fui::Insets{
       static_cast<int16_t>(safe.y), static_cast<int16_t>(renderer.getScreenWidth() - safe.x - safe.width),
       static_cast<int16_t>(renderer.getScreenHeight() - safe.y - safe.height), static_cast<int16_t>(safe.x)});
-  screen.insetContent(fui::Insets{theme.spaceSm, theme.spaceLg, theme.spaceSm, theme.spaceLg});
+  // Horizontal inset sized so the outer cover columns (content x plus the
+  // grid's cell inset) sit on the theme's side-padding line: the heading and
+  // tabs then align with the clock and battery, which tuck a few px further
+  // in (headerStatusInset's optical bias).
+  const int16_t hInset = std::max<int16_t>(
+      0, static_cast<int16_t>(UITheme::getInstance().getMetrics().headerSidePadding - COVER_CELL_INSET - safe.x));
+  screen.insetContent(fui::Insets{theme.spaceSm, hInset, theme.spaceSm, hInset});
   const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
-  const auto header = screen.takeTop(UITheme::getInstance().getMetrics().batteryBarHeight, theme.spaceSm);
+  // Reserve the band's slot in the flow (its content draws at a fixed screen
+  // position in drawHeaderBand); the slot, slightly oversized, doubles as
+  // padding above the heading.
+  screen.takeTop(static_cast<int16_t>(UITheme::getInstance().getMetrics().batteryBarHeight + 4), theme.spaceSm);
   auto tabRect = screen.takeBottom(UITheme::getInstance().getMetrics().coverGridTabBarHeight, theme.spaceMd);
   if (books->empty()) {
-    drawTabs(screen, tabRect.inset(fui::Insets{0, 6, 0, 6}));
+    drawTabs(screen, tabRect.inset(fui::Insets{0, COVER_CELL_INSET, 0, COVER_CELL_INSET}));
     drawEmpty(screen);
-    drawHeaderBand(header, tabRect.x + 6, tabRect.x + tabRect.width - 6);
+    drawHeaderBand();
     return;
   }
   auto headingText = theme.titleText;
   headingText.bold = true;
   // The heading's line box already carries the font's internal leading below
   // the glyphs, so the small gap is enough visual air before the cover.
+  // The 4-column grid's short rows free vertical space; spend it above the
+  // heading so the whole content block (label, hero, shelf) drops toward the
+  // tabs instead of pooling empty space at the bottom.
+  screen.spacer(24);
   auto headingRect = screen.takeTop(screen.target().lineHeight(headingText.font), theme.spaceSm);
-  // Bound the featured section while leaving room for its metadata.
+  // Bound the featured section while leaving room for its metadata. The hero
+  // is the focal point: it takes a generous share and the 4-column grid below
+  // packs smaller thumbs with tight gaps.
   const int16_t featuredHeight = std::min<int>(
-      screen.body().height, std::max<int>(std::min<int>(240, screen.body().height * 3 / 10),
+      screen.body().height, std::max<int>(std::min<int>(300, screen.body().height * 36 / 100),
                                           screen.target().lineHeight(theme.bodyText.font) * (landscape ? 1 : 2) +
                                               screen.target().lineHeight(theme.smallText.font) * 2 + 32));
   drawCurrent(screen, screen.takeTop(featuredHeight, theme.spaceMd));
@@ -118,33 +136,22 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   const auto& gridRect = gridBounds;
   tabRect.x = gridRect.x + grid.cellInset.left;
   tabRect.width = gridRect.width - grid.cellInset.left - grid.cellInset.right;
-  // Heading shares the clock's alignment line (drawHeaderBand lands the
-  // status content on the outer cover columns, i.e. this same x). The
-  // selection ring extends left of this line by design — it reads as a frame
-  // around the cover, not as the column edge.
+  // Heading aligns to the outer cover columns. The selection ring extends
+  // left of this line by design — it reads as a frame around the cover, not
+  // as the column edge.
   headingRect.x = tabRect.x;
   headingRect.width = tabRect.width;
   screen.target().text(headingRect, hasContinueReading ? tr(STR_CONTINUE_READING) : tr(STR_START_READING), headingText);
   drawTabs(screen, tabRect);
-  // Drawn last so it can borrow the grid geometry, like the tab bar above.
-  drawHeaderBand(header, tabRect.x, tabRect.x + tabRect.width);
+  drawHeaderBand();
 }
 
-void CoverGridHomeUi::drawHeaderBand(fui::Rect header, int coverLeft, int coverRight) {
-  // Same alignment trick as the tabs: the clock's left edge and the battery's
-  // right edge sit on the outer cover columns. drawHeader anchors both at
-  // headerStatusInset() from the band edges, and the clock text is
-  // left-anchored, so 1- vs 2-digit hours never move it.
-  const int inset = GUI.headerStatusInset();
-  const int headerX = std::max(0, coverLeft - inset);
-  const int headerRight = std::min<int>(renderer.getScreenWidth(), coverRight + inset);
-  // Anchored at the theme's topPadding like every pushed screen's header, so
-  // the battery/clock hold one position across the whole UI. The in-flow slot
-  // this band used to occupy stays reserved, doubling as padding above the
-  // heading below.
-  GUI.drawHeader(renderer,
-                 Rect{headerX, UITheme::getInstance().getMetrics().topPadding, headerRight - headerX, header.height},
-                 nullptr);
+void CoverGridHomeUi::drawHeaderBand() {
+  // The stock full-width band at the theme's topPadding, exactly like every
+  // pushed screen's header: the battery/clock hold one position across the
+  // whole UI, and the grid is widened to meet them (see the hInset above).
+  const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.batteryBarHeight}, nullptr);
 }
 
 void CoverGridHomeUi::drawEmpty(UiScreen& screen) {
@@ -224,24 +231,27 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect) {
     // cursor on the hero card.
     const int16_t barH = card.coverSize.height;
     screen.target().fill(
-        fui::Rect{static_cast<int16_t>(rect.x - 9), static_cast<int16_t>(rect.y + (rect.height - barH) / 2), 3, barH},
+        fui::Rect{static_cast<int16_t>(rect.x - 5), static_cast<int16_t>(rect.y + (rect.height - barH) / 2), 3, barH},
         fui::Paint::dither(fui::Color::LightGray));
   }
 }
 
 fui::Rect CoverGridHomeUi::layoutGrid(UiScreen& screen, fui::Rect rect) {
   const auto& theme = screen.theme();
-  grid.gap = std::max<int>(theme.spaceSm, rect.width * 2 / 100);
+  // Tight gaps: four columns leave little width to spare between covers.
+  grid.gap = std::max<int>(4, rect.width / 100);
   grid.rowGap = grid.gap;
-  grid.cellInset = fui::Insets{6, 6, 6, 6};
+  grid.cellInset = fui::Insets{COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET};
   const int maxCoverWidth = std::max(1, (rect.width - (GRID_COLUMNS - 1) * grid.gap) / GRID_COLUMNS - 12);
   const int maxCoverHeight = std::max(1, (rect.height - (GRID_ROWS - 1) * grid.rowGap) / GRID_ROWS - 12);
-  grid.coverSize.height = std::max(1, std::min({maxCoverHeight, maxCoverWidth * 5 / 3, card.coverSize.height * 3 / 2}));
+  // Hero-relative cap at 5/3 (was 3/2): slightly larger thumbs tighten the
+  // SpaceBetween column gaps across the full-width grid.
+  grid.coverSize.height = std::max(1, std::min({maxCoverHeight, maxCoverWidth * 5 / 3, card.coverSize.height * 5 / 3}));
   grid.coverSize.width = std::max(1, grid.coverSize.height * 3 / 5);
   grid.rowHeight = grid.coverSize.height + 12;
-  const int gridWidth = GRID_COLUMNS * (grid.coverSize.width + 12) + (GRID_COLUMNS - 1) * grid.gap;
-  rect.x += (rect.width - gridWidth) / 2;
-  rect.width = gridWidth;
+  // Full content width: the SpaceBetween column layout pins the outer covers
+  // to the rect edges, so the grid reaches the chrome's inset line instead of
+  // centering at its natural width.
   rect.height = GRID_ROWS * grid.rowHeight + (GRID_ROWS - 1) * grid.rowGap;
   return rect;
 }

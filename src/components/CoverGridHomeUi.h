@@ -32,7 +32,7 @@ class CoverGridHomeUi final : public UiAppHost {
   static void screenFn(UiScreen& screen, void* user);
   static void onAction(const freeink::ui::ActionEvent& event, void* user);
   void draw(UiScreen& screen);
-  void drawHeaderBand(freeink::ui::Rect header, int coverLeft, int coverRight);
+  void drawHeaderBand();
   void drawEmpty(UiScreen& screen);
   void drawCurrent(UiScreen& screen, freeink::ui::Rect rect);
   void drawGrid(UiScreen& screen);

@@ -304,7 +304,10 @@ void BaseTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
   }
 }
 
-int BaseTheme::headerStatusInset() { return UITheme::getInstance().getMetrics().headerSidePadding; }
+// Slightly inside the side padding: the battery's boxed glyph and the clock
+// digits read wider than text/cover ink on the same line, so flush placement
+// looks like it overhangs the content columns.
+int BaseTheme::headerStatusInset() { return UITheme::getInstance().getMetrics().headerSidePadding + 4; }
 
 void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::HeaderProps& props) const {
   const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
@@ -364,18 +367,6 @@ void BaseTheme::applyHeaderStatus(const GfxRenderer& renderer, freeink::ui::Head
   if (metrics.headerShowsClock && SETTINGS.clockShowInHeader && halClock.isAvailable() &&
       halClock.formatTime(clockText, sizeof(clockText), SETTINGS.clockFormat == 1)) {
     status.clockText = clockText;
-    // Ink-align a left-anchored clock: the first digit's ink starts its side
-    // bearing right of the pen ('1' bears more than '9'), so shift the pen
-    // left by that bearing to keep the visible edge fixed on the inset.
-    if (!status.batteryLeft) {
-      const auto& fonts = renderer.getFontMap();
-      const auto it = fonts.find(SMALL_FONT_ID);
-      if (it != fonts.end()) {
-        if (const EpdGlyph* glyph = it->second.getGlyph(static_cast<uint32_t>(clockText[0]))) {
-          status.clockBearing = static_cast<int16_t>(glyph->left);
-        }
-      }
-    }
   }
 }
 
