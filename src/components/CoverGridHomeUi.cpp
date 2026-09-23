@@ -95,7 +95,7 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
       static_cast<int16_t>(renderer.getScreenHeight() - safe.y - safe.height), static_cast<int16_t>(safe.x)});
   screen.insetContent(fui::Insets{theme.spaceSm, theme.spaceLg, theme.spaceSm, theme.spaceLg});
   const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
-  const auto header = screen.takeTop(UITheme::getInstance().getMetrics().batteryBarHeight);
+  const auto header = screen.takeTop(UITheme::getInstance().getMetrics().batteryBarHeight, theme.spaceSm);
   auto tabRect = screen.takeBottom(UITheme::getInstance().getMetrics().coverGridTabBarHeight, theme.spaceMd);
   if (books->empty()) {
     drawTabs(screen, tabRect.inset(fui::Insets{0, 6, 0, 6}));
@@ -105,6 +105,8 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   }
   auto headingText = theme.titleText;
   headingText.bold = true;
+  // The heading's line box already carries the font's internal leading below
+  // the glyphs, so the small gap is enough visual air before the cover.
   auto headingRect = screen.takeTop(screen.target().lineHeight(headingText.font), theme.spaceSm);
   // Bound the featured section while leaving room for its metadata.
   const int16_t featuredHeight = std::min<int>(
@@ -136,7 +138,13 @@ void CoverGridHomeUi::drawHeaderBand(fui::Rect header, int coverLeft, int coverR
   const int inset = GUI.headerStatusInset();
   const int headerX = std::max(0, coverLeft - inset);
   const int headerRight = std::min<int>(renderer.getScreenWidth(), coverRight + inset);
-  GUI.drawHeader(renderer, Rect{headerX, header.y, headerRight - headerX, header.height}, nullptr);
+  // Anchored at the theme's topPadding like every pushed screen's header, so
+  // the battery/clock hold one position across the whole UI. The in-flow slot
+  // this band used to occupy stays reserved, doubling as padding above the
+  // heading below.
+  GUI.drawHeader(renderer,
+                 Rect{headerX, UITheme::getInstance().getMetrics().topPadding, headerRight - headerX, header.height},
+                 nullptr);
 }
 
 void CoverGridHomeUi::drawEmpty(UiScreen& screen) {
