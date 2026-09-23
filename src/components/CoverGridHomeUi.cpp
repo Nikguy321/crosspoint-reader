@@ -306,6 +306,5 @@ bool CoverGridHomeUi::paintFramedCover(fui::DrawTarget& target, fui::Rect rect, 
   // The false spine draws inside the cover paint (HomeCoverCache), glued to
   // the art's left edge, so it stays aligned whatever each cover's margin is.
   const bool drawn = index < coverPaths.size() && coverCache.paint(rect, index, coverPaths[index]);
-  target.stroke(rect, ink, 1, 0);
   return drawn;
 }

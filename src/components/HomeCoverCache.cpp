@@ -55,6 +55,7 @@ bool HomeCoverCache::paint(fui::Rect rect, size_t index, const std::string& path
       constexpr int ART_SHIFT = 3;
       drawn = GUI.drawCoverThumbFill(renderer, coverBitmap, Rect{rect.x, rect.y, rect.width, rect.height}, ART_SHIFT);
       if (drawn) {
+        renderer.drawRect(rect.x, rect.y, rect.width, rect.height);
         // False spine glued to the art's left edge (centered art means that
         // edge moves with each cover's fit margin): a dark band with a
         // dithered crease makes every cover read as a bound book. Drawn here
@@ -66,7 +67,10 @@ bool HomeCoverCache::paint(fui::Rect rect, size_t index, const std::string& path
     }
     coverFile.close();
   }
-  if (!drawn) GUI.drawCoverPlaceholder(renderer, Rect{rect.x, rect.y, rect.width, rect.height});
+  if (!drawn) {
+    GUI.drawCoverPlaceholder(renderer, Rect{rect.x, rect.y, rect.width, rect.height});
+    renderer.drawRect(rect.x, rect.y, rect.width, rect.height);
+  }
   if (coverCache) {
     const size_t needed = renderer.getRegionByteSize(rect.x, rect.y, rect.width, rect.height);
     if (needed > cached.bytes && needed <= coverCacheCapacity - coverCacheUsed) {
