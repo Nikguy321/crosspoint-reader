@@ -50,29 +50,25 @@ void CoverGridHomeUi::refreshCoverPaths() {
 void CoverGridHomeUi::refreshCoverPath(size_t index) {
   if (index >= books->size() || index >= coverPaths.size()) return;
   coverCache.invalidate(index);
-  coverPaths[index] = thumbHeights[index] > 0
-                          ? UITheme::getCoverThumbPath((*books)[index].coverBmpPath, thumbHeights[index])
-                          : std::string();
-  if (index != 0) return;
-  coverCache.readSize(coverPaths[0], featuredCoverWidth, featuredCoverHeight);
+  coverPaths[index] =
+      thumbHeight > 0 ? UITheme::getCoverThumbPath((*books)[index].coverBmpPath, thumbHeight) : std::string();
 }
 
-int CoverGridHomeUi::thumbHeightFor(size_t index) const {
-  return index < thumbHeights.size() && thumbHeights[index] > 0 ? thumbHeights[index] : THUMB_HEIGHT;
-}
+int CoverGridHomeUi::thumbHeightFor() const { return thumbHeight > 0 ? thumbHeight : THUMB_HEIGHT; }
 
 bool CoverGridHomeUi::takeThumbHeightsChanged() { return std::exchange(thumbHeightsChanged, false); }
 
-void CoverGridHomeUi::noteThumbHeight(size_t index, int slotWidth, int slotHeight) {
-  if (index >= thumbHeights.size()) return;
-  // Thumbs target a (0.6*h, h) box. Full bleed would need h = w*5/3 (crop the
-  // overflow); halfway between that and a plain fit shows more of each cover:
-  // a slight crop plus slight side margins inside the frame.
-  const int height = std::max({1, slotHeight, (slotHeight + slotWidth * 5 / 3) / 2 + 2});
-  if (thumbHeights[index] != height) {
-    thumbHeights[index] = height;
+void CoverGridHomeUi::noteThumbHeight(int slotHeight) {
+  // One shared height for every slot (hero and grid covers are the same
+  // size), generated to overfill the 2:3 slot so covers fill it edge to edge
+  // (full bleed; the paint clips the overflow). A 0.6-aspect cover needs
+  // 10/9 of the slot height to fill its width; the +8 keeps a few px of
+  // surplus so the art's rightward nudge never exposes the left edge.
+  const int height = std::max(1, slotHeight * 10 / 9 + 8);
+  if (thumbHeight != height) {
+    thumbHeight = height;
     thumbHeightsChanged = true;
-    refreshCoverPath(index);
+    refreshCoverPaths();
   }
 }
 
@@ -103,26 +99,37 @@ void CoverGridHomeUi::draw(UiScreen& screen) {
   // in (headerStatusInset's optical bias).
   const int16_t hInset = std::max<int16_t>(
       0, static_cast<int16_t>(UITheme::getInstance().getMetrics().headerSidePadding - COVER_CELL_INSET - safe.x));
-  screen.insetContent(fui::Insets{theme.spaceSm, hInset, theme.spaceSm, hInset});
+  // Drop the status band, hero, and grid down: touch boards get a full step
+  // (no button-hint band to fit), button boards a modest nudge. The tabs stay
+  // put (bottom-anchored below).
+  const int16_t topInset =
+      BoardConfig::hasTouch() ? static_cast<int16_t>(theme.spaceLg) : static_cast<int16_t>(theme.spaceSm + 4);
+  screen.insetContent(fui::Insets{topInset, hInset, theme.spaceSm, hInset});
   const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
   // Reserve the band's slot in the flow (its content draws at a fixed screen
   // position in drawHeaderBand); the slot doubles as padding above the heading.
   screen.takeTop(UITheme::getInstance().getMetrics().batteryBarHeight, theme.spaceSm);
-  auto tabRect = screen.takeBottom(UITheme::getInstance().getMetrics().coverGridTabBarHeight, theme.spaceMd);
+  // Button boards run tighter above the tabs to make room for the top step.
+  const int16_t tabGap = BoardConfig::hasTouch() ? theme.spaceSm : static_cast<int16_t>(4);
+  auto tabRect = screen.takeBottom(UITheme::getInstance().getMetrics().coverGridTabBarHeight, tabGap);
   if (books->empty()) {
     drawTabs(screen, tabRect.inset(fui::Insets{0, COVER_CELL_INSET, 0, COVER_CELL_INSET}));
     drawEmpty(screen);
     drawHeaderBand();
     return;
   }
-  // Bound the featured section while leaving room for its metadata. The hero
-  // is the focal point: it takes a generous share and the 4-column grid below
-  // packs smaller thumbs with tight gaps.
+  // Hero cover matches the grid covers: the body splits into three equal
+  // cover rows (hero + two grid rows), so the featured section is one row
+  // tall and every cover on screen shares one size. The metadata floor still
+  // applies when the rows would be too short for the hero's text lines.
+  const fui::Rect body = screen.body();
+  const int rowGap = std::max<int>(4, body.width / 100);
+  grid.gap = grid.rowGap = rowGap;
+  const int coverRowHeight = std::max(1, (body.height - theme.spaceSm - 2 * rowGap) / 3);
   const int16_t featuredHeight = std::min<int>(
-      screen.body().height, std::max<int>(std::min<int>(300, screen.body().height * 36 / 100),
-                                          screen.target().lineHeight(theme.bodyText.font) * (landscape ? 1 : 2) +
-                                              screen.target().lineHeight(theme.smallText.font) * 2 + 32));
-  drawCurrent(screen, screen.takeTop(featuredHeight, theme.spaceMd));
+      body.height, std::max<int>(coverRowHeight, screen.target().lineHeight(theme.bodyText.font) * (landscape ? 1 : 2) +
+                                                     screen.target().lineHeight(theme.smallText.font) * 2 + 32));
+  drawCurrent(screen, screen.takeTop(featuredHeight, theme.spaceSm), coverRowHeight);
   drawGrid(screen);
   const auto& gridRect = gridBounds;
   tabRect.x = gridRect.x + grid.cellInset.left;
@@ -159,7 +166,7 @@ void CoverGridHomeUi::drawEmpty(UiScreen& screen) {
   screen.target().text(fui::Rect{body.x, y, body.width, messageHeight}, tr(STR_START_READING), message);
 }
 
-void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect) {
+void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect, const int coverRowHeight) {
   const auto& theme = screen.theme();
   const auto& book = books->front();
   card.title = book.title.c_str();
@@ -190,17 +197,14 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect) {
   card.progressHeight = 6;
   card.padding = fui::Insets{6, 6, 6, 6};
   card.gap = theme.spaceLg + theme.spaceSm;
-  card.coverSize.height = std::max(1, std::min(rect.height - 12, (rect.width / 3) * 5 / 3));
-  card.coverSize.width = std::max(1, card.coverSize.height * 3 / 5);
-  noteThumbHeight(0, card.coverSize.width, card.coverSize.height);
-  // Generation bounds stay stable; the displayed cover follows the actual image.
-  if (featuredCoverWidth > 0 && featuredCoverHeight > 0) {
-    const float scale = std::min(1.0f, std::min(float(card.coverSize.width) / featuredCoverWidth,
-                                                float(card.coverSize.height) / featuredCoverHeight));
-    card.coverSize.width = std::max(1, static_cast<int>(featuredCoverWidth * scale));
-    card.coverSize.height = std::max(1, static_cast<int>(featuredCoverHeight * scale));
-  }
-  gridBounds = layoutGrid(screen, screen.body());
+  // Fixed 2:3 hero box sized from the shared cover row, NOT the featured
+  // rect: when the metadata floor makes the hero section taller than a row,
+  // the extra height pads the card instead of inflating the cover past the
+  // grid covers (which copy this size).
+  card.coverSize.height = std::max(1, std::min<int>(rect.height, coverRowHeight) - 12);
+  card.coverSize.width = std::max(1, card.coverSize.height * 2 / 3);
+  noteThumbHeight(card.coverSize.height);
+  gridBounds = layoutGrid(screen.body());
   rect.x = gridBounds.x;
   rect.width = gridBounds.width;
   card.coverPainterUserData = this;
@@ -221,19 +225,11 @@ void CoverGridHomeUi::drawCurrent(UiScreen& screen, fui::Rect rect) {
   }
 }
 
-fui::Rect CoverGridHomeUi::layoutGrid(UiScreen& screen, fui::Rect rect) {
-  const auto& theme = screen.theme();
-  // Tight gaps: four columns leave little width to spare between covers.
-  grid.gap = std::max<int>(4, rect.width / 100);
-  grid.rowGap = grid.gap;
+fui::Rect CoverGridHomeUi::layoutGrid(fui::Rect rect) {
+  // Exactly the hero's box: the three-equal-rows split in draw() already
+  // guarantees it fits, and sharing the size keeps one cached thumb per book.
   grid.cellInset = fui::Insets{COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET, COVER_CELL_INSET};
-  const int maxCoverWidth = std::max(1, (rect.width - (GRID_COLUMNS - 1) * grid.gap) / GRID_COLUMNS - 12);
-  const int maxCoverHeight = std::max(1, (rect.height - (GRID_ROWS - 1) * grid.rowGap) / GRID_ROWS - 12);
-  // Thumbs use a squarer 2:3 box than the hero's 3:5: the covers crop
-  // full-bleed anyway, and the extra width tightens the SpaceBetween column
-  // gaps without costing any of the height budget.
-  grid.coverSize.height = std::max(1, std::min({maxCoverHeight, maxCoverWidth * 3 / 2, card.coverSize.height * 5 / 3}));
-  grid.coverSize.width = std::max(1, grid.coverSize.height * 2 / 3);
+  grid.coverSize = card.coverSize;
   grid.rowHeight = grid.coverSize.height + 12;
   // Full content width: the SpaceBetween column layout pins the outer covers
   // to the rect edges, so the grid reaches the chrome's inset line instead of
@@ -260,7 +256,6 @@ void CoverGridHomeUi::drawGrid(UiScreen& screen) {
   grid.cellStyles = card.styles;
   grid.labelHeight = 0;
   grid.labelGap = 0;
-  for (size_t i = 1; i < thumbHeights.size(); ++i) noteThumbHeight(i, grid.coverSize.width, grid.coverSize.height);
   grid.scrollIndicator = false;
   grid.itemProvider = [](uint16_t index, void*) { return fui::coverGridItem(nullptr, index + 1); };
   grid.coverPainterUserData = this;
@@ -308,14 +303,9 @@ bool CoverGridHomeUi::paintFramedCover(fui::DrawTarget& target, fui::Rect rect, 
   const auto ink = fui::Paint::solid(fui::Color::Black);
   target.fill(fui::Rect{rect.right(), static_cast<int16_t>(rect.y + SHADOW_OFFSET), SHADOW_OFFSET, rect.height}, ink);
   target.fill(fui::Rect{static_cast<int16_t>(rect.x + SHADOW_OFFSET), rect.bottom(), rect.width, SHADOW_OFFSET}, ink);
+  // The false spine draws inside the cover paint (HomeCoverCache), glued to
+  // the art's left edge, so it stays aligned whatever each cover's margin is.
   const bool drawn = index < coverPaths.size() && coverCache.paint(rect, index, coverPaths[index]);
-  // False spine: a dark left edge with a dithered crease makes every cover
-  // (hero included) read as a bound book, so the tight column gaps read as
-  // shelf spacing rather than cramped covers.
-  constexpr int16_t SPINE_W = 3;
-  target.fill(fui::Rect{rect.x, rect.y, SPINE_W, rect.height}, ink);
-  target.fill(fui::Rect{static_cast<int16_t>(rect.x + SPINE_W), rect.y, 2, rect.height},
-              fui::Paint::dither(fui::Color::LightGray));
   target.stroke(rect, ink, 1, 0);
   return drawn;
 }

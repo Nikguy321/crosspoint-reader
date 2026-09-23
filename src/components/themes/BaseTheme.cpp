@@ -129,9 +129,10 @@ void BaseTheme::drawCoverPlaceholder(const GfxRenderer& renderer, Rect rect) {
   }
 }
 
-bool BaseTheme::drawCoverThumbFill(const GfxRenderer& renderer, const Bitmap& bitmap, Rect slot) {
+bool BaseTheme::drawCoverThumbFill(const GfxRenderer& renderer, const Bitmap& bitmap, Rect slot, const int xOffset) {
   if (slot.width <= 0 || slot.height <= 0) return false;
-  const int x = slot.x + (slot.width - bitmap.getWidth()) / 2;
+  // xOffset nudges the centered art sideways; the clip stays on the slot.
+  const int x = slot.x + (slot.width - bitmap.getWidth()) / 2 + xOffset;
   const int y = slot.y + (slot.height - bitmap.getHeight()) / 2;
   const auto clip = renderer.getClipRect();
   const int left = std::max(slot.x, clip[0]);

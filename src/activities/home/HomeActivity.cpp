@@ -166,9 +166,9 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 
   int progress = 0;
   for (RecentBook& book : recentBooks) {
-    // The cover grid draws each slot at its own size; generating at any other
-    // height would rescale the dithered thumb at draw time and alias badly.
-    const int thumbHeight = coverGridUi ? coverGridUi->thumbHeightFor(progress) : coverHeight;
+    // The cover grid shares one slot size; generating at any other height
+    // would rescale the dithered thumb at draw time and alias badly.
+    const int thumbHeight = coverGridUi ? coverGridUi->thumbHeightFor() : coverHeight;
     if (coverGridUi) {
       loadGridCover(book, thumbHeight, showingLoading, popupRect);
       ++progress;
