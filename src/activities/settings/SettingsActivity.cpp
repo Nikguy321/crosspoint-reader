@@ -200,7 +200,7 @@ void SettingsActivity::routeControlsSetting(const SettingInfo& setting) {
 
   if (home_button::isSetting(ptr)) return route(homeSettings, setting);
   if (ptr == &CrossPointSettings::shortPwrBtn) return route(powerSettings, setting, StrId::STR_CLICK);
-  if (ptr == &CrossPointSettings::doubleClickPwrLight) return route(powerSettings, setting, StrId::STR_DOUBLE_CLICK);
+  if (ptr == &CrossPointSettings::doubleClickPwrLight) return route(powerSettings, setting, StrId::STR_TOGGLE_LIGHT);
   if (ptr == &CrossPointSettings::pwrBtnFootnoteBack) return route(powerSettings, setting);
   if (ptr == &CrossPointSettings::sideButtonLayout) return route(sideSettings, setting, StrId::STR_PAGE_TURN_LAYOUT);
   if (ptr == &CrossPointSettings::longPressButtonBehavior) {
