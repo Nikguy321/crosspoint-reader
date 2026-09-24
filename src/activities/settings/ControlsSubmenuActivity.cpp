@@ -21,11 +21,10 @@ void ControlsSubmenuActivity::rebuildVisible() {
   for (int i = 0; i < static_cast<int>(rows_.size()); ++i) {
     // The footnote-back toggle only applies while the power click action is
     // Footnotes.
-    if (rows_[i].valuePtr == &CrossPointSettings::pwrBtnFootnoteBack &&
-        SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::FOOTNOTES) {
-      continue;
-    }
-    visible_.push_back(i);
+    const bool hidden = rows_[i].valuePtr == &CrossPointSettings::pwrBtnFootnoteBack &&
+                        SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::FOOTNOTES;
+    // cppcheck-suppress useStlAlgorithm
+    if (!hidden) visible_.push_back(i);
   }
 }
 
