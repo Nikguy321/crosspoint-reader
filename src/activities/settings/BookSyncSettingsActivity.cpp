@@ -12,15 +12,22 @@
 #include "MappedInputManager.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "util/BookSyncHooks.h"
 
 namespace fui = freeink::ui;
 
 namespace {
-enum Row : uint8_t { PEER_SSID, PEER_URL, WINDOW, PUSH_ON_CLOSE, PULL_ON_OPEN };
+enum Row : uint8_t { PEER_SSID, PEER_PASSWORD, PEER_URL, WINDOW, PUSH_ON_CLOSE, PULL_ON_OPEN };
 
 const StrId menuNames[BookSyncSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_BOOKSYNC_PEER_SSID, StrId::STR_BOOKSYNC_PEER_URL, StrId::STR_BOOKSYNC_WINDOW,
-    StrId::STR_BOOKSYNC_PUSH_ON_CLOSE, StrId::STR_BOOKSYNC_PULL_ON_OPEN};
+    StrId::STR_BOOKSYNC_PEER_SSID, StrId::STR_BOOKSYNC_PEER_PASSWORD, StrId::STR_BOOKSYNC_PEER_URL,
+    StrId::STR_BOOKSYNC_WINDOW,    StrId::STR_BOOKSYNC_PUSH_ON_CLOSE, StrId::STR_BOOKSYNC_PULL_ON_OPEN};
+
+// The user saved the peer name or password: the Wi-Fi list follows it.
+void savePeerNetwork() {
+  RenderLock lock;
+  BookSyncHooks::savePeerNetwork();
+}
 
 // "Wait for Wi-Fi" label for a BookSync::WINDOW_SECONDS index.
 StrId windowLabel(const uint8_t windowIndex) {
@@ -69,6 +76,24 @@ void BookSyncSettingsActivity::activateIndex(const int index) {
         if (result.isCancelled) return;
         BOOKSYNC_STORE.setPeerSsid(std::get<KeyboardResult>(result.data).text);
         BOOKSYNC_STORE.saveToFile();
+        savePeerNetwork();
+      });
+      break;
+    }
+    case PEER_PASSWORD: {
+      // Empty means the peer's hotspot is open.
+      auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_BOOKSYNC_PEER_PASSWORD),
+                                                               BOOKSYNC_STORE.getPeerPassword(),
+                                                               BookSync::MAX_PASSWORD_LENGTH, InputType::Text);
+      if (!keyboard) {
+        LOG_ERR("BKS", "OOM: KeyboardEntryActivity");
+        break;
+      }
+      startActivityForResult(std::move(keyboard), [](const ActivityResult& result) {
+        if (result.isCancelled) return;
+        BOOKSYNC_STORE.setPeerPassword(std::get<KeyboardResult>(result.data).text);
+        BOOKSYNC_STORE.saveToFile();
+        savePeerNetwork();
       });
       break;
     }
@@ -119,6 +144,7 @@ void BookSyncSettingsActivity::buildScreen(UiScreen& screen) {
 
   const BookSync::Config config = BOOKSYNC_STORE.getConfig();
   rowValues_[PEER_SSID] = config.peerSsid.empty() ? tr(STR_STATE_OFF) : config.peerSsid;
+  rowValues_[PEER_PASSWORD] = config.peerPassword.empty() ? tr(STR_NOT_SET) : "******";
   rowValues_[PEER_URL] = config.peerUrl.empty() ? tr(STR_NOT_SET) : config.peerUrl;
   rowValues_[WINDOW] = I18N.get(windowLabel(config.windowIndex));
   rowValues_[PUSH_ON_CLOSE] = config.pushOnClose ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);

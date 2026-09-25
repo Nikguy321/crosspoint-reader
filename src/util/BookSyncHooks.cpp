@@ -7,6 +7,8 @@
 #include <Logging.h>
 #include <esp_attr.h>
 
+#include <optional>
+
 #include "KOReaderCredentialStore.h"
 #include "SilentRestart.h"
 #include "WifiCredentialStore.h"
@@ -23,6 +25,24 @@ RTC_NOINIT_ATTR uint32_t libraryLandingMarker;
 bool bootLibraryLanding = false;
 bool skipNextOpenPull = false;
 
+// The Wi-Fi store is loaded on demand (WifiSelectionActivity), so load it before
+// writing or the save would drop every other network.
+void writePeerNetwork(const bool userSaved) {
+  const BookSync::Config config = BOOKSYNC_STORE.getConfig();
+  if (config.peerSsid.empty()) return;
+  WIFI_STORE.loadFromFile();
+  std::optional<std::string> saved;
+  if (const auto cred = WIFI_STORE.findCredential(config.peerSsid)) saved = cred->password;
+  const auto password = BookSync::peerCredentialToWrite(config, saved, userSaved);
+  if (!password) return;
+  const char* kind = password->empty() ? "open" : "with password";
+  if (WIFI_STORE.addCredential(config.peerSsid, *password)) {
+    LOG_INF("BKS", "Saved peer network %s (%s)", config.peerSsid.c_str(), kind);
+  } else {
+    LOG_ERR("BKS", "Could not save peer network %s (%s)", config.peerSsid.c_str(), kind);
+  }
+}
+
 size_t cumulativeSize(const void* ctx, const int index) {
   return static_cast<const Epub*>(ctx)->getCumulativeSpineItemSize(index);
 }
@@ -38,17 +58,9 @@ void onBoot(const bool silentReboot, const bool silentRebootToReader) {
 
 bool bootToLibrary() { return bootLibraryLanding; }
 
-void ensurePeerNetworkSaved() {
-  const std::string peer = BOOKSYNC_STORE.getPeerSsid();
-  if (peer.empty()) return;
-  WIFI_STORE.loadFromFile();
-  if (WIFI_STORE.hasSavedCredential(peer)) return;
-  if (WIFI_STORE.addCredential(peer, "")) {
-    LOG_INF("BKS", "Saved peer network %s (open)", peer.c_str());
-  } else {
-    LOG_ERR("BKS", "Could not save peer network %s", peer.c_str());
-  }
-}
+void ensurePeerNetworkSaved() { writePeerNetwork(false); }
+
+void savePeerNetwork() { writePeerNetwork(true); }
 
 uint32_t patientWindowMs(const BookSyncTrigger trigger) {
   return BookSync::patientWindowMs(trigger, BOOKSYNC_STORE.getWindowIndex());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 // Reading-position sync with a peer's hotspot (a WiPhone) and a home KOSync
@@ -18,6 +19,8 @@ constexpr char DEFAULT_PEER_SSID[] = "WiPhone-Books";
 constexpr char DEFAULT_PEER_URL[] = "http://192.168.4.1";
 constexpr size_t MAX_SSID_LENGTH = 32;
 constexpr size_t MAX_URL_LENGTH = 128;
+// A WPA2 passphrase is 8-63 characters, a raw PSK 64 hex digits (the Wi-Fi store's limit).
+constexpr size_t MAX_PASSWORD_LENGTH = 64;
 
 // "Wait for Wi-Fi" choices in seconds, persisted by index (append-only). 0 keeps
 // the stock behaviour: no saved network in range opens the network list.
@@ -33,6 +36,7 @@ constexpr uint32_t AUTO_TRIGGER_WINDOW_MS = 20000;
 struct Config {
   std::string peerSsid = DEFAULT_PEER_SSID;
   std::string peerUrl = DEFAULT_PEER_URL;
+  std::string peerPassword;  // the peer hotspot's WPA2 password; empty = an open hotspot
   uint8_t windowIndex = DEFAULT_WINDOW_INDEX;
   bool pushOnClose = false;
   bool pullOnOpen = false;
@@ -51,5 +55,18 @@ bool isCloseTrigger(BookSyncTrigger trigger);
 // is joined to the peer SSID, `configured` everywhere else (and whenever either
 // peer setting is empty). SSIDs compare exactly, as 802.11 does.
 std::string chooseServerUrl(const std::string& connectedSsid, const Config& config, const std::string& configured);
+
+// The password to write to the Wi-Fi store for the peer SSID, or nullopt when
+// nothing needs writing. `saved` is what the store holds for that SSID (nullopt
+// when it holds nothing). When a sync starts only a missing entry is added;
+// when the user saves the peer name or password (`userSaved`) the entry is
+// overwritten with the configured password. Empty means an open network.
+std::optional<std::string> peerCredentialToWrite(const Config& config, const std::optional<std::string>& saved,
+                                                 bool userSaved);
+
+// The peer hotspot was in the last scan, but the saved entry cannot join it: a
+// protected hotspot saved without a password, or an open one saved with a
+// password (a password sets a WPA2 minimum, so an open network is never joined).
+bool peerPasswordMismatch(bool peerVisible, bool peerEncrypted, const std::optional<std::string>& saved);
 
 }  // namespace BookSync
