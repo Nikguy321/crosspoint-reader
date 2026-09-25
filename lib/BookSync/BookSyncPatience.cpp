@@ -5,6 +5,7 @@ void BookSyncPatience::arm(const uint32_t window, const uint32_t nowMs) {
   startMs = nowMs;
   rescanAtMs = nowMs;
   isWaiting = false;
+  peerPasswordHint = false;
 }
 
 void BookSyncPatience::disarm() {

@@ -30,9 +30,14 @@ class BookSyncPatience {
   // Whole seconds left in the window, rounded up (0 once expired or disarmed).
   uint32_t secondsLeft(uint32_t nowMs) const;
 
+  // Shown on the countdown: the peer is in range but its saved password cannot join it.
+  void setPeerPasswordHint(bool show) { peerPasswordHint = show; }
+  bool showPeerPasswordHint() const { return peerPasswordHint; }
+
  private:
   uint32_t windowMs = 0;
   uint32_t startMs = 0;
   uint32_t rescanAtMs = 0;
   bool isWaiting = false;
+  bool peerPasswordHint = false;
 };

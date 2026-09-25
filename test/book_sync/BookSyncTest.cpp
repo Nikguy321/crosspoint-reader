@@ -95,6 +95,7 @@ TEST(BookSyncConfig, Defaults) {
   const BookSync::Config config;
   EXPECT_EQ(config.peerSsid, "WiPhone-Books");
   EXPECT_EQ(config.peerUrl, "http://192.168.4.1");
+  EXPECT_EQ(config.peerPassword, "");  // the WiPhone's hotspot is open unless its owner sets a password
   EXPECT_EQ(BookSync::windowMs(config.windowIndex), 300000u);
   EXPECT_FALSE(config.pushOnClose);
   EXPECT_FALSE(config.pullOnOpen);
@@ -141,6 +142,86 @@ TEST(BookSyncConfig, CloseTriggers) {
   EXPECT_FALSE(BookSync::isCloseTrigger(BookSyncTrigger::Open));
 }
 
+// --- The peer network in the Wi-Fi list ------------------------------------------------------
+
+TEST(BookSyncPeerNetwork, ASyncAddsAMissingPeerAsOpenByDefault) {
+  const BookSync::Config config;
+  const auto write = BookSync::peerCredentialToWrite(config, std::nullopt, false);
+  ASSERT_TRUE(write.has_value());
+  EXPECT_EQ(*write, "");
+}
+
+TEST(BookSyncPeerNetwork, ASyncAddsAMissingPeerWithItsPassword) {
+  BookSync::Config config;
+  config.peerPassword = "trailhead-42";
+  const auto write = BookSync::peerCredentialToWrite(config, std::nullopt, false);
+  ASSERT_TRUE(write.has_value());
+  EXPECT_EQ(*write, "trailhead-42");
+}
+
+TEST(BookSyncPeerNetwork, ASyncNeverOverwritesAnEntryInTheList) {
+  BookSync::Config config;
+  config.peerPassword = "trailhead-42";
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::string(""), false).has_value());
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::string("typed-by-hand"), false).has_value());
+  config.peerPassword.clear();
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::string("typed-by-hand"), false).has_value());
+}
+
+TEST(BookSyncPeerNetwork, SavingThePeerSettingsOverwritesTheEntry) {
+  BookSync::Config config;
+  config.peerPassword = "trailhead-42";
+  const auto protect = BookSync::peerCredentialToWrite(config, std::string(""), true);
+  ASSERT_TRUE(protect.has_value());
+  EXPECT_EQ(*protect, "trailhead-42");
+
+  config.peerPassword.clear();  // back to an open hotspot
+  const auto open = BookSync::peerCredentialToWrite(config, std::string("trailhead-42"), true);
+  ASSERT_TRUE(open.has_value());
+  EXPECT_EQ(*open, "");
+
+  const auto added = BookSync::peerCredentialToWrite(config, std::nullopt, true);
+  ASSERT_TRUE(added.has_value());
+  EXPECT_EQ(*added, "");
+}
+
+TEST(BookSyncPeerNetwork, SavingAnUnchangedPasswordWritesNothing) {
+  BookSync::Config config;
+  config.peerPassword = "trailhead-42";
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::string("trailhead-42"), true).has_value());
+  config.peerPassword.clear();
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::string(""), true).has_value());
+}
+
+TEST(BookSyncPeerNetwork, NoPeerSsidWritesNothing) {
+  BookSync::Config config;
+  config.peerSsid.clear();
+  config.peerPassword = "trailhead-42";
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::nullopt, false).has_value());
+  EXPECT_FALSE(BookSync::peerCredentialToWrite(config, std::nullopt, true).has_value());
+}
+
+TEST(BookSyncPeerNetwork, ProtectedHotspotSavedOpenIsAMismatch) {
+  EXPECT_TRUE(BookSync::peerPasswordMismatch(true, true, std::string("")));
+}
+
+TEST(BookSyncPeerNetwork, OpenHotspotSavedWithAPasswordIsAMismatch) {
+  // A saved password sets a WPA2 minimum, so the station never joins an open network.
+  EXPECT_TRUE(BookSync::peerPasswordMismatch(true, false, std::string("trailhead-42")));
+}
+
+TEST(BookSyncPeerNetwork, MatchingEntriesAreNotAMismatch) {
+  EXPECT_FALSE(BookSync::peerPasswordMismatch(true, false, std::string("")));
+  // A protected hotspot with a password saved: whether it is the right one only the join can tell.
+  EXPECT_FALSE(BookSync::peerPasswordMismatch(true, true, std::string("trailhead-42")));
+}
+
+TEST(BookSyncPeerNetwork, OutOfRangeOrUnsavedIsNotAMismatch) {
+  EXPECT_FALSE(BookSync::peerPasswordMismatch(false, false, std::string("")));
+  EXPECT_FALSE(BookSync::peerPasswordMismatch(false, true, std::string("")));
+  EXPECT_FALSE(BookSync::peerPasswordMismatch(true, true, std::nullopt));
+}
+
 // --- Patient connect --------------------------------------------------------------------------
 
 TEST(BookSyncPatience, DisarmedIsTheStockList) {
@@ -184,6 +265,16 @@ TEST(BookSyncPatience, AnEmptyScanAfterTheWindowGivesUp) {
   EXPECT_TRUE(patience.takeRescan(64999 + 1));
   EXPECT_FALSE(patience.nothingToJoin(65000));
   EXPECT_FALSE(patience.waiting());
+}
+
+TEST(BookSyncPatience, ArmingClearsThePasswordHint) {
+  BookSyncPatience patience;
+  patience.arm(60000, 0);
+  EXPECT_FALSE(patience.showPeerPasswordHint());
+  patience.setPeerPasswordHint(true);
+  EXPECT_TRUE(patience.showPeerPasswordHint());
+  patience.arm(60000, 1000);
+  EXPECT_FALSE(patience.showPeerPasswordHint());
 }
 
 TEST(BookSyncPatience, DisarmStopsWaiting) {

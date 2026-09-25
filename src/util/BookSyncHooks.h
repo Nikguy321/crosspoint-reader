@@ -18,9 +18,13 @@ void onBoot(bool silentReboot, bool silentRebootToReader);
 // main.cpp routing: a close that was headed for the library lands there.
 bool bootToLibrary();
 
-// KOReaderSyncActivity::onEnter (under a RenderLock): save the peer's open
-// hotspot so auto-connect finds it, never over an entry the user saved.
+// KOReaderSyncActivity::onEnter (under a RenderLock): save the peer's hotspot
+// (with the Peer Wi-Fi Password, empty = open) so auto-connect finds it, never
+// over an entry already in the Wi-Fi list.
 void ensurePeerNetworkSaved();
+// BookSyncSettingsActivity (under a RenderLock), after the user saves the peer
+// name or password: write that network over any existing entry.
+void savePeerNetwork();
 // How long the Wi-Fi step waits for a saved network (0 = the stock network list).
 uint32_t patientWindowMs(BookSyncTrigger trigger);
 // KOReaderSyncActivity::returnToReader: where a finished sync goes.

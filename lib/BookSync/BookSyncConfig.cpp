@@ -33,4 +33,16 @@ std::string chooseServerUrl(const std::string& connectedSsid, const Config& conf
   return config.peerUrl;
 }
 
+std::optional<std::string> peerCredentialToWrite(const Config& config, const std::optional<std::string>& saved,
+                                                 const bool userSaved) {
+  if (config.peerSsid.empty()) return std::nullopt;
+  if (!saved.has_value()) return config.peerPassword;
+  if (userSaved && *saved != config.peerPassword) return config.peerPassword;
+  return std::nullopt;
+}
+
+bool peerPasswordMismatch(const bool peerVisible, const bool peerEncrypted, const std::optional<std::string>& saved) {
+  return peerVisible && saved.has_value() && peerEncrypted == saved->empty();
+}
+
 }  // namespace BookSync

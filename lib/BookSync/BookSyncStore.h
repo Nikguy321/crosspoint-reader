@@ -9,7 +9,8 @@
 
 // Settings for syncing with a peer's hotspot and the automatic triggers, kept
 // in their own file so a stock koreader.json is never touched. The username,
-// password and home server stay in KOReaderCredentialStore.
+// password and home server stay in KOReaderCredentialStore. The peer hotspot's
+// password is XOR-obfuscated with the device MAC, as KOReaderCredentialStore does.
 class BookSyncStore : public PersistableStore<BookSyncStore> {
   BookSync::Config config;
   // The settings screen and the web API write while the reader and the sync
@@ -29,12 +30,14 @@ class BookSyncStore : public PersistableStore<BookSyncStore> {
   BookSync::Config getConfig() const;
   std::string getPeerSsid() const;
   std::string getPeerUrl() const;
+  std::string getPeerPassword() const;
   uint8_t getWindowIndex() const;
   bool getPushOnClose() const;
   bool getPullOnOpen() const;
 
   void setPeerSsid(const std::string& ssid);
   void setPeerUrl(const std::string& url);
+  void setPeerPassword(const std::string& password);
   void setWindowIndex(uint8_t index);
   void setPushOnClose(bool enabled);
   void setPullOnOpen(bool enabled);

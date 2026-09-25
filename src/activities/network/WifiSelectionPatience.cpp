@@ -3,13 +3,23 @@
 // countdown instead of opening the network list, which never sleeps and waits
 // for a person. Back cancels, Confirm opens the list, and the window running out
 // cancels the sync.
+//
+// A wrong peer password cannot be read from the join itself: arduino-esp32 maps
+// the usual wrong-key disconnect (4-way handshake timeout) to a plain disconnect
+// and retries, so the attempt just times out. The scan does say whether the
+// hotspot is protected, which catches the case that matters: saved open, hotspot
+// protected (or the reverse).
 #include <BookSyncStore.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <WiFi.h>
 
+#include <algorithm>
+#include <optional>
+
 #include "MappedInputManager.h"
+#include "WifiCredentialStore.h"
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -22,6 +32,22 @@ bool WifiSelectionActivity::patientWait() {
     LOG_DBG("WIFI", "No saved network to join; rescanning in %lu ms, %lu s left",
             static_cast<unsigned long>(BookSyncPatience::RESCAN_INTERVAL_MS),
             static_cast<unsigned long>(patience.secondsLeft(millis())));
+
+    const std::string peer = BOOKSYNC_STORE.getPeerSsid();
+    const auto peerNetwork = std::find_if(networks.begin(), networks.end(), [&peer](const WifiNetworkInfo& network) {
+      return !network.isHiddenPlaceholder && !peer.empty() && network.ssid == peer;
+    });
+    const bool peerVisible = peerNetwork != networks.end();
+    const bool peerEncrypted = peerVisible && peerNetwork->isEncrypted;
+    std::optional<std::string> savedPassword;
+    if (const auto cred = WIFI_STORE.findCredential(peer)) savedPassword = cred->password;
+    const bool mismatch = BookSync::peerPasswordMismatch(peerVisible, peerEncrypted, savedPassword);
+    if (mismatch && !patience.showPeerPasswordHint()) {
+      LOG_INF("WIFI", "Peer %s is %s but saved %s", peer.c_str(), peerEncrypted ? "protected" : "open",
+              peerEncrypted ? "without a password" : "with a password");
+    }
+    patience.setPeerPasswordHint(mismatch);
+
     state = WifiSelectionState::SCANNING;
     requestUpdate();
     return true;
@@ -75,7 +101,10 @@ bool WifiSelectionActivity::renderPatientWait(const Rect* screen, const ThemeMet
   UITheme::drawCenteredText(renderer, *screen, UI_12_FONT_ID, top, tr(STR_BOOKSYNC_WAITING), true, EpdFontFamily::BOLD);
 
   const std::string peer = BOOKSYNC_STORE.getPeerSsid();
-  if (!peer.empty()) {
+  if (patience.showPeerPasswordHint()) {
+    UITheme::drawCenteredText(renderer, *screen, UI_10_FONT_ID, top + lineHeight + metrics->verticalSpacing * 2,
+                              tr(STR_BOOKSYNC_CHECK_PEER_PASSWORD), true, EpdFontFamily::BOLD);
+  } else if (!peer.empty()) {
     char lookingFor[96];
     snprintf(lookingFor, sizeof(lookingFor), tr(STR_BOOKSYNC_LOOKING_FOR), peer.c_str());
     const Rect textBounds{screen->x + metrics->contentSidePadding, top + lineHeight + metrics->verticalSpacing,
