@@ -6,15 +6,16 @@
 
 /**
  * KOReader Sync > Peer & Auto Sync (booksync fork): the peer hotspot's name,
- * password and server, how long a sync waits for Wi-Fi, and the automatic syncs
- * on book close and open. Stored in BookSyncStore; saving the name or password
- * also writes the network to the Wi-Fi list.
+ * password and server, a hub's network and server, the server every other
+ * network uses (shown only), how long a sync waits for Wi-Fi, and the automatic
+ * syncs on book close and open. Stored in BookSyncStore; saving the peer name
+ * adds it to the Wi-Fi list, saving its password writes that entry.
  */
 class BookSyncSettingsActivity final : public UiListActivity {
  public:
   explicit BookSyncSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-  static constexpr int MENU_ITEMS = 6;
+  static constexpr int MENU_ITEMS = 9;
 
  private:
   int listCount() const override;

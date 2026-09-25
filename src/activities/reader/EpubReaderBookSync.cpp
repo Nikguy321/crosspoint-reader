@@ -1,7 +1,8 @@
 // EpubReaderActivity's booksync hooks: the automatic sync on book open and on
-// Back, and the landing of a percentage-only record armed before the post-sync
-// reboot. Kept apart from EpubReaderActivity.cpp so the fork touches that file
-// only at its call sites.
+// Back, the landing of a percentage-only record armed before the post-sync
+// reboot, and the position the book opened at (a close pushes only a moved
+// position). Kept apart from EpubReaderActivity.cpp so the fork touches that
+// file only at its call sites.
 #include <Logging.h>
 
 #include "CrossPointSettings.h"
@@ -25,9 +26,24 @@ void EpubReaderActivity::onBookSyncLoad() {
   bookSyncOpenPending = BookSyncHooks::pullOnOpenWanted();
 }
 
+float EpubReaderActivity::bookSyncPercentage() const {
+  // The percentage ProgressMapper::toSavedProgress sends for this position.
+  const CrossPointPosition pos = getCurrentPosition();
+  const float intra =
+      pos.totalPages > 1 ? static_cast<float>(pos.pageNumber) / static_cast<float>(pos.totalPages - 1) : 0.0f;
+  return epub->calculateProgress(pos.spineIndex, intra);
+}
+
 bool EpubReaderActivity::bookSyncOnOpen() {
+  if (bookSyncOpenPercentage && !bookSyncOpenPending) return false;
   // Once the first page is on the panel, so the local position is the real one.
-  if (!bookSyncOpenPending || !section || lastRenderCompleteMs == 0 || RenderLock::peek()) return false;
+  if (!section || lastRenderCompleteMs == 0 || RenderLock::peek()) return false;
+  if (!bookSyncOpenPercentage) {
+    RenderLock lock;
+    bookSyncOpenPercentage = bookSyncPercentage();
+    BookSyncHooks::takeOpenBaseline(*epub, *bookSyncOpenPercentage);
+  }
+  if (!bookSyncOpenPending) return false;
   bookSyncOpenPending = false;
   LOG_INF("BKS", "Sync on book open");
   return launchKOReaderSync(BookSyncTrigger::Open);
@@ -50,8 +66,24 @@ bool EpubReaderActivity::bookSyncOnBack() {
   const bool longPress = mappedInput.getHeldTime() >= ReaderUtils::GO_BACK_OR_HOME_MS;
   const BookSyncTrigger trigger =
       longPress != SETTINGS.backShortToFileBrowser ? BookSyncTrigger::CloseToLibrary : BookSyncTrigger::CloseToHome;
+
+  // An unmoved book never goes over a newer record, and the end-of-book screen
+  // leaves the stock way (it saves nothing and moves a finished book to /Read).
+  bool wanted;
+  {
+    RenderLock lock;
+    wanted = BookSyncHooks::closeSyncWanted(*epub, isAtEndOfBook(), bookSyncOpenPercentage, bookSyncPercentage());
+  }
+  if (!wanted) {
+    BookSyncHooks::leaveSync(trigger, bookPath);
+    return true;
+  }
+
   LOG_INF("BKS", "Sync on book close");
-  if (!launchKOReaderSync(trigger)) {
+  pendingSyncSaveError = false;
+  if (!launchKOReaderSync(trigger) || pendingSyncSaveError) {
+    // No sync, or the position could not be saved: Back still leaves the book.
+    pendingSyncSaveError = false;
     BookSyncHooks::leaveSync(trigger, bookPath);
   }
   return true;

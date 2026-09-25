@@ -62,8 +62,9 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
   void setServerUrl(const std::string& url);
   const std::string& getServerUrl() const { return serverUrl; }
 
-  // Get base URL for API calls (with http:// normalization if no protocol, falls back to default)
-  std::string getBaseUrl() const;
+  // Get base URL for API calls (with http:// normalization if no protocol, falls back to default).
+  // forCurrentNetwork=false ignores a peer/hub network the station is on (booksync fork).
+  std::string getBaseUrl(bool forCurrentNetwork = true) const;
 
   // Whether API calls target the CrossPoint sync server that supports protocol extensions.
   bool usesCrossPointSyncServer() const;

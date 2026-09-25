@@ -1,8 +1,10 @@
 #pragma once
 
 #include <BookSyncConfig.h>
+#include <BookSyncPush.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 class Epub;
@@ -23,8 +25,9 @@ bool bootToLibrary();
 // over an entry already in the Wi-Fi list.
 void ensurePeerNetworkSaved();
 // BookSyncSettingsActivity (under a RenderLock), after the user saves the peer
-// name or password: write that network over any existing entry.
-void savePeerNetwork();
+// name or password row: BookSync::peerCredentialToWrite decides what that row
+// may change in the Wi-Fi list.
+void savePeerNetwork(BookSync::PeerWrite cause);
 // How long the Wi-Fi step waits for a saved network (0 = the stock network list).
 uint32_t patientWindowMs(BookSyncTrigger trigger);
 // KOReaderSyncActivity::returnToReader: where a finished sync goes.
@@ -43,5 +46,19 @@ bool takePendingLanding(const Epub& epub, int& spineIndex, float& within);
 bool pullOnOpenWanted();
 // Whether leaving a book with Back should run a sync first.
 bool pushOnCloseWanted();
+
+// The book's last agreement with a server (BookSyncPush.h), in its cache dir.
+// EpubReaderActivity::bookSyncOnOpen, once the first page is on the panel: a
+// record applied by the last sync is synced at the page it landed on.
+void takeOpenBaseline(const Epub& epub, float openPercentage);
+// EpubReaderActivity::bookSyncOnBack: whether this close pushes (BookSync::closeSyncWanted).
+bool closeSyncWanted(const Epub& epub, bool atEndOfBook, std::optional<float> openPercentage, float nowPercentage);
+// KOReaderSyncActivity: the book and the server now agree (an upload, or already
+// synchronized), or the server's record was applied.
+void recordSynced(const std::string& epubPath, float localPercentage, float remotePercentage);
+void recordApplied(const std::string& epubPath, float remotePercentage);
+// KOReaderSyncActivity's smart decision: BookSync::smartOverride for this book.
+BookSync::SmartOverride smartOverride(const std::string& epubPath, float localPercentage, float remotePercentage,
+                                      const std::string& remoteDeviceId, const std::string& remoteDevice);
 
 }  // namespace BookSyncHooks

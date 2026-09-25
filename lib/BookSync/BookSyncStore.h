@@ -31,6 +31,8 @@ class BookSyncStore : public PersistableStore<BookSyncStore> {
   std::string getPeerSsid() const;
   std::string getPeerUrl() const;
   std::string getPeerPassword() const;
+  std::string getHubSsid() const;
+  std::string getHubUrl() const;
   uint8_t getWindowIndex() const;
   bool getPushOnClose() const;
   bool getPullOnOpen() const;
@@ -38,15 +40,17 @@ class BookSyncStore : public PersistableStore<BookSyncStore> {
   void setPeerSsid(const std::string& ssid);
   void setPeerUrl(const std::string& url);
   void setPeerPassword(const std::string& password);
+  void setHubSsid(const std::string& ssid);
+  void setHubUrl(const std::string& url);
   void setWindowIndex(uint8_t index);
   void setPushOnClose(bool enabled);
   void setPullOnOpen(bool enabled);
 
-  // KOReaderCredentialStore::getBaseUrl() composes from this: the peer URL while
-  // the station is joined to the peer SSID, `configured` otherwise.
+  // KOReaderCredentialStore::getBaseUrl() composes from this: the peer or hub URL
+  // while the station is joined to that SSID, `configured` otherwise.
   std::string serverUrlForCurrentNetwork(const std::string& configured) const;
-  // True while the station is joined to the peer SSID.
-  bool onPeerNetwork() const;
+  // BookSync::onDeviceNetwork() for the current station: no plaintext Basic header.
+  bool onDeviceNetwork() const;
 };
 
 #define BOOKSYNC_STORE BookSyncStore::getInstance()

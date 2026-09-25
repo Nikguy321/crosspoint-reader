@@ -1,5 +1,6 @@
 #include "KOReaderSyncActivity.h"
 
+#include <BookSyncPush.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -44,6 +45,19 @@ DocumentMatchMethod alternateMatchMethod(const DocumentMatchMethod method) {
 
 const char* matchMethodName(const DocumentMatchMethod method) {
   return method == DocumentMatchMethod::FILENAME ? "filename" : "binary";
+}
+
+// The record the primary PUT just stored, under the other match method's id too
+// (booksync fork). Only the primary PUT decides whether the upload succeeded.
+void uploadUnderAlternateId(KOReaderProgress& progress, const std::string& epubPath) {
+  const DocumentMatchMethod altMethod = alternateMatchMethod(KOREADER_STORE.getMatchMethod());
+  const auto altHash =
+      BookSync::secondDocumentId(progress.document, calculateDocumentHashForMethod(epubPath, altMethod));
+  if (!altHash) return;
+  progress.document = *altHash;
+  const auto altResult = KOReaderSyncClient::updateProgress(progress);
+  LOG_DBG("KOSync", "Alternate upload (%s): result=%d http=%d doc=%s", matchMethodName(altMethod), altResult,
+          KOReaderSyncClient::lastHttpCode, altHash->c_str());
 }
 
 }  // namespace
@@ -98,6 +112,7 @@ void KOReaderSyncActivity::saveProgressAndReturn(int spineIndex, int page) {
     requestUpdate(true);
     return;
   }
+  BookSyncHooks::recordApplied(epubPath, remoteProgress.percentage);
   returnToReader();
 }
 
@@ -276,18 +291,38 @@ void KOReaderSyncActivity::performSync() {
 
   const ProgressComparison comparison =
       compareProgress(localPosition, localProgress.percentage, remotePosition, remoteProgress.percentage);
+  bool offerRemote = false;
   if (smartSyncEnabled()) {
     LOG_DBG("KOSync", "Smart decision: doc=%s result=%d local=%.6f remote=%.6f remoteXpath=%s mapped=%d/%d",
             primaryHash.c_str(), static_cast<int>(comparison), localProgress.percentage, remoteProgress.percentage,
             remoteProgress.progress.c_str(), remotePosition.spineIndex, remotePosition.pageNumber);
+    // The record this book synced with is neither echoed back nor applied over a later move, and another
+    // device's place goes to the compare screen instead of being uploaded over or applied unseen (booksync fork).
+    if (comparison == ProgressComparison::LocalAhead || comparison == ProgressComparison::RemoteAhead) {
+      const BookSync::SmartOverride choice =
+          BookSyncHooks::smartOverride(epubPath, localProgress.percentage, remoteProgress.percentage,
+                                       remoteProgress.deviceId, remoteProgress.device);
+      if (choice == BookSync::SmartOverride::AlreadySynced) {
+        completeAlreadySynced();
+        return;
+      }
+      if (choice == BookSync::SmartOverride::Upload) {
+        performUpload();
+        return;
+      }
+      offerRemote = choice == BookSync::SmartOverride::Offer;
+    }
     switch (comparison) {
       case ProgressComparison::Synchronized:
+        BookSyncHooks::recordSynced(epubPath, localProgress.percentage, remoteProgress.percentage);
         completeAlreadySynced();
         return;
       case ProgressComparison::LocalAhead:
+        if (offerRemote) break;
         performUpload();
         return;
       case ProgressComparison::RemoteAhead:
+        if (offerRemote) break;
         saveProgressAndReturn(remotePosition.spineIndex, remotePosition.pageNumber);
         return;
       case ProgressComparison::Unknown:
@@ -318,7 +353,8 @@ void KOReaderSyncActivity::performUpload() {
   KOReaderProgress progress;
   progress.document = documentHash;
   progress.progress = localProgress.xpath;
-  progress.percentage = localProgress.percentage;
+  // At the end-of-book screen the spine index is one past the last item and the percentage runs past 1.
+  progress.percentage = BookSync::wirePercentage(localProgress.percentage);
 
   // Rich CrossPoint position for the default CrossPoint sync server (lossless
   // CrossPoint<->CrossPoint sync). The HTTP client also enforces this boundary
@@ -363,6 +399,11 @@ void KOReaderSyncActivity::performUpload() {
   epub.reset();
 
   const auto result = KOReaderSyncClient::updateProgress(progress);
+  if (result == KOReaderSyncClient::OK) {
+    const float pushed = progress.percentage;
+    uploadUnderAlternateId(progress, epubPath);
+    BookSyncHooks::recordSynced(epubPath, pushed, pushed);
+  }
 
   // Drop the radio while user reads the result; full teardown happens at silent reboot.
   esp_wifi_stop();

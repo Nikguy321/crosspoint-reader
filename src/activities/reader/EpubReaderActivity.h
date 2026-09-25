@@ -56,9 +56,11 @@ class EpubReaderActivity final : public ReaderActivity {
   bool pendingReadFolderMove = false;
   // Book sync on open/close and the percentage-only landing (EpubReaderBookSync.cpp, booksync fork).
   bool bookSyncOpenPending = false;
+  std::optional<float> bookSyncOpenPercentage;  // once the first page is on the panel
   void onBookSyncLoad();
   bool bookSyncOnOpen();
   bool bookSyncOnBack();
+  float bookSyncPercentage() const;
 
   // Toolbar reader menu (SETTINGS.readerMenuStyle == READER_MENU_TOOLBAR): drawn
   // over the page instead of pushing the full-screen list menu. Select opens the
