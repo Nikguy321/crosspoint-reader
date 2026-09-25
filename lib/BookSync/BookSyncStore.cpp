@@ -16,6 +16,8 @@ void BookSyncStore::toJson(JsonDocument& doc) const {
   doc["peerSsid"] = c.peerSsid;
   doc["peerUrl"] = c.peerUrl;
   doc["peerPassword_obf"] = obfuscation::obfuscateToBase64(c.peerPassword);
+  doc["hubSsid"] = c.hubSsid;
+  doc["hubUrl"] = c.hubUrl;
   doc["windowIndex"] = c.windowIndex;
   doc["pushOnClose"] = c.pushOnClose;
   doc["pullOnOpen"] = c.pullOnOpen;
@@ -32,6 +34,8 @@ bool BookSyncStore::fromJson(JsonVariantConst doc) {
   config.peerPassword = obfuscation::deobfuscateFromBase64(doc["peerPassword_obf"] | "", BookSync::MAX_PASSWORD_LENGTH,
                                                            &decoded, &tooLong);
   if (!decoded || tooLong) config.peerPassword.clear();
+  config.hubSsid = doc["hubSsid"] | defaults.hubSsid.c_str();
+  config.hubUrl = doc["hubUrl"] | defaults.hubUrl.c_str();
   config.windowIndex = BookSync::sanitizeWindowIndex(doc["windowIndex"] | defaults.windowIndex);
   config.pushOnClose = doc["pushOnClose"] | defaults.pushOnClose;
   config.pullOnOpen = doc["pullOnOpen"] | defaults.pullOnOpen;
@@ -56,6 +60,16 @@ std::string BookSyncStore::getPeerUrl() const {
 std::string BookSyncStore::getPeerPassword() const {
   std::lock_guard<std::mutex> lock(configMutex);
   return config.peerPassword;
+}
+
+std::string BookSyncStore::getHubSsid() const {
+  std::lock_guard<std::mutex> lock(configMutex);
+  return config.hubSsid;
+}
+
+std::string BookSyncStore::getHubUrl() const {
+  std::lock_guard<std::mutex> lock(configMutex);
+  return config.hubUrl;
 }
 
 uint8_t BookSyncStore::getWindowIndex() const {
@@ -88,6 +102,16 @@ void BookSyncStore::setPeerPassword(const std::string& password) {
   config.peerPassword = password.substr(0, BookSync::MAX_PASSWORD_LENGTH);
 }
 
+void BookSyncStore::setHubSsid(const std::string& ssid) {
+  std::lock_guard<std::mutex> lock(configMutex);
+  config.hubSsid = ssid.substr(0, BookSync::MAX_SSID_LENGTH);
+}
+
+void BookSyncStore::setHubUrl(const std::string& url) {
+  std::lock_guard<std::mutex> lock(configMutex);
+  config.hubUrl = url.substr(0, BookSync::MAX_URL_LENGTH);
+}
+
 void BookSyncStore::setWindowIndex(const uint8_t index) {
   std::lock_guard<std::mutex> lock(configMutex);
   config.windowIndex = BookSync::sanitizeWindowIndex(index);
@@ -108,12 +132,12 @@ std::string BookSyncStore::serverUrlForCurrentNetwork(const std::string& configu
   if (ssid.empty()) return configured;
   const std::string chosen = BookSync::chooseServerUrl(ssid, getConfig(), configured);
   if (chosen != configured) {
-    LOG_DBG("BKS", "On peer network %s, using %s", ssid.c_str(), chosen.c_str());
+    LOG_DBG("BKS", "On %s, using %s", ssid.c_str(), chosen.c_str());
   }
   return chosen;
 }
 
-bool BookSyncStore::onPeerNetwork() const {
-  const std::string peer = getPeerSsid();
-  return !peer.empty() && connectedSsid() == peer;
+bool BookSyncStore::onDeviceNetwork() const {
+  const std::string ssid = connectedSsid();
+  return !ssid.empty() && BookSync::onDeviceNetwork(ssid, getConfig());
 }

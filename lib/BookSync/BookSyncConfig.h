@@ -37,6 +37,10 @@ struct Config {
   std::string peerSsid = DEFAULT_PEER_SSID;
   std::string peerUrl = DEFAULT_PEER_URL;
   std::string peerPassword;  // the peer hotspot's WPA2 password; empty = an open hotspot
+  // A second fixed server by SSID, empty = off: a hub's own hotspot, e.g. COVEY's
+  // game hotspot "COVEY" at http://192.168.89.1:8088. Joined from the Wi-Fi list.
+  std::string hubSsid;
+  std::string hubUrl;
   uint8_t windowIndex = DEFAULT_WINDOW_INDEX;
   bool pushOnClose = false;
   bool pullOnOpen = false;
@@ -52,17 +56,37 @@ uint32_t patientWindowMs(BookSyncTrigger trigger, uint8_t windowIndex);
 bool isCloseTrigger(BookSyncTrigger trigger);
 
 // The server URL the base URL is composed from: the peer URL while the station
-// is joined to the peer SSID, `configured` everywhere else (and whenever either
-// peer setting is empty). SSIDs compare exactly, as 802.11 does.
+// is joined to the peer SSID, the hub URL while joined to the hub SSID (the peer
+// wins if both name the same network), `configured` everywhere else (and
+// whenever a pair has an empty half). SSIDs compare exactly, as 802.11 does.
 std::string chooseServerUrl(const std::string& connectedSsid, const Config& config, const std::string& configured);
+
+// The plaintext Basic header stays off the air: on the peer's hotspot (open
+// unless given a password), and while the hub's server is in use (it
+// authenticates on x-auth-key alone, as the peer's does).
+bool onDeviceNetwork(const std::string& connectedSsid, const Config& config);
+
+// What wrote the peer network to the Wi-Fi list: a sync starting, or the user
+// saving the Peer Wi-Fi Name or Peer Wi-Fi Password row.
+enum class PeerWrite : uint8_t { SyncStart, NameSaved, PasswordSaved };
 
 // The password to write to the Wi-Fi store for the peer SSID, or nullopt when
 // nothing needs writing. `saved` is what the store holds for that SSID (nullopt
-// when it holds nothing). When a sync starts only a missing entry is added;
-// when the user saves the peer name or password (`userSaved`) the entry is
-// overwritten with the configured password. Empty means an open network.
+// when it holds nothing). A sync start or a saved peer name only adds a missing
+// entry, so a password saved from the Wi-Fi list survives pointing the peer at
+// that network; only saving the peer password overwrites the entry with it.
+// Empty means an open network.
 std::optional<std::string> peerCredentialToWrite(const Config& config, const std::optional<std::string>& saved,
-                                                 bool userSaved);
+                                                 PeerWrite cause);
+
+// Whether the in-memory Wi-Fi list may be written back: it loaded, or there was
+// no file to load. Saving after a failed read would replace every saved network.
+bool wifiListWritable(bool loaded, bool fileExists);
+
+// The patient connect joins the peer with the configured password when it is in
+// range but not in the Wi-Fi list (the list holds at most 8 networks), once per
+// scan.
+bool joinPeerDirectly(const Config& config, bool peerVisible, bool peerInWifiList, bool alreadyTried);
 
 // The peer hotspot was in the last scan, but the saved entry cannot join it: a
 // protected hotspot saved without a password, or an open one saved with a

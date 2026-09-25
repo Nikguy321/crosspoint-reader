@@ -31,8 +31,8 @@ void applyAuthHeaders(freeink::SecureHttpClient& http) {
   http.addHeader("Accept", "application/vnd.koreader.v1+json");
   http.addHeader("x-auth-user", KOREADER_STORE.getUsername());
   http.addHeader("x-auth-key", KOREADER_STORE.getMd5Password());
-  // The peer's hotspot is open: never put the plaintext password on it (booksync fork).
-  if (BOOKSYNC_STORE.onPeerNetwork()) return;
+  // Never the plaintext password on a peer's or hub's hotspot (booksync fork).
+  if (BOOKSYNC_STORE.onDeviceNetwork()) return;
   const std::string credentials = KOREADER_STORE.getUsername() + ":" + KOREADER_STORE.getPassword();
   const String encoded = base64::encode(credentials.c_str());
   http.addHeader("Authorization", std::string("Basic ") + encoded.c_str());

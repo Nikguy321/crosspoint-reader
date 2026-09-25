@@ -114,9 +114,10 @@ void KOReaderCredentialStore::setServerUrl(const std::string& url) {
   LOG_DBG("KRS", "Set server URL: %s", url.empty() ? "(default)" : url.c_str());
 }
 
-std::string KOReaderCredentialStore::getBaseUrl() const {
-  // Joined to the peer's hotspot, the peer is the server (booksync fork).
-  const std::string configuredUrl = BOOKSYNC_STORE.serverUrlForCurrentNetwork(serverUrl);
+std::string KOReaderCredentialStore::getBaseUrl(const bool forCurrentNetwork) const {
+  // Joined to the peer's or hub's hotspot, that device is the server (booksync fork).
+  const std::string configuredUrl =
+      forCurrentNetwork ? BOOKSYNC_STORE.serverUrlForCurrentNetwork(serverUrl) : serverUrl;
   std::string url;
   if (configuredUrl.empty()) {
     url = DEFAULT_SERVER_URL;

@@ -28,19 +28,36 @@ void WifiSelectionActivity::setPatientWindowMs(const uint32_t windowMs) { patien
 
 bool WifiSelectionActivity::patientWait() {
   if (!patience.armed()) return false;
+
+  const BookSync::Config config = BOOKSYNC_STORE.getConfig();
+  const std::string& peer = config.peerSsid;
+  const auto peerNetwork = std::find_if(networks.begin(), networks.end(), [&peer](const WifiNetworkInfo& network) {
+    return !network.isHiddenPlaceholder && !peer.empty() && network.ssid == peer;
+  });
+  const bool peerVisible = peerNetwork != networks.end();
+  const bool peerEncrypted = peerVisible && peerNetwork->isEncrypted;
+  std::optional<WifiCredential> savedPeer;
+  if (!peer.empty()) savedPeer = WIFI_STORE.findCredential(peer);
+
+  // A peer the Wi-Fi list could not take (it is full) is joined with the configured password.
+  if (!patience.expired(millis()) &&
+      BookSync::joinPeerDirectly(config, peerVisible, savedPeer.has_value(), hasAttemptedAutoSsid(peer))) {
+    LOG_INF("WIFI", "Peer %s is not in the Wi-Fi list; joining it with the Peer Wi-Fi Password", peer.c_str());
+    if (tryAutoConnectCredential(WifiCredential{peer, config.peerPassword})) return true;
+  }
+
   if (patience.nothingToJoin(millis())) {
     LOG_DBG("WIFI", "No saved network to join; rescanning in %lu ms, %lu s left",
             static_cast<unsigned long>(BookSyncPatience::RESCAN_INTERVAL_MS),
             static_cast<unsigned long>(patience.secondsLeft(millis())));
 
-    const std::string peer = BOOKSYNC_STORE.getPeerSsid();
-    const auto peerNetwork = std::find_if(networks.begin(), networks.end(), [&peer](const WifiNetworkInfo& network) {
-      return !network.isHiddenPlaceholder && !peer.empty() && network.ssid == peer;
-    });
-    const bool peerVisible = peerNetwork != networks.end();
-    const bool peerEncrypted = peerVisible && peerNetwork->isEncrypted;
+    // What a join would use: the Wi-Fi list's entry, else the configured password.
     std::optional<std::string> savedPassword;
-    if (const auto cred = WIFI_STORE.findCredential(peer)) savedPassword = cred->password;
+    if (savedPeer) {
+      savedPassword = savedPeer->password;
+    } else if (!peer.empty()) {
+      savedPassword = config.peerPassword;
+    }
     const bool mismatch = BookSync::peerPasswordMismatch(peerVisible, peerEncrypted, savedPassword);
     if (mismatch && !patience.showPeerPasswordHint()) {
       LOG_INF("WIFI", "Peer %s is %s but saved %s", peer.c_str(), peerEncrypted ? "protected" : "open",
