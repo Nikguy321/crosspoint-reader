@@ -237,6 +237,7 @@ bool EpubReaderActivity::loadBook() {
       LOG_DBG("ERS", "Opened for first time, navigating to text reference at index %d", textSpineIndex);
     }
   }
+  onBookSyncLoad();
 
   loadCachedBookmarks();
   return true;
@@ -374,6 +375,7 @@ void EpubReaderActivity::loop() {
     finish();
     return;
   }
+  if (bookSyncOnOpen()) return;
 
   // Someone else turned the screen while this reader was stacked (the control
   // center's orientation tile). Reflow before the next render, or the page
@@ -622,7 +624,7 @@ void EpubReaderActivity::loop() {
     return;
   }
 
-  if (handleBackNavigation()) {
+  if (bookSyncOnBack() || handleBackNavigation()) {
     return;
   }
 
@@ -958,7 +960,7 @@ unsigned long EpubReaderActivity::confirmLongPressThreshold() const {
   }
 }
 
-bool EpubReaderActivity::launchKOReaderSync() {
+bool EpubReaderActivity::launchKOReaderSync(const BookSyncTrigger trigger) {
   if (!KOREADER_STORE.hasCredentials()) return false;
 
   RenderLock renderLock;
@@ -1001,7 +1003,7 @@ bool EpubReaderActivity::launchKOReaderSync() {
   LOG_DBG("KOSync", "Epub released (heap after: %u)", (unsigned)ESP.getFreeHeap());
 
   activityManager.replaceActivity(std::make_unique<KOReaderSyncActivity>(
-      renderer, mappedInput, savedEpubPath, localPos, std::move(localKoPos), std::move(localChapterName)));
+      renderer, mappedInput, savedEpubPath, localPos, std::move(localKoPos), std::move(localChapterName), trigger));
   return true;
 }
 

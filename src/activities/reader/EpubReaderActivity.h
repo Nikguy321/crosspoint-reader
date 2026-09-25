@@ -1,5 +1,6 @@
 #pragma once
 
+#include <BookSyncConfig.h>
 #include <Epub.h>
 #include <Epub/FootnoteEntry.h>
 #include <Epub/PageLink.h>
@@ -53,6 +54,11 @@ class EpubReaderActivity final : public ReaderActivity {
   bool recentsEntryRemoved = false;
   unsigned long bookmarkMessageTime = 0UL;
   bool pendingReadFolderMove = false;
+  // Book sync on open/close and the percentage-only landing (EpubReaderBookSync.cpp, booksync fork).
+  bool bookSyncOpenPending = false;
+  void onBookSyncLoad();
+  bool bookSyncOnOpen();
+  bool bookSyncOnBack();
 
   // Toolbar reader menu (SETTINGS.readerMenuStyle == READER_MENU_TOOLBAR): drawn
   // over the page instead of pushing the full-screen list menu. Select opens the
@@ -162,7 +168,7 @@ class EpubReaderActivity final : public ReaderActivity {
   void activateMoreRow(int row);
   void openFootnoteSelect(bool reopenMenuOnCancel);
   void openDictionaryWordSelect();
-  bool launchKOReaderSync();
+  bool launchKOReaderSync(BookSyncTrigger trigger = BookSyncTrigger::Manual);
   unsigned long confirmLongPressThreshold() const;
   void toggleAutoPageTurn(uint8_t selectedPageTurnOption);
   void loadCachedBookmarks();

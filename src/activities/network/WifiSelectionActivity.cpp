@@ -210,6 +210,7 @@ void WifiSelectionActivity::processWifiScanResults() {
     realNetworkCount = 0;
     appendHiddenNetworkEntry();
     rebuildNetworkRowItems();
+    if (autoConnecting && !manualNetworkListRequested && patientWait()) return;
     autoConnecting = false;
     state = WifiSelectionState::NETWORK_LIST;
     selectedNetworkIndex = 0;
@@ -263,6 +264,7 @@ void WifiSelectionActivity::processWifiScanResults() {
   if (autoConnecting && !manualNetworkListRequested && tryNextSavedNetworkFromScan()) {
     return;
   }
+  if (autoConnecting && !manualNetworkListRequested && patientWait()) return;
 
   autoConnecting = false;
   state = WifiSelectionState::NETWORK_LIST;
@@ -429,6 +431,7 @@ void WifiSelectionActivity::handleAutoConnectFailure() {
     if (tryNextSavedNetworkFromScan()) {
       return;
     }
+    if (patientWait()) return;
     autoConnecting = false;
     state = WifiSelectionState::NETWORK_LIST;
     selectedNetworkIndex = 0;
@@ -582,6 +585,7 @@ void WifiSelectionActivity::checkConnectionStatus() {
 void WifiSelectionActivity::loop() {
   // Check scan progress
   if (state == WifiSelectionState::SCANNING) {
+    if (patientLoop()) return;
     if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
       WiFi.scanDelete();
       onComplete(false);
@@ -1032,6 +1036,7 @@ void WifiSelectionActivity::renderConnecting(const Rect* screen, const ThemeMetr
   const int statusX = screen->x + metrics->contentSidePadding;
   const int statusWidth = screen->width - metrics->contentSidePadding * 2;
 
+  if (state == WifiSelectionState::SCANNING && renderPatientWait(screen, metrics)) return;
   if (state == WifiSelectionState::SCANNING) {
     const char* statusText = autoConnecting ? tr(STR_FINDING_SAVED_WIFI) : tr(STR_SCANNING);
     const Rect statusBounds{statusX, screen->y, statusWidth, screen->height};

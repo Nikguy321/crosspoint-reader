@@ -1,5 +1,6 @@
 #include "KOReaderCredentialStore.h"
 
+#include <BookSyncStore.h>
 #include <Logging.h>
 #include <MD5Builder.h>
 #include <ObfuscationUtils.h>
@@ -114,14 +115,16 @@ void KOReaderCredentialStore::setServerUrl(const std::string& url) {
 }
 
 std::string KOReaderCredentialStore::getBaseUrl() const {
+  // Joined to the peer's hotspot, the peer is the server (booksync fork).
+  const std::string configuredUrl = BOOKSYNC_STORE.serverUrlForCurrentNetwork(serverUrl);
   std::string url;
-  if (serverUrl.empty()) {
+  if (configuredUrl.empty()) {
     url = DEFAULT_SERVER_URL;
-  } else if (serverUrl.find("://") == std::string::npos) {
+  } else if (configuredUrl.find("://") == std::string::npos) {
     // Normalize URL: add http:// if no protocol specified (local servers typically don't have SSL)
-    url = "http://" + serverUrl;
+    url = "http://" + configuredUrl;
   } else {
-    url = serverUrl;
+    url = configuredUrl;
   }
 
   // Strip trailing slashes to avoid double-slash in API paths

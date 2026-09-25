@@ -1,5 +1,7 @@
 #pragma once
 
+#include <BookSyncPatience.h>
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -103,6 +105,13 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   static constexpr unsigned long AUTO_CONNECTION_TIMEOUT_MS = 7000;
   unsigned long connectionStartTime = 0;
 
+  // A sync event keeps rescanning for a saved network instead of opening the
+  // list (WifiSelectionPatience.cpp, booksync fork).
+  BookSyncPatience patience;
+  bool patientWait();
+  bool patientLoop();
+  bool renderPatientWait(const Rect* screen, const ThemeMetrics* metrics) const;
+
   // The UiAppHost app hosts the network list and the save/forget prompts
   // (themed rows and dialogs, touch routing); every other state keeps its
   // legacy centered-text rendering.
@@ -142,6 +151,8 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
 
  public:
   explicit WifiSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool autoConnect = true);
+  // Wait up to windowMs for a saved network to appear (0 = open the list).
+  void setPatientWindowMs(uint32_t windowMs);
   void onEnter() override;
   void onExit() override;
   void loop() override;

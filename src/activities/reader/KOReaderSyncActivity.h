@@ -1,4 +1,5 @@
 #pragma once
+#include <BookSyncConfig.h>
 #include <Epub.h>
 
 #include <functional>
@@ -24,7 +25,7 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
  public:
   explicit KOReaderSyncActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& epubPath,
                                 CrossPointPosition localPosition, SavedProgressPosition localKoPos,
-                                std::string localChapterName);
+                                std::string localChapterName, BookSyncTrigger trigger = BookSyncTrigger::Manual);
 
   void onEnter() override;
   void onExit() override;
@@ -50,6 +51,7 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   std::string epubPath;
   std::string localChapterName;
   CrossPointPosition localPosition;
+  BookSyncTrigger trigger;
 
   State state = WIFI_SELECTION;
   std::string statusMessage;
