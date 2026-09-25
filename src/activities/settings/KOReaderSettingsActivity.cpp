@@ -2,10 +2,13 @@
 
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Logging.h>
+#include <Memory.h>
 
 #include <memory>
 #include <string>
 
+#include "BookSyncSettingsActivity.h"
 #include "KOReaderAuthActivity.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
@@ -16,8 +19,9 @@ namespace fui = freeink::ui;
 
 namespace {
 const StrId menuNames[KOReaderSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_USERNAME,      StrId::STR_PASSWORD,      StrId::STR_SYNC_SERVER_URL, StrId::STR_DOCUMENT_MATCHING,
-    StrId::STR_SEND_METADATA, StrId::STR_SYNC_BEHAVIOR, StrId::STR_SIGN_UP,         StrId::STR_AUTHENTICATE};
+    StrId::STR_USERNAME,          StrId::STR_PASSWORD,      StrId::STR_SYNC_SERVER_URL,
+    StrId::STR_DOCUMENT_MATCHING, StrId::STR_SEND_METADATA, StrId::STR_SYNC_BEHAVIOR,
+    StrId::STR_SIGN_UP,           StrId::STR_AUTHENTICATE,  StrId::STR_BOOKSYNC_SETTINGS};
 }  // namespace
 
 KOReaderSettingsActivity::KOReaderSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -111,6 +115,14 @@ void KOReaderSettingsActivity::activateIndex(const int index) {
       return;
     }
     startActivityForResult(std::make_unique<KOReaderAuthActivity>(renderer, mappedInput), [](const ActivityResult&) {});
+  } else if (index == 8) {
+    // Peer & automatic sync (booksync fork)
+    auto bookSyncSettings = makeUniqueNoThrow<BookSyncSettingsActivity>(renderer, mappedInput);
+    if (!bookSyncSettings) {
+      LOG_ERR("KRS", "OOM: BookSyncSettingsActivity");
+      return;
+    }
+    startActivityForResult(std::move(bookSyncSettings), [](const ActivityResult&) {});
   }
 }
 
@@ -150,6 +162,8 @@ void KOReaderSettingsActivity::buildScreen(UiScreen& screen) {
     } else if (i == 5) {
       rowValues_[i] =
           KOREADER_STORE.getSyncBehavior() == KOReaderSyncBehavior::SMART ? tr(STR_SMART_SYNC) : tr(STR_ASK_EVERY_TIME);
+    } else if (i == 8) {
+      rowValues_[i].clear();
     } else {
       rowValues_[i] = KOREADER_STORE.hasCredentials() ? "" : std::string("[") + tr(STR_SET_CREDENTIALS_FIRST) + "]";
     }

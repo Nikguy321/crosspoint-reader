@@ -28,9 +28,9 @@ class KOReaderCredentialStore : public PersistableStore<KOReaderCredentialStore>
  private:
   std::string username;
   std::string password;
-  std::string serverUrl;                                            // Custom sync server URL (empty = default)
-  DocumentMatchMethod matchMethod = DocumentMatchMethod::FILENAME;  // Default to filename for compatibility
-  bool sendMetadata = false;                                        // Send document metadata with progress sync
+  std::string serverUrl;                                          // Custom sync server URL (empty = default)
+  DocumentMatchMethod matchMethod = DocumentMatchMethod::BINARY;  // Fresh installs match file content (booksync fork)
+  bool sendMetadata = false;                                      // Send document metadata with progress sync
   KOReaderSyncBehavior syncBehavior = KOReaderSyncBehavior::SMART;
 
   // Private constructor for singleton
