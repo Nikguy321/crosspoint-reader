@@ -31,6 +31,13 @@ void applyAuthHeaders(freeink::SecureHttpClient& http) {
   http.addHeader("Accept", "application/vnd.koreader.v1+json");
   http.addHeader("x-auth-user", KOREADER_STORE.getUsername());
   http.addHeader("x-auth-key", KOREADER_STORE.getMd5Password());
+  // "I take a percentage" (booksync fork). A WiPhone or COVEY holding a
+  // percentage-only place answers an UNMARKED client with {} rather than
+  // "progress":"", because KOReader jumps to page 1 on an empty progress
+  // (kosync.koplugin syncToProgress("") -> GotoXPointer("")). This reader falls
+  // back to the percentage, so it wants the real reply. Every request, every
+  // network: this header carries no secret.
+  http.addHeader("X-BookSync", "1");
   // Never the plaintext password on a peer's or hub's hotspot (booksync fork).
   if (BOOKSYNC_STORE.onDeviceNetwork()) return;
   const std::string credentials = KOREADER_STORE.getUsername() + ":" + KOREADER_STORE.getPassword();
