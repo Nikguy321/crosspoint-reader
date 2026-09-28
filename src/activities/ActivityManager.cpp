@@ -372,6 +372,25 @@ bool ActivityManager::isReaderActivity() const {
          (currentActivity && currentActivity->isReaderActivity());
 }
 
+#if CROSSPOINT_BENCH_CONSOLE
+const char* ActivityManager::benchCurrentName() const { return currentActivity ? currentActivity->name.c_str() : ""; }
+
+const char* ActivityManager::benchStackName(const size_t index) const {
+  return index < stackActivities.size() ? stackActivities[index]->name.c_str() : "";
+}
+
+bool ActivityManager::benchCurrentIsReader() const { return currentActivity && currentActivity->isReaderActivity(); }
+
+bool ActivityManager::benchRenderIdle() const {
+  if (requestedUpdate.load() || pendingAction != PendingAction::None) return false;
+  // The render task takes its notification count to zero when it wakes and
+  // holds renderingMutex while it draws; a zero peek of the count plus a free
+  // mutex means nothing is queued or drawing.
+  if (renderTaskHandle && ulTaskNotifyValueClear(renderTaskHandle, 0) != 0) return false;
+  return !RenderLock::peek();
+}
+#endif
+
 bool ActivityManager::handleForcedRefresh() { return currentActivity && currentActivity->handleForcedRefresh(); }
 
 bool ActivityManager::skipLoopDelay() const { return currentActivity && currentActivity->skipLoopDelay(); }

@@ -137,10 +137,22 @@ void HalGPIO::begin() {
   _deviceType = DeviceType::X4;
 #endif
   inputMgr.begin();
+#if CROSSPOINT_BENCH_CONSOLE
+  // Claims the SDK's single button-hook slot. Safe on the X4 Pro, whose board
+  // code installs no hook (only the T5S3 does): never enable the console on a
+  // board that uses one.
+  InputManager::setButtonHook(&HalGPIO::benchButtonHook);
+  benchTouch.setPanelSize(BoardConfig::ACTIVE.displayWidth, BoardConfig::ACTIVE.displayHeight);
+#endif
 }
 
 void HalGPIO::update() {
   inputMgr.update();
+#if CROSSPOINT_BENCH_CONSOLE
+  const auto now = static_cast<uint32_t>(millis());
+  if (benchKey.busy()) benchKey.onUpdate(now, inputMgr.isPressed(benchKey.buttonIndex()));
+  benchTouch.onUpdate(now);
+#endif
   const bool connected = isUsbConnected();
   usbStateChanged = (connected != lastUsbConnected);
   lastUsbConnected = connected;
@@ -175,6 +187,7 @@ bool HalGPIO::hasTouch() const { return inputMgr.hasTouch(); }
 
 bool HalGPIO::hasHomeKey() const { return BoardConfig::hasHomeKey(); }
 
+#if !CROSSPOINT_BENCH_CONSOLE
 bool HalGPIO::wasHomeKeyPressed() const { return inputMgr.wasHomeKeyPressed(); }
 
 bool HalGPIO::wasHomeKeyTapped() const { return inputMgr.wasHomeKeyTapped(); }
@@ -204,6 +217,80 @@ bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEn
 }
 
 bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity(); }
+#else
+// Each query reports the physical contact first and the injected one otherwise,
+// so an injected contact never masks a real finger.
+bool HalGPIO::wasHomeKeyPressed() const { return inputMgr.wasHomeKeyPressed() || benchTouch.homePressed(); }
+
+bool HalGPIO::wasHomeKeyTapped() const { return inputMgr.wasHomeKeyTapped() || benchTouch.homeTapped(); }
+
+bool HalGPIO::wasHomeKeyLongPressed() const { return inputMgr.wasHomeKeyLongPressed() || benchTouch.homeLongPressed(); }
+
+bool HalGPIO::wasTouchTap(float& nx, float& ny) const { return inputMgr.wasTouchTap(nx, ny) || benchTouch.tap(nx, ny); }
+
+bool HalGPIO::wasTouchDown(float& nx, float& ny) const {
+  return inputMgr.wasTouchPressedAt(nx, ny) || benchTouch.down(nx, ny);
+}
+
+bool HalGPIO::wasTouchReleased() const { return inputMgr.wasTouchReleased() || benchTouch.released(); }
+
+bool HalGPIO::isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const {
+  return inputMgr.isTouchTapCandidate(nx, ny, heldMs) ||
+         benchTouch.tapCandidate(static_cast<uint32_t>(millis()), nx, ny, heldMs);
+}
+
+bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
+  return inputMgr.isTouchHeldAt(nx, ny) || benchTouch.heldAt(nx, ny);
+}
+
+bool HalGPIO::wasTouchLongPress(float& nx, float& ny) const {
+  return inputMgr.wasTouchLongPress(nx, ny) || benchTouch.longPress(nx, ny);
+}
+
+void HalGPIO::suppressTouchContact() {
+  inputMgr.suppressTouchContact();
+  benchTouch.suppress();
+}
+
+unsigned long HalGPIO::lastTouchHeldMs() const {
+  // The injected contact's duration while it is the one being reported.
+  return (benchTouch.released() || benchTouch.contactActive()) ? benchTouch.lastHeldMs() : inputMgr.lastTouchHeldMs();
+}
+
+bool HalGPIO::wasSwipe(float& nxStart, float& nyStart, float& nxEnd, float& nyEnd) const {
+  return inputMgr.wasSwipe(nxStart, nyStart, nxEnd, nyEnd) || benchTouch.swipe(nxStart, nyStart, nxEnd, nyEnd);
+}
+
+bool HalGPIO::wasTouchActivity() const { return inputMgr.wasTouchActivity() || benchTouch.activity(); }
+
+uint8_t HalGPIO::benchButtonHook() { return gpio.benchKey.mask(); }
+
+void HalGPIO::benchPressButton(const uint8_t buttonIndex, const uint32_t holdMs, const uint8_t presses,
+                               const uint32_t gapMs) {
+  benchClearInjection();
+  benchKey.start(buttonIndex, holdMs, presses, gapMs);
+}
+
+void HalGPIO::benchPressHomeKey(const uint32_t holdMs, const uint8_t taps, const uint32_t gapMs) {
+  benchClearInjection();
+  benchTouch.startHomeKey(holdMs, taps, gapMs);
+}
+
+void HalGPIO::benchFinishInjection() {
+  if (benchKey.busy()) benchKey.finishSoon();
+  if (benchTouch.busy()) benchTouch.finishSoon();
+}
+
+void HalGPIO::benchTouchContact(const int x1, const int y1, const int x2, const int y2, const uint32_t holdMs) {
+  benchClearInjection();
+  benchTouch.startContact(x1, y1, x2, y2, holdMs);
+}
+
+void HalGPIO::benchClearInjection() {
+  benchKey.clear();
+  benchTouch.clear();
+}
+#endif
 
 void HalGPIO::setSharedConfirmPowerShortPressEmitsPower(const bool enabled) {
   InputManager::setSharedConfirmPowerShortPressEmitsPower(enabled);

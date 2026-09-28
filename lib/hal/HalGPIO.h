@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <InputManager.h>
 
+#if CROSSPOINT_BENCH_CONSOLE
+#include <BenchInjection.h>
+#endif
+
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -45,6 +49,12 @@ class HalGPIO {
 
   bool lastUsbConnected = false;
   bool usbStateChanged = false;
+
+#if CROSSPOINT_BENCH_CONSOLE
+  // Bench console input injection, played frame by frame from update().
+  bench::KeyInjector benchKey;
+  bench::TouchInjector benchTouch;
+#endif
 
  public:
   enum class DeviceType : uint8_t { X4, X3 };
@@ -129,6 +139,28 @@ class HalGPIO {
   enum class WakeupReason { PowerButton, AfterFlash, AfterUSBPower, Other };
 
   WakeupReason getWakeupReason() const;
+
+#if CROSSPOINT_BENCH_CONSOLE
+  // Bench console injection (see src/util/BenchConsole). A button press goes
+  // through InputManager's button hook, OR'd with the physical buttons; a touch
+  // contact or Home-key press is overlaid on the SDK's touch queries below.
+  // Panel coordinates are native panel pixels. presses/taps > 1 is a
+  // double-press with gapMs released between presses.
+  void benchPressButton(uint8_t buttonIndex, uint32_t holdMs, uint8_t presses, uint32_t gapMs);
+  void benchPressHomeKey(uint32_t holdMs, uint8_t taps, uint32_t gapMs);
+  void benchTouchContact(int x1, int y1, int x2, int y2, uint32_t holdMs);
+  // A previous injection is still playing (a new one must wait for it).
+  bool benchInjectionBusy() const { return benchKey.busy() || benchTouch.busy(); }
+  // True once the release frame was delivered and one more update ran.
+  bool benchInjectionDone() const { return benchKey.done() || benchTouch.done(); }
+  bool benchKeyPressDelivered() const { return benchKey.pressDelivered(); }
+  // How long the last press or contact was actually held, as delivered.
+  uint32_t benchDeliveredHoldMs() const { return benchKey.done() ? benchKey.heldMs() : benchTouch.heldMs(); }
+  // End the running injection at the next update with a real release.
+  void benchFinishInjection();
+  void benchClearInjection();
+  static uint8_t benchButtonHook();
+#endif
 
   // Button indices
   static constexpr uint8_t BTN_BACK = 0;

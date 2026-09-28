@@ -37,8 +37,10 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "platform/UsbSerialJtagHandoff.h"
+#include "util/BenchConsole.h"
 #include "util/BookSyncHooks.h"
 #include "util/ButtonNavigator.h"
+#include "util/PowerButtonTiming.h"
 #include "util/ScreenshotUtil.h"
 #include "util/Timezones.h"
 
@@ -60,11 +62,6 @@ SdCardFontSystem sdFontSystem;
 FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts(), renderer.getTtfFonts());
 static unsigned long allowSleepAt = 0;
 static unsigned long lastX4ProPowerClickAt = 0;
-
-namespace {
-constexpr unsigned long X4PRO_POWER_DOUBLE_CLICK_MS = 500;
-constexpr unsigned long X4PRO_POWER_CLICK_MAX_HOLD_MS = 300;
-}  // namespace
 
 // A wake hold must never become an in-app power-button action.  Boot may continue
 // while the button is held; swallow the one release that ends that wake gesture.
@@ -357,6 +354,10 @@ void setup() {
   // enumeration proceed asynchronously so users do not pay this startup cost.
   delay(250);
 #endif
+#if CROSSPOINT_BENCH_CONSOLE
+  // Must precede begin(), which otherwise creates the default 256-byte queue.
+  logSerial.setRxBufferSize(BenchConsole::RX_BUFFER_BYTES);
+#endif
   Serial.begin(115200);
 #if LOG_SERIAL_HAS_TX_TIMEOUT
   logSerial.setTxTimeoutMs(1);  // This is a load-bearing 1. Do not modify.
@@ -599,6 +600,11 @@ void loop() {
   if (activityManager.requiresExclusiveStorageLoop()) {
     // USB Drive handed the raw SD card to the host. Do not run screenshots,
     // sleep, shortcuts, or normal navigation while its filesystem is detached.
+#if CROSSPOINT_BENCH_CONSOLE
+    // Dev builds: the bench console still serves SHOT, STATE and injected input
+    // here (they touch no files); its file verbs and SLEEP refuse.
+    BenchConsole::poll(/*exclusiveStorage=*/true, 0);
+#endif
     activityManager.loop();
     if (activityManager.preventAutoSleep()) {
       powerManager.setPowerSaving(false);
@@ -629,6 +635,16 @@ void loop() {
     lastMemPrint = millis();
   }
 
+#if CROSSPOINT_BENCH_CONSOLE
+  // The bench console owns the serial input (it also serves CMD:SCREENSHOT).
+  static unsigned long lastActivityTime = millis();
+  const uint8_t benchResult = BenchConsole::poll(/*exclusiveStorage=*/false, lastActivityTime);
+  if (benchResult & BenchConsole::REQUEST_SLEEP) {
+    enterDeepSleep(true);  // the auto-sleep path
+    return;
+  }
+  const bool benchActivity = (benchResult & BenchConsole::USER_ACTIVITY) != 0;
+#else
   // Handle incoming serial commands,
   // nb: we use logSerial from logging to avoid deprecation warnings
   if (logSerial.available() > 0) {
@@ -648,8 +664,10 @@ void loop() {
 
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
+  constexpr bool benchActivity = false;
+#endif
   if (gpio.wasAnyPressed() || gpio.wasAnyReleased() || gpio.wasTouchActivity() || halTiltSensor.hadActivity() ||
-      activityManager.preventAutoSleep()) {
+      activityManager.preventAutoSleep() || benchActivity) {
     lastActivityTime = millis();         // Reset inactivity timer
     powerManager.setPowerSaving(false);  // Restore normal CPU frequency on user activity
   }
@@ -726,7 +744,14 @@ void loop() {
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();
-  if (sleepTimeoutMs > 0 && millis() - lastActivityTime >= sleepTimeoutMs) {
+#if CROSSPOINT_BENCH_CONSOLE
+  // A computer on the USB cable cannot wake a deep-sleeping reader (USB powers
+  // down with the chip), so the inactivity sleep waits while a host is attached.
+  const bool benchHoldsAwake = BenchConsole::hostPresent();
+#else
+  constexpr bool benchHoldsAwake = false;
+#endif
+  if (sleepTimeoutMs > 0 && !benchHoldsAwake && millis() - lastActivityTime >= sleepTimeoutMs) {
     LOG_DBG("SLP", "Auto-sleep triggered after %lu ms of inactivity", sleepTimeoutMs);
     enterDeepSleep(true);
     // This should never be hit as `enterDeepSleep` calls esp_deep_sleep_start

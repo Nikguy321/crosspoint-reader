@@ -115,6 +115,20 @@ class ActivityManager {
   // Trigger a render and block until it completes.
   // Must NOT be called from the render task or while holding a RenderLock.
   void requestUpdateAndWait();
+
+#if CROSSPOINT_BENCH_CONSOLE
+  // Bench console introspection. Names are the activities' internal names;
+  // index 0 of the stack is the bottom.
+  const char* benchCurrentName() const;
+  size_t benchStackDepth() const { return stackActivities.size(); }
+  const char* benchStackName(size_t index) const;
+  // No render requested, queued, or in progress.
+  bool benchRenderIdle() const;
+  // An activity switch is queued for the next loop().
+  bool benchSwitchPending() const { return pendingActivity != nullptr; }
+  // The current (top) activity is a book reader.
+  bool benchCurrentIsReader() const;
+#endif
 };
 
 extern ActivityManager activityManager;  // singleton, to be defined in main.cpp

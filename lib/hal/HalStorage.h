@@ -66,6 +66,13 @@ class HalStorage {
   bool openFileForWrite(const char* moduleName, const String& path, HalFile& file);
   bool removeDir(const char* path);
 
+#if CROSSPOINT_BENCH_CONSOLE
+  // Card capacity and used space for the bench console. Used space is cached by
+  // the SDK for 20 s: the first call after the TTL scans the FAT.
+  uint64_t sdTotalBytes();
+  uint64_t sdUsedBytes();
+#endif
+
   static HalStorage& getInstance() { return instance; }
 
   class StorageLock;  // private class, used internally

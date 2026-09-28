@@ -184,6 +184,18 @@ bool HalStorage::rename(const char* oldPath, const char* newPath) {
 
 bool HalStorage::rmdir(const char* path) { HAL_STORAGE_WRAPPED_CALL(rmdir, path); }
 
+#if CROSSPOINT_BENCH_CONSOLE
+uint64_t HalStorage::sdTotalBytes() {
+  StorageLock lock;
+  return SDCard.sdTotalBytes();
+}
+
+uint64_t HalStorage::sdUsedBytes() {
+  StorageLock lock;
+  return SDCard.sdUsedBytes();
+}
+#endif
+
 bool HalStorage::openFileForRead(const char* moduleName, const char* path, HalFile& file) {
   StorageLock lock;  // ensure thread safety for the duration of this function
   FsFile fsFile;
