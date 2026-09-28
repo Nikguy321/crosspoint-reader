@@ -57,6 +57,9 @@ python3 scripts/x4bench.py sleep
 - Close any other serial monitor first: the tool opens the port exclusively.
 - `python3 scripts/x4bench.py --help` lists every verb and key name. Self-test:
   `python3 scripts/x4bench_selftest.py`.
+- `python3 scripts/x4bench.py card <name> --shot /tmp/card.png` shows a sleep-screen card
+  exactly as the sleep screen draws it, without sleeping, and screenshots it; the next key
+  or tap returns. See [Sleep screen cards](../sleep-screen-cards.md).
 
 ## Useful bug report contents
 

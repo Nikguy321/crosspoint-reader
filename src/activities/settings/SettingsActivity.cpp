@@ -30,6 +30,7 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "SilentRestart.h"
+#include "SleepCardSettingsActivity.h"
 #include "StatusBarSettingsActivity.h"
 #include "TextSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
@@ -87,6 +88,14 @@ void SettingsActivity::rebuildSettingsLists() {
   }
 
   // Append device-only ACTION items
+  if (BoardConfig::isX4Pro()) {
+    // Sleep Screen Cards sits right under the Sleep Screen choice it configures.
+    const auto sleepScreen = std::find_if(displaySettings.begin(), displaySettings.end(), [](const SettingInfo& s) {
+      return s.valuePtr == &CrossPointSettings::sleepScreen;
+    });
+    displaySettings.insert(sleepScreen == displaySettings.end() ? displaySettings.end() : sleepScreen + 1,
+                           SettingInfo::Action(StrId::STR_SLEEP_CARDS, SettingAction::SleepCards));
+  }
   if (!BoardConfig::hasTouch()) {
     controlsSettings.insert(controlsSettings.begin(),
                             SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
@@ -433,6 +442,13 @@ void SettingsActivity::toggleCurrentSetting() {
           startActivityForResult(std::move(activity), nullptr);
         } else {
           LOG_ERR("SETTINGS", "OOM: KeyboardLayoutsActivity");
+        }
+        break;
+      case SettingAction::SleepCards:
+        if (auto activity = makeUniqueNoThrow<SleepCardSettingsActivity>(renderer, mappedInput)) {
+          startActivityForResult(std::move(activity), resultHandler);
+        } else {
+          LOG_ERR("SETTINGS", "OOM: SleepCardSettingsActivity");
         }
         break;
       case SettingAction::About:

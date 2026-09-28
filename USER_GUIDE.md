@@ -218,6 +218,8 @@ The Settings screen allows you to configure the device's behavior. There are a f
   - "Cover + Custom" - The book cover image while actively reading, falls back to "Custom" behavior otherwise
   - "Quick resume" - The text of the last page read will be displayed on the sleep screen and a moon icon is shown on the edge of the screen. Waking up the device will return to the same page of the opened book. This is useful for quickly resuming reading without waiting for the device to fully wake up and load the book.
   - "Transparent" - A transparent overlay image drawn over the current screen; see [Sleep Screen](#37-sleep-screen) below for more information
+  - X4 Pro only: "Now Reading", "Day Card", "Month Calendar", "Quote", "Owner Card", "Tonight's Sky" and "Shuffle"; see [Sleep screen cards (X4 Pro)](#sleep-screen-cards-x4-pro) below
+- **Sleep Screen Cards** (X4 Pro only, right under Sleep Screen): the cards' options - Location, Hunting Season, Season Start/End, Legal Light, Owner Name and Contacts, Quote Source, and which cards Shuffle may pick.
 - **Sleep Screen Cover Mode**: How to display the book cover when "Cover" sleep screen is selected:
   
   - "Fit" (default) - Scale the image down to fit centered on the screen, padding with white borders as necessary
@@ -538,6 +540,31 @@ The **Sleep Screen** setting controls what is displayed when the device goes to 
 | **Cover + Custom** | The cover of the currently open book, shown only while actively reading. Falls back to **Custom** behavior when not reading. |
 | **Transparent**    | A BMP or PNG overlay drawn over the current screen. Supports PNG and 32-bit BGRA alpha transparency, and treats white as transparent in regular BMPs. Falls back to **Dark** if no valid overlay image is found. |
 | **None**           | A blank screen.                                                                                                              |
+
+#### Sleep screen cards (X4 Pro)
+
+On the X4 Pro the Dark and Light screens show the X4 Pro mark, and the Sleep Screen setting also offers these cards. The screen keeps its picture with no power, so every card says when the reader fell asleep ("Asleep since 21:04") rather than showing a clock.
+
+| Card | Shows |
+| ---- | ----- |
+| **Now Reading** | The open book's cover, title, author, progress, chapter and page, and the reading time left in the chapter and the book (from your own page-turn pace, once it has a few pages to go on). |
+| **Day Card** | The date, sunrise, sunset and day length, and the moon's phase with the next full moon. With **Hunting Season** on (or between its dates) it adds the day's legal shooting light. |
+| **Month Calendar** | The month with today circled, the moon's quarters, hunting-season days marked, and the next full moon. |
+| **Quote** | A random entry from `/quotes.txt` at the root of the SD card, or a bookmark's text from the open book (**Quote Source**). |
+| **Owner Card** | "If found, please return to" with the name and contacts you typed in **Sleep Screen Cards**. |
+| **Tonight's Sky** | Moonrise and moonset, and when Venus, Mars, Jupiter and Saturn rise, stand highest and set, with a map of the sky for the evening. |
+| **Shuffle** | A different ticked card each time (Custom pictures can be one of them). |
+
+Sun, moon and planet times need **Location** (decimal degrees, latitude first, e.g. `51.48, -0.00` or `51.48 N 0.00 W`); until it is set those lines read "Set location in Settings". A card with nothing to show (no book, no clock time) falls back to the X4 Pro logo.
+
+`/quotes.txt` is plain text: entries separated by blank lines, the attribution on its own line starting with `--` or at the end of the last line after ` -- `:
+
+```text
+Adopt the pace of nature: her secret is patience.
+ -- Ralph Waldo Emerson
+
+Be kind. -- Plato
+```
 
 #### Cover settings
 

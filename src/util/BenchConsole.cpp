@@ -28,11 +28,14 @@
 
 #include "CrossPointSettings.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
+#include "activities/boot_sleep/SleepCardPreviewActivity.h"
+#include "sleepcards/SleepCard.h"
 #include "util/HomeButtonInput.h"
 #include "util/PowerButtonTiming.h"
 #include "util/TaskWatchdog.h"
 
-extern GfxRenderer renderer;  // defined in main.cpp
+extern GfxRenderer renderer;                   // defined in main.cpp
+extern MappedInputManager mappedInputManager;  // defined in main.cpp
 
 namespace BenchConsole {
 namespace {
@@ -70,7 +73,7 @@ bool txStalled = false;
 
 bench::HostPresence host;
 
-enum class Pending : uint8_t { None, Input, Shot, Open };
+enum class Pending : uint8_t { None, Input, Shot, Open, Card };
 struct PendingState {
   Pending kind = Pending::None;
   char verb[12] = {};
@@ -868,6 +871,48 @@ void cmdOpen(const char* path, const bool exclusive) {
   pend.passes = 0;
 }
 
+// CARD <name|default>: a sleep-screen card drawn exactly as the sleep screen
+// would, shown without sleeping (SleepCardPreviewActivity; the next key or tap
+// returns). The reply waits until it is on the panel. A CARD while a preview is
+// up redraws that preview rather than stacking another one.
+void cmdCard(char* args, const bool exclusive) {
+  char* name = args ? args : const_cast<char*>("");
+  while (*name == ' ') ++name;
+  size_t len = strlen(name);
+  while (len > 0 && name[len - 1] == ' ') name[--len] = '\0';
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR CARD board");
+    return;
+  }
+  const bool isDefault = strcmp(name, "default") == 0;
+  const sleepcards::CardId id = isDefault ? sleepcards::CardId::None : sleepcards::cardByName(name);
+  if (!isDefault && id == sleepcards::CardId::None) {
+    reply("ERR CARD unknown");
+    return;
+  }
+  // The card reads the SD card: not while USB (mass storage) or a transfer owns it.
+  if (activityManager.benchSwitchPending() || storageBusy(exclusive)) {
+    reply("ERR CARD busy");
+    return;
+  }
+  snprintf(pathBuf, sizeof(pathBuf), "%s", name);
+  if (strcmp(activityManager.benchCurrentName(), SleepCardPreviewActivity::NAME) == 0) {
+    static_cast<SleepCardPreviewActivity*>(activityManager.benchCurrentActivity())->show(id);
+    pend.kind = Pending::Card;
+    pend.passes = 0;
+    return;
+  }
+  auto preview = makeUniqueNoThrow<SleepCardPreviewActivity>(renderer, mappedInputManager, id);
+  if (!preview) {
+    LOG_ERR("BENCH", "OOM: SleepCardPreviewActivity");
+    reply("ERR CARD oom");
+    return;
+  }
+  activityManager.pushActivity(std::move(preview));
+  pend.kind = Pending::Card;
+  pend.passes = 0;
+}
+
 void cmdLegacyScreenshot() {
   const uint32_t bufferSize = display.getBufferSize();
   logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
@@ -922,6 +967,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdPut(args, exclusive);
   } else if (strcmp(verb, "OPEN") == 0) {
     cmdOpen(args, exclusive);
+  } else if (strcmp(verb, "CARD") == 0) {
+    cmdCard(args, exclusive);
   } else if (strcmp(verb, "SLEEP") == 0) {
     if (exclusive) {
       reply("ERR SLEEP busy");
@@ -968,6 +1015,23 @@ void servicePending() {
     } else {
       reply("ERR OPEN failed act=%s", activityManager.benchCurrentName());
     }
+    return;
+  }
+  if (pend.kind == Pending::Card) {
+    if (activityManager.benchSwitchPending()) {
+      if (++pend.passes < OPEN_MAX_PASSES) return;
+      pend.kind = Pending::None;
+      reply("ERR CARD timeout");
+      return;
+    }
+    pend.kind = Pending::None;
+    const auto result = SleepCardPreviewActivity::lastResult();
+    if (!result.valid || strcmp(activityManager.benchCurrentName(), SleepCardPreviewActivity::NAME) != 0) {
+      reply("ERR CARD failed act=%s", activityManager.benchCurrentName());
+      return;
+    }
+    reply("OK CARD %s shown=%s outcome=%s ms=%lu", pathBuf, sleepcards::cardName(result.shown), result.outcome,
+          result.ms);
     return;
   }
   if (pend.kind != Pending::Input) return;

@@ -15,6 +15,7 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py put book.epub "/Books/My Book.epub"
   scripts/x4bench.py push ~/books /Books  # add-only
   scripts/x4bench.py open "/Books/My Book.epub"
+  scripts/x4bench.py card day --shot /tmp/day.png   # sleep card preview
   scripts/x4bench.py sleep                # end of a bench session
 
 Protocol (proto=1)
@@ -56,6 +57,13 @@ Verbs
   OPEN <path>              the reader opens it (epub xtc txt md bmp png); OK
                            once the reader is up, ERR OPEN failed if the book
                            did not load.
+  CARD <name|default>      a sleep-screen card drawn exactly as the sleep screen
+                           would draw it, shown WITHOUT sleeping: now_reading,
+                           day, calendar, quote, owner, sky, pictures, shuffle,
+                           or default (the logo screen). OK CARD <name>
+                           shown=<card> outcome=drawn|pictures|declined|logo
+                           ms=<compute + draw> once it is on the panel; the
+                           next key or tap returns to the screen below.
   SLEEP                    deep sleep through the auto-sleep path (refused
                            while an upload/sync/OTA holds the reader awake)
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
@@ -639,6 +647,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("localdir")
     s.add_argument("remotedir")
     s.add_argument("--all", action="store_true", help="include dot files")
+    s = sub.add_parser("card", help="show a sleep-screen card without sleeping (next key/tap returns)")
+    s.add_argument("name", help="now_reading day calendar quote owner sky pictures shuffle default")
+    s.add_argument("--shot", help="also save a screenshot of it here (PNG)")
     sub.add_parser("awake")
     sub.add_parser("sleep")
     s = sub.add_parser("cmd", help="raw passthrough: prints every console line")
@@ -708,6 +719,14 @@ def run(args, link: Link, out=sys.stdout) -> int:
     elif op == "open":
         rest, _ = link.command(f"OPEN {args.path}", t or 90)  # waits for the book to load
         print(rest, file=out)
+    elif op == "card":
+        rest, _ = link.command(f"CARD {args.name}", t or 30)  # the card is on the panel when this returns
+        print(rest, file=out)
+        if args.shot:
+            fields, fb = take_shot(link, t or 30)
+            w, h, rows = shot_rows(fields, fb)
+            write_local(args.shot, png_bytes(w, h, rows))
+            print(f"{args.shot} {w}x{h}", file=out)
     elif op == "awake":
         link.command("AWAKE", t or 5)
         print("awake", file=out)

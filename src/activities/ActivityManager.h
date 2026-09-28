@@ -120,6 +120,7 @@ class ActivityManager {
   // Bench console introspection. Names are the activities' internal names;
   // index 0 of the stack is the bottom.
   const char* benchCurrentName() const;
+  Activity* benchCurrentActivity() const { return currentActivity.get(); }
   size_t benchStackDepth() const { return stackActivities.size(); }
   const char* benchStackName(size_t index) const;
   // No render requested, queued, or in progress.

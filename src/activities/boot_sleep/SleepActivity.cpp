@@ -1,6 +1,7 @@
 #include "SleepActivity.h"
 
 #include <BitmapHelpers.h>
+#include <BoardConfig.h>
 #include <Epub.h>
 #include <Epub/converters/PngToFramebufferConverter.h>
 #include <FontCacheManager.h>
@@ -29,6 +30,9 @@
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "sleepcards/BrandScreen.h"
+#include "sleepcards/DeviceCards.h"
+#include "sleepcards/NowReadingPace.h"
 
 namespace {
 
@@ -504,6 +508,10 @@ void releaseSdFontCachesForDecode(const GfxRenderer& renderer) {
 void SleepActivity::onEnter() {
   Activity::onEnter();
 
+  // The Now Reading card's pace samples live in RAM; deep sleep reboots. Save them whatever this
+  // sleep shows (a few bytes, only when the reader measured something since the last save).
+  if (BoardConfig::isX4Pro()) sleepcards::pace::flushReaderPace();
+
   const bool renderQuickResume =
       SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
       (fromTimeout &&
@@ -563,6 +571,23 @@ void SleepActivity::onEnter() {
         return renderCustomSleepScreen();
       }
     default:
+      if (CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)) return renderCardSleepScreen();
+      return renderDefaultSleepScreen();
+  }
+}
+
+// A sleep-screen card (X4 Pro). Anything a card cannot show falls back to the
+// logo screen; Shuffle may pick the picture frame (the CUSTOM screen).
+void SleepActivity::renderCardSleepScreen() const {
+  if (!BoardConfig::isX4Pro()) return renderDefaultSleepScreen();
+  switch (sleepcards::drawDeviceCard(renderer, sleepcards::cardForSleepMode(SETTINGS.sleepScreen))) {
+    case sleepcards::CardOutcome::Drawn:
+      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+      return;
+    case sleepcards::CardOutcome::Pictures:
+      return renderCustomSleepScreen();
+    case sleepcards::CardOutcome::Declined:
+    default:
       return renderDefaultSleepScreen();
   }
 }
@@ -620,13 +645,19 @@ void SleepActivity::renderDefaultSleepScreen() const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
-  renderer.clearScreen();
-  renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
-  renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
+  if (BoardConfig::isX4Pro()) {
+    sleepcards::drawX4ProLogoScreen(renderer, tr(STR_SLEEPING));
+  } else {
+    renderer.clearScreen();
+    renderer.drawImage(Logo120, (pageWidth - 120) / 2, (pageHeight - 120) / 2, 120, 120);
+    renderer.drawCenteredText(UI_10_FONT_ID, pageHeight / 2 + 70, tr(STR_CROSSPOINT), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 95, tr(STR_SLEEPING));
+  }
 
-  // Make sleep screen dark unless light is selected in settings
-  if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT) {
+  // Make sleep screen dark unless light is selected in settings. A card's
+  // fallback stays light, like the cards themselves.
+  if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT &&
+      !CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)) {
     renderer.invertScreen();
   }
 

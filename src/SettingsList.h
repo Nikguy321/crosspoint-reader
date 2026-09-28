@@ -18,6 +18,7 @@
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
 #include "components/UITheme.h"
+#include "sleepcards/SleepCardSettings.h"
 #include "util/DictionaryRegistry.h"
 
 // Build the font family setting dynamically. When registry is non-null, SD card fonts
@@ -218,6 +219,16 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::BLANK] = StrId::STR_NONE_OPT;
     sleepScreenValues[CrossPointSettings::QUICK_RESUME] = StrId::STR_QUICK_RESUME;
     sleepScreenValues[CrossPointSettings::TRANSPARENT_CUSTOM] = StrId::STR_TRANSPARENT;
+    sleepScreenValues[CrossPointSettings::NOW_READING] = StrId::STR_SLEEP_NOW_READING;
+    sleepScreenValues[CrossPointSettings::DAY] = StrId::STR_SLEEP_DAY;
+    sleepScreenValues[CrossPointSettings::CALENDAR] = StrId::STR_SLEEP_CALENDAR;
+    sleepScreenValues[CrossPointSettings::QUOTE] = StrId::STR_SLEEP_QUOTE;
+    sleepScreenValues[CrossPointSettings::OWNER] = StrId::STR_SLEEP_OWNER;
+    sleepScreenValues[CrossPointSettings::SKY] = StrId::STR_SLEEP_SKY;
+    sleepScreenValues[CrossPointSettings::SHUFFLE] = StrId::STR_SLEEP_SHUFFLE;
+    // The sleep-screen cards are X4 Pro only; elsewhere a stored card mode is out of range and
+    // loads as the default.
+    if (!BoardConfig::isX4Pro()) sleepScreenValues.resize(CrossPointSettings::CLASSIC_SLEEP_SCREEN_MODE_COUNT);
 
     std::vector<StrId> statusBarClockValues(CrossPointSettings::STATUS_BAR_CLOCK_MODE_COUNT);
     statusBarClockValues[CrossPointSettings::STATUS_BAR_CLOCK_HIDE] = StrId::STR_HIDE;
@@ -451,6 +462,48 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
               KOREADER_STORE.saveToFile();
             },
             "koSyncBehavior", StrId::STR_KOREADER_SYNC),
+        // --- Sleep Screen Cards (X4 Pro; device UI is SleepCardSettingsActivity under Display) ---
+        SettingInfo::String(StrId::STR_LOCATION, &SETTINGS.sleepCardLocation[0], sizeof(SETTINGS.sleepCardLocation),
+                            "sleepCardLocation", StrId::STR_SLEEP_CARDS)
+            .withNormalizer(&sleepcards::normalizeLocation),
+        SettingInfo::Enum(StrId::STR_HUNTING_SEASON, &CrossPointSettings::huntingSeason,
+                          {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES}, "huntingSeason",
+                          StrId::STR_SLEEP_CARDS),
+        SettingInfo::Value(StrId::STR_SEASON_START_MONTH, &CrossPointSettings::huntStartMonth, {1, 12, 1},
+                           "huntStartMonth", StrId::STR_SLEEP_CARDS),
+        SettingInfo::Value(StrId::STR_SEASON_START_DAY, &CrossPointSettings::huntStartDay, {1, 31, 1}, "huntStartDay",
+                           StrId::STR_SLEEP_CARDS),
+        SettingInfo::Value(StrId::STR_SEASON_END_MONTH, &CrossPointSettings::huntEndMonth, {1, 12, 1}, "huntEndMonth",
+                           StrId::STR_SLEEP_CARDS),
+        SettingInfo::Value(StrId::STR_SEASON_END_DAY, &CrossPointSettings::huntEndDay, {1, 31, 1}, "huntEndDay",
+                           StrId::STR_SLEEP_CARDS),
+        SettingInfo::Enum(StrId::STR_LEGAL_LIGHT, &CrossPointSettings::legalLightRule,
+                          {StrId::STR_LEGAL_LIGHT_30_MIN, StrId::STR_LEGAL_LIGHT_CIVIL}, "legalLightRule",
+                          StrId::STR_SLEEP_CARDS),
+        SettingInfo::String(StrId::STR_OWNER_NAME, &SETTINGS.ownerName[0], sizeof(SETTINGS.ownerName), "ownerName",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::String(StrId::STR_OWNER_CONTACT_1, &SETTINGS.ownerContact1[0], sizeof(SETTINGS.ownerContact1),
+                            "ownerContact1", StrId::STR_SLEEP_CARDS),
+        SettingInfo::String(StrId::STR_OWNER_CONTACT_2, &SETTINGS.ownerContact2[0], sizeof(SETTINGS.ownerContact2),
+                            "ownerContact2", StrId::STR_SLEEP_CARDS),
+        SettingInfo::Enum(
+            StrId::STR_QUOTE_SOURCE, &CrossPointSettings::quoteSource,
+            {StrId::STR_QUOTE_SOURCE_FILE, StrId::STR_QUOTE_SOURCE_BOOKMARKS, StrId::STR_QUOTE_SOURCE_BOTH},
+            "quoteSource", StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_NOW_READING, &CrossPointSettings::shuffleNowReading, "shuffleNowReading",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_DAY, &CrossPointSettings::shuffleDay, "shuffleDay",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_CALENDAR, &CrossPointSettings::shuffleCalendar, "shuffleCalendar",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_QUOTE, &CrossPointSettings::shuffleQuote, "shuffleQuote",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_OWNER, &CrossPointSettings::shuffleOwner, "shuffleOwner",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_SKY, &CrossPointSettings::shuffleSky, "shuffleSky",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_PICTURES, &CrossPointSettings::shufflePictures, "shufflePictures",
+                            StrId::STR_SLEEP_CARDS),
         // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
         SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
                             "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR),
@@ -505,6 +558,12 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     if (!BoardConfig::isX4Pro()) eraseEntry(StrId::STR_AUTO_POWER_OFF);
     // Tilt page turn needs the QMI8658 IMU (X3).
     if (!halTiltSensor.isAvailable()) eraseEntry(StrId::STR_TILT_PAGE_TURN);
+    // Sleep-screen cards: X4 Pro only (see the sleepScreen labels above).
+    if (!BoardConfig::isX4Pro()) {
+      v.erase(
+          std::remove_if(v.begin(), v.end(), [](const SettingInfo& s) { return s.category == StrId::STR_SLEEP_CARDS; }),
+          v.end());
+    }
     return v;
   }();
 

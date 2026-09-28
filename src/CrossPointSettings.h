@@ -26,8 +26,21 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     BLANK = 5,
     QUICK_RESUME = 6,
     TRANSPARENT_CUSTOM = 7,
+    // Sleep-screen cards (X4 Pro only; src/sleepcards). Persisted by index: append only.
+    NOW_READING = 8,
+    DAY = 9,
+    CALENDAR = 10,
+    QUOTE = 11,
+    OWNER = 12,
+    SKY = 13,
+    SHUFFLE = 14,
     SLEEP_SCREEN_MODE_COUNT
   };
+  // The modes every board offers; the cards above exist on the X4 Pro only.
+  static constexpr uint8_t CLASSIC_SLEEP_SCREEN_MODE_COUNT = TRANSPARENT_CUSTOM + 1;
+  static constexpr bool isSleepCardMode(const uint8_t mode) {
+    return mode >= NOW_READING && mode < SLEEP_SCREEN_MODE_COUNT;
+  }
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
   enum SLEEP_SCREEN_COVER_FILTER {
     NO_FILTER = 0,
@@ -394,6 +407,29 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint16_t keyboardLayouts = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
   uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
+
+  // Sleep Screen Cards (X4 Pro; Display > Sleep Screen Cards, src/sleepcards). Nothing here has a
+  // personal default: the location starts unset and the owner lines empty.
+  // Decimal degrees "lat,lon" (sleepcards::normalizeLocation), "" = not set.
+  char sleepCardLocation[32] = "";
+  uint8_t huntingSeason = 0;  // sleepcards::HuntMode: Off / On / Between dates
+  uint8_t huntStartMonth = 10;
+  uint8_t huntStartDay = 1;
+  uint8_t huntEndMonth = 10;
+  uint8_t huntEndDay = 31;
+  uint8_t legalLightRule = 0;  // sleepcards::LegalLightRule: sunrise/sunset 30 min, civil twilight
+  char ownerName[48] = "";
+  char ownerContact1[48] = "";
+  char ownerContact2[48] = "";
+  uint8_t quoteSource = 2;  // sleepcards::QuoteSource: file / bookmarks / both
+  // Cards Shuffle may pick.
+  uint8_t shuffleNowReading = 1;
+  uint8_t shuffleDay = 1;
+  uint8_t shuffleCalendar = 1;
+  uint8_t shuffleQuote = 1;
+  uint8_t shuffleOwner = 0;
+  uint8_t shuffleSky = 1;
+  uint8_t shufflePictures = 0;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;

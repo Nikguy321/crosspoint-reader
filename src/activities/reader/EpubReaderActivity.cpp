@@ -1,5 +1,6 @@
 #include "EpubReaderActivity.h"
 
+#include <BoardConfig.h>
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -43,6 +44,7 @@
 #include "activities/settings/TextSettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "sleepcards/NowReadingPace.h"
 #include "util/BookmarkUtil.h"
 #include "util/ButtonNavigator.h"
 #include "util/ScreenshotUtil.h"
@@ -1456,6 +1458,11 @@ void EpubReaderActivity::renderBook() {
 
   if (currentSpineIndex != lastSavedSpineIndex || section->currentPage != lastSavedPage ||
       section->pageCount != lastSavedPageCount) {
+    if (BoardConfig::isX4Pro() && !automaticPageTurnActive) {  // reading pace for the Now Reading sleep card
+      sleepcards::pace::noteReaderPage(
+          millis(), currentSpineIndex, section->currentPage, section->estimatedTotalPages(),
+          epub->calculateProgress(currentSpineIndex, 1.0f) - epub->calculateProgress(currentSpineIndex, 0.0f));
+    }
     if (saveProgress(currentSpineIndex, section->currentPage, section->estimatedTotalPages())) {
       lastSavedSpineIndex = currentSpineIndex;
       lastSavedPage = section->currentPage;

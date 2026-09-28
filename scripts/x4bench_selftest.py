@@ -48,6 +48,7 @@ class FakeDevice(threading.Thread):
         self.chunks = 0
         self.puts = []
         self.keys = []
+        self.cards = []
         self.fb = b""
         self.shot = {}
         self.stop = False
@@ -176,6 +177,15 @@ class FakeDevice(threading.Thread):
                     line = line[:-1]  # a short write lost one character
                 self.emit(line, noise=(i // 96) % 50 == 7)
             self.emit("OK SHOT")
+        elif verb == "CARD":
+            if rest not in ("now_reading", "day", "calendar", "quote", "owner", "sky", "pictures", "shuffle",
+                            "default"):
+                self.emit("ERR CARD unknown")
+                return
+            self.cards.append(rest)
+            shown = "none" if rest == "default" else rest
+            self.emit(f"OK CARD {rest} shown={shown} outcome={'logo' if rest == 'default' else 'drawn'} ms=42",
+                      noise=True)
         elif verb == "KEY":
             time.sleep(self.key_delay)
             self.keys.append(rest)
@@ -300,6 +310,18 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(code, x4bench.EXIT_OK)
         self.assertEqual(out, "3 cut up=1\n")
         code, _ = self.cli("cat", "/missing.log")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_card_shows_a_sleep_card(self):
+        self.ser.close()
+        code, out = self.cli("card", "day")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out, "day shown=day outcome=drawn ms=42\n")
+        code, out = self.cli("card", "default")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("outcome=logo", out)
+        self.assertEqual(self.dev.cards, ["day", "default"])
+        code, _ = self.cli("card", "bogus")
         self.assertEqual(code, x4bench.EXIT_ERR)
 
     def test_no_port_exit_code(self):

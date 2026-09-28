@@ -29,6 +29,7 @@ enum class SettingAction {
   KeyboardLayouts,
   HomeButton,
   About,
+  SleepCards,
 };
 
 struct SettingInfo {
@@ -55,6 +56,8 @@ struct SettingInfo {
   // Direct char[] string fields (for settings stored in CrossPointSettings)
   size_t stringOffset = 0;
   size_t stringMaxLen = 0;
+  // Optional: makes typed text canonical before it is stored (false = not valid, keep the old value).
+  bool (*stringNormalizer)(const char* text, char* out, size_t cap) = nullptr;
 
   // Dynamic accessors (for settings stored outside CrossPointSettings, e.g. KOReaderCredentialStore)
   std::function<uint8_t()> valueGetter;
@@ -69,6 +72,11 @@ struct SettingInfo {
 
   SettingInfo& withTextSettings() {
     inTextSettings = true;
+    return *this;
+  }
+
+  SettingInfo& withNormalizer(bool (*normalizer)(const char* text, char* out, size_t cap)) {
+    stringNormalizer = normalizer;
     return *this;
   }
 

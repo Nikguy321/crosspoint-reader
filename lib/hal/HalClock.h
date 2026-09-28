@@ -34,6 +34,9 @@ class HalClock {
   // Returns false if RTC is not available.
   bool localTime(struct tm& out) const;
 
+  // Drop the read cache: the next read goes to the RTC (e.g. for a timestamp that must be exact).
+  void invalidate() const { _lastPollMs = 0; }
+
   // Current time as a UTC Unix epoch (same cached read as localTime()).
   // Returns false if RTC is not available.
   bool utcEpoch(time_t& out) const;

@@ -1,0 +1,262 @@
+#include "SleepCardSettingsActivity.h"
+
+#include <GfxRenderer.h>
+#include <I18n.h>
+#include <Logging.h>
+#include <Memory.h>
+
+#include <cstdio>
+#include <cstring>
+#include <iterator>
+#include <memory>
+#include <utility>
+
+#include "CrossPointSettings.h"
+#include "MappedInputManager.h"
+#include "activities/util/KeyboardEntryActivity.h"
+#include "components/UITheme.h"
+#include "sleepcards/CardText.h"
+#include "sleepcards/SleepCardSettings.h"
+
+namespace fui = freeink::ui;
+
+namespace {
+enum Row : uint8_t {
+  LOCATION,
+  HUNTING,
+  SEASON_START,
+  SEASON_END,
+  LEGAL_LIGHT,
+  OWNER_NAME,
+  OWNER_CONTACT_1,
+  OWNER_CONTACT_2,
+  QUOTE_SOURCE,
+  SHUFFLE_NOW_READING,
+  SHUFFLE_DAY,
+  SHUFFLE_CALENDAR,
+  SHUFFLE_QUOTE,
+  SHUFFLE_OWNER,
+  SHUFFLE_SKY,
+  SHUFFLE_PICTURES,
+};
+
+const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {
+    StrId::STR_LOCATION,      StrId::STR_HUNTING_SEASON,      StrId::STR_SEASON_START,    StrId::STR_SEASON_END,
+    StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,          StrId::STR_OWNER_CONTACT_1, StrId::STR_OWNER_CONTACT_2,
+    StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING, StrId::STR_SHUFFLE_DAY,     StrId::STR_SHUFFLE_CALENDAR,
+    StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,       StrId::STR_SHUFFLE_SKY,     StrId::STR_SHUFFLE_PICTURES};
+
+uint8_t CrossPointSettings::* shuffleField(const int row) {
+  switch (row) {
+    case SHUFFLE_NOW_READING:
+      return &CrossPointSettings::shuffleNowReading;
+    case SHUFFLE_DAY:
+      return &CrossPointSettings::shuffleDay;
+    case SHUFFLE_CALENDAR:
+      return &CrossPointSettings::shuffleCalendar;
+    case SHUFFLE_QUOTE:
+      return &CrossPointSettings::shuffleQuote;
+    case SHUFFLE_OWNER:
+      return &CrossPointSettings::shuffleOwner;
+    case SHUFFLE_SKY:
+      return &CrossPointSettings::shuffleSky;
+    case SHUFFLE_PICTURES:
+      return &CrossPointSettings::shufflePictures;
+    default:
+      return nullptr;
+  }
+}
+
+// "Oct 1".
+std::string monthDayLabel(const uint8_t month, const uint8_t day) {
+  char buf[24];
+  std::snprintf(buf, sizeof(buf), "%s %u", sleepcards::monthShortName(month), static_cast<unsigned>(day));
+  return buf;
+}
+
+// "10-01", the form the keyboard edits.
+std::string monthDayEntry(const uint8_t month, const uint8_t day) {
+  char buf[8];
+  std::snprintf(buf, sizeof(buf), "%02u-%02u", static_cast<unsigned>(month), static_cast<unsigned>(day));
+  return buf;
+}
+
+// The stored "47.6100,-122.3300" shown with a space after the comma.
+std::string locationLabel(const char* stored) {
+  double lat = 0;
+  double lon = 0;
+  if (!sleepcards::parseLocation(stored, lat, lon)) return tr(STR_NOT_SET);
+  char buf[40];
+  std::snprintf(buf, sizeof(buf), "%.4f, %.4f", lat, lon);
+  return buf;
+}
+
+void copyField(char* dest, const size_t cap, const std::string& text) { std::snprintf(dest, cap, "%s", text.c_str()); }
+}  // namespace
+
+SleepCardSettingsActivity::SleepCardSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
+    : UiListActivity("SleepCardSettings", renderer, mappedInput) {
+  for (int i = 0; i < MENU_ITEMS; i++) {
+    rowItems_[i].label = I18N.get(menuNames[i]);
+    rowItems_[i].actionValue = static_cast<int16_t>(i);
+  }
+}
+
+int SleepCardSettingsActivity::listCount() const { return MENU_ITEMS; }
+
+const char* SleepCardSettingsActivity::headerTitle() const { return tr(STR_SLEEP_CARDS); }
+
+void SleepCardSettingsActivity::editText(const int row, const char* title, const char* initial,
+                                         const size_t maxLength) {
+  auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, title, initial, maxLength);
+  if (!keyboard) {
+    LOG_ERR("SCS", "OOM: KeyboardEntryActivity");
+    return;
+  }
+  startActivityForResult(std::move(keyboard), [this, row](const ActivityResult& result) {
+    if (result.isCancelled) return;
+    applyText(row, std::get<KeyboardResult>(result.data).text);
+  });
+}
+
+void SleepCardSettingsActivity::applyText(const int row, const std::string& text) {
+  bool ok = true;
+  switch (row) {
+    case LOCATION: {
+      char stored[sizeof(SETTINGS.sleepCardLocation)];
+      ok = sleepcards::normalizeLocation(text.c_str(), stored, sizeof(stored));
+      if (ok) copyField(SETTINGS.sleepCardLocation, sizeof(SETTINGS.sleepCardLocation), stored);
+      break;
+    }
+    case SEASON_START:
+    case SEASON_END: {
+      sleepcards::MonthDay md;
+      ok = sleepcards::parseMonthDay(text.c_str(), md);
+      if (ok && row == SEASON_START) {
+        SETTINGS.huntStartMonth = md.month;
+        SETTINGS.huntStartDay = md.day;
+      } else if (ok) {
+        SETTINGS.huntEndMonth = md.month;
+        SETTINGS.huntEndDay = md.day;
+      }
+      break;
+    }
+    case OWNER_NAME:
+      copyField(SETTINGS.ownerName, sizeof(SETTINGS.ownerName), text);
+      break;
+    case OWNER_CONTACT_1:
+      copyField(SETTINGS.ownerContact1, sizeof(SETTINGS.ownerContact1), text);
+      break;
+    case OWNER_CONTACT_2:
+      copyField(SETTINGS.ownerContact2, sizeof(SETTINGS.ownerContact2), text);
+      break;
+    default:
+      return;
+  }
+  invalid_[row] = !ok;
+  if (ok) {
+    SETTINGS.saveToFile();
+  } else {
+    LOG_INF("SCS", "Row %d: entry refused, not saved", row);
+  }
+  requestUpdate();
+}
+
+void SleepCardSettingsActivity::activateIndex(const int index) {
+  // Activation opens a keyboard or repaints a new value; a lingering flash would
+  // gray an unrelated row.
+  app.clearTapFlash();
+  switch (index) {
+    case LOCATION: {
+      double lat = 0;
+      double lon = 0;
+      char initial[40] = "";
+      if (sleepcards::parseLocation(SETTINGS.sleepCardLocation, lat, lon)) {
+        std::snprintf(initial, sizeof(initial), "%.4f, %.4f", lat, lon);
+      }
+      editText(index, tr(STR_LOCATION_ENTRY), initial, 31);
+      return;
+    }
+    case SEASON_START:
+      editText(index, tr(STR_SEASON_DATE_ENTRY), monthDayEntry(SETTINGS.huntStartMonth, SETTINGS.huntStartDay).c_str(),
+               8);
+      return;
+    case SEASON_END:
+      editText(index, tr(STR_SEASON_DATE_ENTRY), monthDayEntry(SETTINGS.huntEndMonth, SETTINGS.huntEndDay).c_str(), 8);
+      return;
+    case OWNER_NAME:
+      editText(index, tr(STR_OWNER_NAME), SETTINGS.ownerName, sizeof(SETTINGS.ownerName) - 1);
+      return;
+    case OWNER_CONTACT_1:
+      editText(index, tr(STR_OWNER_CONTACT_1), SETTINGS.ownerContact1, sizeof(SETTINGS.ownerContact1) - 1);
+      return;
+    case OWNER_CONTACT_2:
+      editText(index, tr(STR_OWNER_CONTACT_2), SETTINGS.ownerContact2, sizeof(SETTINGS.ownerContact2) - 1);
+      return;
+    case HUNTING:
+      SETTINGS.huntingSeason =
+          static_cast<uint8_t>((SETTINGS.huntingSeason + 1) % static_cast<uint8_t>(sleepcards::HuntMode::Count));
+      break;
+    case LEGAL_LIGHT:
+      SETTINGS.legalLightRule =
+          static_cast<uint8_t>((SETTINGS.legalLightRule + 1) % static_cast<uint8_t>(sleepcards::LegalLightRule::Count));
+      break;
+    case QUOTE_SOURCE:
+      SETTINGS.quoteSource =
+          static_cast<uint8_t>((SETTINGS.quoteSource + 1) % static_cast<uint8_t>(sleepcards::QuoteSource::Count));
+      break;
+    default: {
+      const auto field = shuffleField(index);
+      if (field == nullptr) return;
+      SETTINGS.*field = SETTINGS.*field ? 0 : 1;
+      break;
+    }
+  }
+  SETTINGS.saveToFile();
+  requestUpdate();
+}
+
+void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  // Content below the GUI.drawHeader band, above the button hints.
+  screen.setContentMarginFromScreen(fui::Insets{static_cast<int16_t>(metrics.topPadding + metrics.headerHeight), 0,
+                                                static_cast<int16_t>(metrics.buttonHintsHeight), 0});
+  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+
+  static constexpr StrId HUNT_LABELS[] = {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES};
+  static constexpr StrId LEGAL_LABELS[] = {StrId::STR_LEGAL_LIGHT_30_MIN, StrId::STR_LEGAL_LIGHT_CIVIL};
+  static constexpr StrId QUOTE_LABELS[] = {StrId::STR_QUOTE_SOURCE_FILE, StrId::STR_QUOTE_SOURCE_BOOKMARKS,
+                                           StrId::STR_QUOTE_SOURCE_BOTH};
+  const auto pick = [](const StrId* labels, const size_t count, const uint8_t value) {
+    return I18N.get(labels[value < count ? value : 0]);
+  };
+  const auto textOrNotSet = [](const char* value) -> std::string { return value[0] ? value : tr(STR_NOT_SET); };
+
+  rowValues_[LOCATION] = locationLabel(SETTINGS.sleepCardLocation);
+  rowValues_[HUNTING] = pick(HUNT_LABELS, std::size(HUNT_LABELS), SETTINGS.huntingSeason);
+  rowValues_[SEASON_START] = monthDayLabel(SETTINGS.huntStartMonth, SETTINGS.huntStartDay);
+  rowValues_[SEASON_END] = monthDayLabel(SETTINGS.huntEndMonth, SETTINGS.huntEndDay);
+  rowValues_[LEGAL_LIGHT] = pick(LEGAL_LABELS, std::size(LEGAL_LABELS), SETTINGS.legalLightRule);
+  rowValues_[OWNER_NAME] = textOrNotSet(SETTINGS.ownerName);
+  rowValues_[OWNER_CONTACT_1] = textOrNotSet(SETTINGS.ownerContact1);
+  rowValues_[OWNER_CONTACT_2] = textOrNotSet(SETTINGS.ownerContact2);
+  rowValues_[QUOTE_SOURCE] = pick(QUOTE_LABELS, std::size(QUOTE_LABELS), SETTINGS.quoteSource);
+  for (int row = SHUFFLE_NOW_READING; row <= SHUFFLE_PICTURES; row++) {
+    rowValues_[row] = SETTINGS.*shuffleField(row) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  }
+  for (int i = 0; i < MENU_ITEMS; i++) {
+    if (invalid_[i]) rowValues_[i] = tr(STR_INVALID_ENTRY);
+    rowItems_[i].value = rowValues_[i].c_str();
+  }
+
+  fui::ListProps props;
+  props.items = rowItems_;
+  props.count = static_cast<uint16_t>(MENU_ITEMS);
+  props.action = ACTION_ROW;
+  props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
+  props.valueInset = 8;               // air between the value and the row edge
+  props.labelText = screen.theme().smallText;
+  props.labelText.maxLines = 2;
+  syncListViewport(screen, props);
+  screen.list(props);
+}

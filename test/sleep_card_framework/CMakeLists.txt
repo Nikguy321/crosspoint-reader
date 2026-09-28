@@ -1,0 +1,3 @@
+add_executable(SleepCardFrameworkTest SleepCardFrameworkTest.cpp)
+target_link_libraries(SleepCardFrameworkTest PRIVATE SleepCardHost GTest::gtest_main)
+gtest_discover_tests(SleepCardFrameworkTest)

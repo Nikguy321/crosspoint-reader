@@ -1321,7 +1321,17 @@ void CrossPointWebServer::handlePostSettings() {
           s.stringSetter(val);
         } else if (s.stringMaxLen > 0) {
           char* ptr = reinterpret_cast<char*>(&SETTINGS) + s.stringOffset;
-          strncpy(ptr, val.c_str(), s.stringMaxLen - 1);
+          if (s.stringNormalizer) {
+            // Stored canonical, as the device's own editor stores it; text that is not valid is refused.
+            std::string canonical(s.stringMaxLen, '\0');
+            if (!s.stringNormalizer(val.c_str(), canonical.data(), canonical.size())) {
+              LOG_DBG("WEB", "Refused %s", s.key);
+              break;
+            }
+            strncpy(ptr, canonical.c_str(), s.stringMaxLen - 1);
+          } else {
+            strncpy(ptr, val.c_str(), s.stringMaxLen - 1);
+          }
           ptr[s.stringMaxLen - 1] = '\0';
         }
         applied++;
