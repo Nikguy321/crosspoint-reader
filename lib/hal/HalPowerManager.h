@@ -36,6 +36,10 @@ class HalPowerManager {
   uint32_t postWakeUntilMs = 0;
   bool postWakeArmed = false;
   uint8_t lastBlock = 0;  // power_policy::Block of the last lightSleep() call
+#if CROSSPOINT_BENCH_CONSOLE
+  bool forceArmed = false;  // bench LSFORCE window open
+  uint32_t forceUntilMs = 0;
+#endif
 
   void setCpuMhzLocked(int mhz);
 
@@ -90,6 +94,12 @@ class HalPowerManager {
   // Why the last lightSleep() call did not sleep ("none" when it slept,
   // "refused" when the SoC rejected the sleep).
   const char* lightSleepBlockName() const;
+#if CROSSPOINT_BENCH_CONSOLE
+  // Bench LSFORCE: for `seconds` the naps ignore the USB-host and charger
+  // guards (the USB pad drops meanwhile), then the chip stays awake
+  // power_policy::BENCH_FORCE_TAIL_MS so the host re-enumerates.
+  void forceLightSleepFor(uint32_t seconds);
+#endif
 
   // EpdBus busy-wait hooks (render task): 80 MHz through a long refresh wait
   // unless a radio is active. Installed by HalDisplay::begin() on the X4 Pro.

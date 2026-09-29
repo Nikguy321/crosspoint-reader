@@ -142,9 +142,21 @@ bool HalPowerManager::lightSleep(HalGPIO& gpio, const LightSleepContext& ctx) {
     in.usbHost = ctx.usbHost;
     in.charging = gpio.isUsbConnected() || (stat >= 0 && digitalRead(stat) == statActive);
     in.frontlightLit = Frontlight.present() && Frontlight.isOn();
+    in.frontlightSurvivesSleep = Frontlight.survivesLightSleep();
     in.inputActive = gpio.rawInputActive() || gpio.touchActive();
     in.debouncePending = gpio.isDebouncePending();
     in.activityBusy = ctx.activityBusy;
+#if CROSSPOINT_BENCH_CONSOLE
+    if (forceArmed) {
+      const auto now = static_cast<uint32_t>(millis());
+      in.benchForced = power_policy::before(now, forceUntilMs);
+      if (!in.benchForced) {
+        forceArmed = false;
+        postWakeUntilMs = now + power_policy::BENCH_FORCE_TAIL_MS;
+        postWakeArmed = true;
+      }
+    }
+#endif
     in.inPostWakeWindow = postWakeArmed && power_policy::before(static_cast<uint32_t>(millis()), postWakeUntilMs);
     in.renderQueued = ctx.renderQueued;
   }
@@ -165,15 +177,23 @@ bool HalPowerManager::lightSleep(HalGPIO& gpio, const LightSleepContext& ctx) {
     gpio_wakeup_enable(static_cast<gpio_num_t>(keys.power),
                        keys.powerActiveHigh ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL);
   }
-  if (stat >= 0) {
+  // A forced nap may start with STAT already active: its level wake would end
+  // every nap at once, so it is not armed then.
+  if (stat >= 0 && !(in.benchForced && digitalRead(stat) == statActive)) {
     gpio_wakeup_enable(static_cast<gpio_num_t>(stat), statActive == HIGH ? GPIO_INTR_HIGH_LEVEL : GPIO_INTR_LOW_LEVEL);
   }
   esp_sleep_enable_gpio_wakeup();
   esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(LIGHT_SLEEP_SLICE_MS) * 1000ULL);
 
+#if CROSSPOINT_BENCH_CONSOLE
+  Frontlight.napProbeArm();
+#endif
   const int64_t t0 = esp_timer_get_time();
   const esp_err_t err = esp_light_sleep_start();
   const int64_t slept = esp_timer_get_time() - t0;
+#if CROSSPOINT_BENCH_CONSOLE
+  Frontlight.napProbeCheck(err == ESP_OK ? slept : 0);
+#endif
   // Every source that fired: the timer can land beside a key, and the single
   // cause reports only the timer then.
   const uint32_t causes = esp_sleep_get_wakeup_causes();
@@ -211,6 +231,14 @@ bool HalPowerManager::lightSleep(HalGPIO& gpio, const LightSleepContext& ctx) {
 const char* HalPowerManager::lightSleepBlockName() const {
   return power_policy::blockName(static_cast<power_policy::Block>(lastBlock));
 }
+
+#if CROSSPOINT_BENCH_CONSOLE
+void HalPowerManager::forceLightSleepFor(const uint32_t seconds) {
+  forceUntilMs = static_cast<uint32_t>(millis()) + seconds * 1000UL;
+  forceArmed = true;
+  LOG_INF("PWR", "Bench: naps forced for %lu s", static_cast<unsigned long>(seconds));
+}
+#endif
 
 void HalPowerManager::startDeepSleep(HalGPIO& gpio, const uint64_t powerOffAfterUs) const {
 #ifdef ENABLE_SERIAL_LOG
@@ -262,6 +290,9 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio, const uint64_t powerOffAfter
   // them to the OFF level and hold them; HalFrontlight::begin() releases the
   // hold at boot.
   {
+    // Return the light-sleep XTAL request first: its count lives in RTC memory
+    // and would otherwise outlive this sleep (HalFrontlight::releaseForDeepSleep()).
+    Frontlight.releaseForDeepSleep();
     const auto& fl = BoardConfig::ACTIVE.frontlight;
     for (const int8_t pin : {fl.gpio, fl.gpioWarm}) {
       if (pin < 0) continue;

@@ -66,7 +66,10 @@ python3 scripts/x4bench.py sleep
   and why the last idle pass did not nap: `host` while the cable is in); `/sleep.log`
   gets a `pwr` line every 5 min while awake (`src/util/PowerLedger.h`).
   `python3 scripts/x4bench.py lightsleep off|on` switches the naps for an A/B run until
-  the next boot. The design and its guards: [Awake power](../awake-power.md).
+  the next boot. `fls=1` in `state` means a lit frontlight keeps napping.
+  `python3 scripts/x4bench.py lsforce <1..45>` lets the naps run that long with the cable
+  in; the port drops meanwhile and returns about 5 s after (a key press brings it back if
+  not). The design and its guards: [Awake power](../awake-power.md).
 - `python3 scripts/check_radio_power.py` (also a ctest, `check_radio_power`) fails if a
   radio start appears outside `src/network/RadioPower.cpp`, which holds the full CPU
   clock from before a radio starts until it is off, or if a clock change or light sleep

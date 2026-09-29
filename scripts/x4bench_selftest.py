@@ -50,6 +50,7 @@ class FakeDevice(threading.Thread):
         self.keys = []
         self.cards = []
         self.lightsleep = "on"
+        self.lsforce = []
         self.fb = b""
         self.shot = {}
         self.stop = False
@@ -151,6 +152,12 @@ class FakeDevice(threading.Thread):
         elif verb == "MKDIR":
             self.dirs.add(rest)
             self.emit(f"OK MKDIR created {rest}")
+        elif verb == "LSFORCE":
+            if not rest.isdigit() or not 1 <= int(rest) <= 45:
+                self.emit("ERR LSFORCE badarg")
+                return
+            self.lsforce.append(int(rest))
+            self.emit(f"OK LSFORCE s={int(rest)} tailms=5000")
         elif verb == "LS" and rest in ("on", "off"):
             self.lightsleep = rest
             self.emit(f"OK LS lightsleep={rest}")
@@ -341,6 +348,16 @@ class BenchSelfTest(unittest.TestCase):
         code, out = self.cli("ls", "/Books")
         self.assertEqual(code, x4bench.EXIT_OK)
         self.assertIn("a.epub", out)
+
+    def test_lsforce_opens_a_window_and_refuses_bad_lengths(self):
+        self.ser.close()
+        code, out = self.cli("lsforce", "20")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out, "s=20 tailms=5000\n")
+        self.assertEqual(self.dev.lsforce, [20])
+        code, _ = self.cli("lsforce", "46")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.assertEqual(self.dev.lsforce, [20])
 
     def test_no_port_exit_code(self):
         sock = socket.socket()

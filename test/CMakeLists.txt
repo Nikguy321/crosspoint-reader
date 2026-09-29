@@ -71,6 +71,7 @@ add_subdirectory(bench_console)
 add_subdirectory(auto_power_off)
 add_subdirectory(sleep_ledger)
 add_subdirectory(power_policy)
+add_subdirectory(frontlight_pwm)
 add_subdirectory(power_ledger)
 # Nick's radio/clock rule is a source check, not a unit: run it with the suite.
 find_package(Python3 COMPONENTS Interpreter)

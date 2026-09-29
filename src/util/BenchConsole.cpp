@@ -13,6 +13,7 @@
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
+#include <HalFrontlight.h>
 #include <HalGPIO.h>
 #include <HalMemory.h>
 #include <HalPowerManager.h>
@@ -20,6 +21,7 @@
 #include <Logging.h>
 #include <MD5Builder.h>
 #include <Memory.h>
+#include <PowerPolicy.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -348,12 +350,17 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
   // lsw = sleeps ended by a key or STAT (the rest end on the 50 ms timer),
   // lsms = time asleep, lsblk = why the last idle pass did not sleep (always
   // "host" while this console is attached), mhz = CPU clock now, radio = the
-  // radio lock or Wi-Fi is up.
-  reply("STATE ls=%d lsn=%lu lsw=%lu lsms=%llu lsblk=%s mhz=%lu radio=%d", powerManager.lightSleepEnabled() ? 1 : 0,
-        static_cast<unsigned long>(powerManager.lightSleepCount()),
+  // radio lock or Wi-Fi is up, fls = a lit frontlight keeps napping (its PWM
+  // survives light sleep), xtal = the IDF's light-sleep XTAL request count (1
+  // only while the light is lit at a nonzero duty), flrun = lit naps of at
+  // least 45 ms whose PWM was measured running / all such naps.
+  reply("STATE ls=%d lsn=%lu lsw=%lu lsms=%llu lsblk=%s mhz=%lu radio=%d fls=%d xtal=%ld flrun=%lu/%lu",
+        powerManager.lightSleepEnabled() ? 1 : 0, static_cast<unsigned long>(powerManager.lightSleepCount()),
         static_cast<unsigned long>(powerManager.lightSleepGpioWakes()),
         static_cast<unsigned long long>(powerManager.lightSleepMicros() / 1000ULL), powerManager.lightSleepBlockName(),
-        static_cast<unsigned long>(getCpuFrequencyMhz()), powerManager.radioActive() ? 1 : 0);
+        static_cast<unsigned long>(getCpuFrequencyMhz()), powerManager.radioActive() ? 1 : 0,
+        Frontlight.survivesLightSleep() ? 1 : 0, static_cast<long>(Frontlight.sleepClockRequests()),
+        static_cast<unsigned long>(Frontlight.napProbeRan()), static_cast<unsigned long>(Frontlight.napProbeChecked()));
   reply("OK STATE");
 }
 
@@ -547,6 +554,26 @@ bool cmdLightSleep(const char* args) {
   LOG_INF("BENCH", "Idle light sleep %s", on ? "on" : "off");
   reply("OK LS lightsleep=%s", on ? "on" : "off");
   return true;
+}
+
+// The window plus its awake tail ends before the shortest auto-sleep can fire
+// (every accepted command resets the activity timer).
+static_assert(power_policy::BENCH_FORCE_MAX_S * 1000UL + power_policy::BENCH_FORCE_TAIL_MS <
+                  CrossPointSettings::MIN_SLEEP_TIMEOUT_MINUTES * 60000UL,
+              "LSFORCE must end before the shortest auto-sleep");
+
+// LSFORCE <1..45>: naps for that many seconds even with this cable attached or
+// a charger in, to count them without unplugging. The USB link drops for the
+// window and comes back once the chip stays awake after it; reconnect then.
+void cmdLightSleepForce(const char* args) {
+  uint32_t seconds = 0;
+  if (!bench::parseU32(args, seconds) || seconds < 1 || seconds > power_policy::BENCH_FORCE_MAX_S) {
+    reply("ERR LSFORCE badarg");
+    return;
+  }
+  powerManager.forceLightSleepFor(seconds);
+  reply("OK LSFORCE s=%lu tailms=%lu", static_cast<unsigned long>(seconds),
+        static_cast<unsigned long>(power_policy::BENCH_FORCE_TAIL_MS));
 }
 
 void cmdLs(char* args, const bool exclusive) {
@@ -981,6 +1008,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     pend.deadline = millis() + SHOT_SETTLE_TIMEOUT_MS;
   } else if (strcmp(verb, "LS") == 0) {
     cmdLs(args, exclusive);
+  } else if (strcmp(verb, "LSFORCE") == 0) {
+    cmdLightSleepForce(args);
   } else if (strcmp(verb, "MD5") == 0) {
     cmdMd5(args, exclusive);
   } else if (strcmp(verb, "CAT") == 0) {

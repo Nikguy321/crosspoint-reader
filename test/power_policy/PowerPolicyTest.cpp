@@ -144,3 +144,52 @@ TEST(PowerPolicy, IdleThresholdByBoard) {
 }
 
 TEST(PowerPolicy, RefusedIsNotASleep) { EXPECT_STREQ(blockName(Block::Refused), "refused"); }
+
+// A lit frontlight stops the nap only when its PWM would stop with it.
+TEST(PowerPolicy, LitLightNapsWhenItsPwmSurvivesSleep) {
+  SleepInputs in = idleReader();
+  in.frontlightLit = true;
+  EXPECT_EQ(lightSleepBlock(in), Block::Light);
+  in.frontlightSurvivesSleep = true;
+  EXPECT_EQ(lightSleepBlock(in), Block::None);
+  in.frontlightLit = false;
+  EXPECT_EQ(lightSleepBlock(in), Block::None);
+  in.frontlightSurvivesSleep = false;
+  EXPECT_EQ(lightSleepBlock(in), Block::None);
+}
+
+// The bench window lifts the USB-host and charger guards and nothing else.
+TEST(PowerPolicy, BenchForceLiftsOnlyTheUsbGuards) {
+  SleepInputs in = idleReader();
+  in.benchForced = true;
+  in.usbHost = true;
+  in.charging = true;
+  EXPECT_EQ(lightSleepBlock(in), Block::None);
+
+  struct Case {
+    void (*set)(SleepInputs&);
+    Block want;
+  };
+  const Case cases[] = {
+      {[](SleepInputs& s) { s.enabled = false; }, Block::Disabled},
+      {[](SleepInputs& s) { s.boardSupports = false; }, Block::Board},
+      {[](SleepInputs& s) { s.powerLockHeld = true; }, Block::Lock},
+      {[](SleepInputs& s) { s.radio.wifiModeOn = true; }, Block::Radio},
+      {[](SleepInputs& s) { s.frontlightLit = true; }, Block::Light},
+      {[](SleepInputs& s) { s.inputActive = true; }, Block::Input},
+      {[](SleepInputs& s) { s.activityBusy = true; }, Block::Activity},
+      {[](SleepInputs& s) { s.inPostWakeWindow = true; }, Block::PostWake},
+      {[](SleepInputs& s) { s.renderQueued = true; }, Block::RenderQueued},
+  };
+  for (const auto& c : cases) {
+    SleepInputs forced = in;
+    c.set(forced);
+    EXPECT_EQ(lightSleepBlock(forced), c.want) << blockName(c.want);
+  }
+}
+
+TEST(PowerPolicy, BenchForceIsBoundedAndLeavesTimeToEnumerate) {
+  constexpr uint32_t SHORTEST_AUTO_SLEEP_MS = 60000;  // CrossPointSettings MIN_SLEEP_TIMEOUT_MINUTES
+  EXPECT_LT(BENCH_FORCE_MAX_S * 1000 + BENCH_FORCE_TAIL_MS, SHORTEST_AUTO_SLEEP_MS);
+  EXPECT_GE(BENCH_FORCE_TAIL_MS, POST_WAKE_AWAKE_MS);
+}

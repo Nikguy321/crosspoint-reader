@@ -29,7 +29,7 @@ enum class Block : uint8_t {
   Radio,         // radio locked or Wi-Fi mode on
   Host,          // a USB host is attached (the USB pad powers down in light sleep)
   Charging,      // charger STAT active (USB power): its enumeration must not see naps
-  Light,         // frontlight lit: LEDC stops in light sleep
+  Light,         // frontlight lit and its PWM does not survive light sleep
   Input,         // a key contact, touch contact or debounce is in progress
   Activity,      // the activity asks for full cadence (preventAutoSleep / skipLoopDelay)
   PostWake,      // inside the awake window after a key or STAT wake
@@ -45,11 +45,13 @@ struct SleepInputs {
   bool usbHost = false;
   bool charging = false;
   bool frontlightLit = false;
+  bool frontlightSurvivesSleep = false;  // its PWM keeps running through a nap (HalFrontlight)
   bool inputActive = false;
   bool debouncePending = false;
   bool activityBusy = false;
   bool inPostWakeWindow = false;
   bool renderQueued = false;
+  bool benchForced = false;  // bench LSFORCE window: naps under a USB host or charger
 };
 
 constexpr Block lightSleepBlock(const SleepInputs& in) {
@@ -57,9 +59,9 @@ constexpr Block lightSleepBlock(const SleepInputs& in) {
   if (!in.boardSupports) return Block::Board;
   if (in.powerLockHeld) return Block::Lock;
   if (radioActive(in.radio)) return Block::Radio;
-  if (in.usbHost) return Block::Host;
-  if (in.charging) return Block::Charging;
-  if (in.frontlightLit) return Block::Light;
+  if (in.usbHost && !in.benchForced) return Block::Host;
+  if (in.charging && !in.benchForced) return Block::Charging;
+  if (in.frontlightLit && !in.frontlightSurvivesSleep) return Block::Light;
   if (in.inputActive || in.debouncePending) return Block::Input;
   if (in.activityBusy) return Block::Activity;
   if (in.inPostWakeWindow) return Block::PostWake;
@@ -118,6 +120,13 @@ constexpr uint32_t idlePowerSavingMs(const bool lightSleepBoard) {
 // After a key or STAT wake the chip stays awake this long: a USB host needs the
 // pad up to enumerate, and a second tap lands on a running loop.
 constexpr uint32_t POST_WAKE_AWAKE_MS = 3000;
+
+// Bench LSFORCE: the longest forced window, and how long the chip then stays
+// awake so the host that lost the USB pad re-enumerates before naps resume.
+// Window + tail stay under the shortest auto-sleep (1 min, counted from the
+// command), so the reader is still up when the host comes back.
+constexpr uint32_t BENCH_FORCE_MAX_S = 45;
+constexpr uint32_t BENCH_FORCE_TAIL_MS = 5000;
 
 // Wrap-safe "now is before until" on a millis() clock.
 constexpr bool before(const uint32_t nowMs, const uint32_t untilMs) {

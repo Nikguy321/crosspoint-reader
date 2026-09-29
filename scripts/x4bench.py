@@ -47,12 +47,23 @@ Verbs
                               the last idle pass did not nap: host while this
                               cable is attached, radio, light, charging, input,
                               lock, postwake, render, activity, refused, off)
-                              mhz radio (radio initialised: full clock)
+                              mhz radio (radio initialised: full clock) fls
+                              (1: a lit frontlight keeps napping, its PWM
+                              survives light sleep; lsblk=light only when not)
+                              xtal (light-sleep crystal requests: 1 while lit,
+                              else 0) flrun=ran/checked (dev: lit naps of 45 ms
+                              or more whose PWM was measured running)
   LS on|off                idle light sleep on or off until the next boot (a
                            deep-sleep wake is a boot: it comes back on);
                            OK LS lightsleep=on|off. For A/B power runs: the
                            naps only happen with no computer on the cable, so
                            read the result from /sleep.log's pwr lines.
+  LSFORCE <1..45>          dev only: naps for that many seconds even with this
+                           cable attached or a charger in (OK LSFORCE s= tailms=).
+                           The USB link DROPS for the window, then the reader
+                           stays awake tailms so the host re-enumerates; wait,
+                           reconnect and read STATE lsn/lsms (if the port never
+                           comes back, one key press on the reader brings it).
   KEY <name> [holdMs] [force]
                            OK KEY <name> req=<ms> held=<delivered ms> [late=1]
                            after the release. late=1: the main loop was
@@ -666,6 +677,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("awake")
     s = sub.add_parser("lightsleep", help="idle light sleep on|off until the next boot")
     s.add_argument("state", choices=("on", "off"))
+    s = sub.add_parser("lsforce", help="nap N seconds (1-45) with the cable attached; the port drops meanwhile")
+    s.add_argument("seconds", type=int)
     sub.add_parser("sleep")
     s = sub.add_parser("cmd", help="raw passthrough: prints every console line")
     s.add_argument("text", nargs=argparse.REMAINDER)
@@ -747,6 +760,9 @@ def run(args, link: Link, out=sys.stdout) -> int:
         print("awake", file=out)
     elif op == "lightsleep":
         rest, _ = link.command(f"LS {args.state}", t or 5)
+        print(rest, file=out)
+    elif op == "lsforce":
+        rest, _ = link.command(f"LSFORCE {args.seconds}", t or 5)
         print(rest, file=out)
     elif op == "sleep":
         link.command("SLEEP", t or 5)
