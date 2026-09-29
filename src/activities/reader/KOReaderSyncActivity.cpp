@@ -23,6 +23,7 @@
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"  // list icons for the compare rows
 #include "fontIds.h"
+#include "network/AutoLocate.h"
 #include "network/RadioPower.h"
 #include "util/BookSyncHooks.h"
 
@@ -129,8 +130,16 @@ void KOReaderSyncActivity::completeAlreadySynced() {
     RenderLock lock(*this);
     state = SYNC_COMPLETE;
   }
+  if (!refreshLocationWhileShowing()) requestUpdate(true);
   markAutoReturn();
-  requestUpdate(true);
+}
+
+bool KOReaderSyncActivity::refreshLocationWhileShowing() {
+  if (!AutoLocate::due(reachedServer)) return false;
+  requestUpdateAndWait();  // the result is on screen while it runs
+  epub.reset();            // not needed past the result; its heap is the TLS session's
+  AutoLocate::run();
+  return true;
 }
 
 void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
@@ -184,6 +193,7 @@ void KOReaderSyncActivity::performSync() {
   // Fetch remote progress. In smart mode, retain the alternate document-id
   // record until both records can be mapped after the Epub is reloaded.
   auto result = KOReaderSyncClient::getProgress(documentHash, remoteProgress);
+  reachedServer = KOReaderSyncClient::lastHttpCode > 0;
   LOG_DBG("KOSync", "Primary remote (%s): result=%d http=%d doc=%s local=%.6f remote=%.6f xpath=%s",
           matchMethodName(primaryMethod), result, KOReaderSyncClient::lastHttpCode, documentHash.c_str(),
           localProgress.percentage, remoteProgress.percentage, remoteProgress.progress.c_str());
@@ -399,31 +409,34 @@ void KOReaderSyncActivity::performUpload() {
   epub.reset();
 
   const auto result = KOReaderSyncClient::updateProgress(progress);
+  reachedServer = KOReaderSyncClient::lastHttpCode > 0;
   if (result == KOReaderSyncClient::OK) {
     const float pushed = progress.percentage;
     uploadUnderAlternateId(progress, epubPath);
     BookSyncHooks::recordSynced(epubPath, pushed, pushed);
   }
 
+  {
+    RenderLock lock(*this);
+    if (result != KOReaderSyncClient::OK) {
+      state = SYNC_FAILED;
+      statusMessage = KOReaderSyncClient::errorString(result);
+    } else {
+      state = UPLOAD_COMPLETE;
+    }
+  }
+  // The sync is done with the network; a due location refresh rides the same connection first.
+  const bool shown = refreshLocationWhileShowing();
+
   // Drop the radio while user reads the result; full teardown happens at silent reboot.
   RadioPower::stop();
 
   if (result != KOReaderSyncClient::OK) {
-    {
-      RenderLock lock(*this);
-      state = SYNC_FAILED;
-      statusMessage = KOReaderSyncClient::errorString(result);
-    }
-    requestUpdate();
+    if (!shown) requestUpdate();
     return;
   }
-
-  {
-    RenderLock lock(*this);
-    state = UPLOAD_COMPLETE;
-  }
   markAutoReturn();
-  requestUpdate(true);
+  if (!shown) requestUpdate(true);
 }
 
 void KOReaderSyncActivity::onEnter() {
@@ -467,6 +480,13 @@ void KOReaderSyncActivity::onExit() {
   Activity::onExit();
 
   if (wifiActivated) {
+    // Paths that kept the station up (the compare screen, no remote progress, a remote place
+    // applied): a due location refresh on the way out, once the sync reached its server. The Epub
+    // is not needed any more and its heap is the TLS session's.
+    if (WiFi.status() == WL_CONNECTED && AutoLocate::due(reachedServer)) {
+      epub.reset();
+      AutoLocate::run();
+    }
     WiFi.disconnect(false);
     delay(30);
     BookSyncHooks::restartAfterSync(trigger);

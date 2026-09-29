@@ -15,7 +15,7 @@
 //
 // "Usable right now" is a cheap check made before choosing (see shuffleUsableMask): Owner needs a
 // name or a contact line, Now Reading an open book that is still on the card, Day / Calendar / Sky
-// a set clock, Quote /quotes.txt or a bookmark of the open book. Pictures is taken as usable when
+// a set clock; Quote always (its built-in set is the fallback). Pictures is taken as usable when
 // ticked (SleepActivity's picture frame falls back to the logo screen by itself). A card that
 // still declines when drawn can be skipped with pickShuffleCardExcluding().
 //

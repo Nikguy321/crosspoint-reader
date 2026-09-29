@@ -200,17 +200,8 @@ void LocateMeActivity::runLookup() {
   }
 
   // The scan: a blocking station scan on the joined radio.
-  size_t apCount = 0;
-  const int16_t found = RadioPower::scanNetworks(false);
-  for (int16_t i = 0; i < found && apCount < MAX_SCAN; i++) {
-    const uint8_t* bssid = WiFi.BSSID(i);
-    if (bssid == nullptr) continue;
-    geolocate::AccessPoint& ap = aps[apCount++];
-    std::memcpy(ap.mac, bssid, sizeof(ap.mac));
-    ap.rssi = static_cast<int16_t>(WiFi.RSSI(i));
-    std::snprintf(ap.ssid, sizeof(ap.ssid), "%s", WiFi.SSID(i).c_str());
-  }
-  WiFi.scanDelete();
+  int16_t found = 0;
+  const size_t apCount = GeolocateClient::scanAccessPoints(aps.get(), MAX_SCAN, found);
   const size_t sent = geolocate::buildRequestBody(aps.get(), apCount, request.get(), geolocate::REQUEST_CAP);
   aps.reset();
   LOG_INF("LOC", "Scan: %d networks, %u usable for Wi-Fi lookup", static_cast<int>(found), static_cast<unsigned>(sent));

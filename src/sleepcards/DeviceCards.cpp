@@ -230,7 +230,9 @@ SleepCardSettings snapshotSettings() {
   copyText(s.ownerName, sizeof(s.ownerName), SETTINGS.ownerName);
   copyText(s.ownerContact1, sizeof(s.ownerContact1), SETTINGS.ownerContact1);
   copyText(s.ownerContact2, sizeof(s.ownerContact2), SETTINGS.ownerContact2);
-  s.quoteSource = static_cast<QuoteSource>(std::min<uint8_t>(SETTINGS.quoteSource, 2));
+  s.quoteSource = SETTINGS.quoteSources < static_cast<uint8_t>(QuoteSource::Count)
+                      ? static_cast<QuoteSource>(SETTINGS.quoteSources)
+                      : QuoteSource::All;
   const struct {
     uint8_t value;
     CardId id;

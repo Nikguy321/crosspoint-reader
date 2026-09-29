@@ -13,6 +13,10 @@ void silentRestartToSettings();  // settings screen
 // Settings > Display > Sleep Screen Cards, over Settings (Back returns there). Locate Me's exit.
 void silentRestartToSleepCards();
 
+// True once deep sleep has committed (the outgoing activity's onExit runs after that): an exit
+// path must not start network work then.
+bool deepSleepStarting();
+
 // Reboots immediately after an activity releases exclusive raw storage. The
 // RTC target ensures setup() lands on Home instead of resuming a reader.
 void restartToHomeAfterStorageHandoff();

@@ -3,9 +3,11 @@
 // row. Public Seattle landmarks only.
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstring>
 #include <string>
 
+#include "src/sleepcards/AutoLocatePolicy.h"
 #include "src/sleepcards/LocationFix.h"
 
 using namespace sleepcards;
@@ -175,4 +177,184 @@ TEST(SleepCardLocation, ANewLocationIsTypedInToday) {
   EXPECT_EQ(retyped("", NEEDLE, "", 0, 0, 0), "typed 0 - 47.6205,-122.3493");
   // Cleared: no record.
   EXPECT_EQ(retyped(NEEDLE, "", "wifi 80 2026-09-29 47.6205,-122.3493"), "");
+}
+
+// ---- "Update location when syncing" -------------------------------------------------------------------
+
+TEST(SleepCardLocation, AnAutomaticWifiFixHasItsOwnRecordAndLine) {
+  EXPECT_EQ(record(fixOf(LocationSource::WifiAuto, 80, 2026, 9, 29)), "wifi-auto 80 2026-09-29 47.6205,-122.3493");
+  LocationFix back;
+  ASSERT_TRUE(parseLocationFix("wifi-auto 80 2026-09-29 47.6205,-122.3493", back));
+  EXPECT_EQ(back.source, LocationSource::WifiAuto);
+  EXPECT_EQ(line(back),
+            "From Wi-Fi (auto), \xC2\xB1"
+            "80 m, Sep 29");
+  // The longest record still fits the setting.
+  EXPECT_EQ(record(fixOf(LocationSource::WifiAuto, MAX_FIX_ACCURACY_M, 2099, 12, 31, "-89.9999,-179.9999")),
+            "wifi-auto 999999 2099-12-31 -89.9999,-179.9999");
+  EXPECT_FALSE(parseLocationFix("wifi-autox 80 2026-09-29 47.6205,-122.3493", back));
+}
+
+namespace {
+autolocate::Situation dueSituation() {
+  autolocate::Situation s;
+  s.enabled = true;
+  s.jobOnline = true;
+  s.connected = true;
+  s.ssid = "HomeNet";
+  s.peerSsid = "WiPhone-Books";
+  s.hubSsid = "COVEY";
+  s.clockValid = true;
+  s.year = 2026;
+  s.month = 9;
+  s.day = 30;
+  s.location = NEEDLE;
+  s.record = "wifi 80 2026-09-28 47.6205,-122.3493";
+  return s;
+}
+}  // namespace
+
+TEST(SleepCardLocation, AutoLocateRunsOnlyWhenDueOnAnInternetNetwork) {
+  using autolocate::Decision;
+  EXPECT_EQ(autolocate::decide(dueSituation()), Decision::Run);
+  auto s = dueSituation();
+  s.enabled = false;
+  EXPECT_EQ(autolocate::decide(s), Decision::Off);
+  // A sync that never reached its server: the network is not working, no lookup on top.
+  s = dueSituation();
+  s.jobOnline = false;
+  EXPECT_EQ(autolocate::decide(s), Decision::JobOffline);
+  // One try a day, whatever came of it.
+  s = dueSituation();
+  s.triedYmd = autolocate::ymd(2026, 9, 30);
+  EXPECT_EQ(autolocate::decide(s), Decision::AlreadyTried);
+  s.triedYmd = autolocate::ymd(2026, 9, 29);
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.triedYmd = autolocate::ymd(2026, 10, 1);  // a later day (the clock was wrong then): a new day
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  EXPECT_EQ(autolocate::ymd(2026, 9, 30), 20260930u);
+  EXPECT_EQ(autolocate::ymd(0, 0, 0), 0u);
+  s = dueSituation();
+  s.connected = false;
+  EXPECT_EQ(autolocate::decide(s), Decision::NotConnected);
+  // The peer's and the hub's hotspots reach no internet.
+  s = dueSituation();
+  s.ssid = "WiPhone-Books";
+  EXPECT_EQ(autolocate::decide(s), Decision::DeviceNetwork);
+  s.ssid = "COVEY";
+  EXPECT_EQ(autolocate::decide(s), Decision::DeviceNetwork);
+  s.ssid = "covey";  // SSIDs compare exactly
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.hubSsid = "";
+  s.ssid = "";  // an empty name never matches an unset hub
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s = dueSituation();
+  s.clockValid = false;
+  EXPECT_EQ(autolocate::decide(s), Decision::NoClock);
+}
+
+TEST(SleepCardLocation, AutoLocateAgeCountsWholeDaysOfAnyRecord) {
+  using autolocate::Decision;
+  auto s = dueSituation();
+  // Saved today (from anywhere, typed too): fresh.
+  s.record = "wifi-auto 80 2026-09-30 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Fresh);
+  s.record = "typed 0 2026-09-30 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Fresh);
+  // Yesterday or before: due; typed locations count too.
+  s.record = "typed 0 2026-09-29 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.record = "ip 25000 2025-12-31 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  // Unknown age: no date, no record, a record for another place, no location at all.
+  s.record = "typed 0 - 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.record = "";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.record = "wifi 80 2026-09-30 47.6097,-122.3422";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.location = "";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  // A record dated after today (the clock was wrong then): due, so it gets a true date.
+  s = dueSituation();
+  s.record = "wifi 80 2026-10-02 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  int days = 0;
+  ASSERT_TRUE(autolocate::locationAgeDays(NEEDLE, "wifi 80 2026-02-28 47.6205,-122.3493", 2026, 3, 1, days));
+  EXPECT_EQ(days, 1);
+  ASSERT_TRUE(autolocate::locationAgeDays(NEEDLE, "wifi 80 2025-09-30 47.6205,-122.3493", 2026, 9, 30, days));
+  EXPECT_EQ(days, 365);
+  EXPECT_FALSE(autolocate::locationAgeDays("", "", 2026, 9, 30, days));
+}
+
+TEST(SleepCardLocation, AutoLocateSavesOnlyATightWifiFix) {
+  using autolocate::Verdict;
+  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 80), Verdict::Save);
+  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 1000), Verdict::Save);
+  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 1001), Verdict::TooVague);
+  // Never an internet-address fix, however it is dressed up.
+  EXPECT_EQ(autolocate::judgeFix(false, 47.6205, -122.3493, 80), Verdict::NotWifi);
+  EXPECT_EQ(autolocate::judgeFix(true, 0.0, 0.0, 80), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(true, 91.0, 0.5, 80), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 0), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(true, std::nan(""), 1.0, 80), Verdict::Invalid);
+
+  char location[32], rec[LOCATION_FIX_CAP];
+  ASSERT_TRUE(
+      autolocate::autoRecord(47.62051, -122.34929, 80, 2026, 9, 30, location, sizeof(location), rec, sizeof(rec)));
+  EXPECT_STREQ(location, NEEDLE);
+  EXPECT_STREQ(rec, "wifi-auto 80 2026-09-30 47.6205,-122.3493");
+  // The record describes the location saved beside it: the Location row reads it back.
+  EXPECT_EQ(line(describeLocation(rec, location)),
+            "From Wi-Fi (auto), \xC2\xB1"
+            "80 m, Sep 30");
+  EXPECT_FALSE(autolocate::autoRecord(47.6, -122.3, 80, 2026, 9, 30, location, sizeof(location), rec, 10));
+  EXPECT_FALSE(autolocate::autoRecord(147.6, -122.3, 80, 2026, 9, 30, location, sizeof(location), rec, sizeof(rec)));
+  EXPECT_STREQ(location, "");
+}
+
+TEST(SleepCardLocation, AutoLocateDecisionNamesAreLogWords) {
+  using autolocate::Decision;
+  for (const Decision d : {Decision::Run, Decision::Off, Decision::JobOffline, Decision::AlreadyTried,
+                           Decision::NotConnected, Decision::DeviceNetwork, Decision::NoClock, Decision::Fresh}) {
+    const std::string name = autolocate::decisionName(d);
+    EXPECT_FALSE(name.empty());
+    EXPECT_EQ(name.find(' '), std::string::npos);
+  }
+}
+
+TEST(SleepCardLocation, AutoLocateKeepsATighterWifiFixOfTheSamePlace) {
+  // A ±30 m Locate Me fix; the new answer ±900 m, 400 m north of it: the same place, kept.
+  const char* locateMe = "wifi 30 2026-09-28 47.6205,-122.3493";
+  double lat = 47.6205 + 400.0 / 111195.0;
+  double lon = -122.3493;
+  uint32_t acc = 900;
+  ASSERT_TRUE(autolocate::keepTighterFix(NEEDLE, locateMe, lat, lon, acc));
+  EXPECT_DOUBLE_EQ(lat, 47.6205);
+  EXPECT_DOUBLE_EQ(lon, -122.3493);
+  EXPECT_EQ(acc, 30u);
+  // An earlier automatic fix counts as measured too.
+  lat = 47.6205;
+  acc = 900;
+  EXPECT_TRUE(autolocate::keepTighterFix(NEEDLE, "wifi-auto 200 2026-09-28 47.6205,-122.3493", lat, lon, acc));
+  EXPECT_EQ(acc, 200u);
+
+  // Replaced: the new fix is tighter, or elsewhere (5 km east), or the old one is not measured.
+  const auto replaced = [](const char* record, const double newLat, const double newLon, const uint32_t newAcc) {
+    double la = newLat, lo = newLon;
+    uint32_t ac = newAcc;
+    const bool kept = autolocate::keepTighterFix(NEEDLE, record, la, lo, ac);
+    return !kept && la == newLat && lo == newLon && ac == newAcc;
+  };
+  EXPECT_TRUE(replaced(locateMe, 47.6205, -122.3493, 20));
+  EXPECT_TRUE(replaced(locateMe, 47.6205,
+                       -122.3493 + 5000.0 / (111195.0 * std::cos(47.6205 * 3.141592653589793 / 180.0)), 900));
+  EXPECT_TRUE(replaced("typed 0 2026-09-28 47.6205,-122.3493", 47.6205, -122.3493, 900));
+  EXPECT_TRUE(replaced("ip 25000 2026-09-28 47.6205,-122.3493", 47.6205, -122.3493, 900));
+  EXPECT_TRUE(replaced("", 47.6205, -122.3493, 900));
+  // A record for another place than the stored one reads as typed in.
+  EXPECT_TRUE(replaced("wifi 30 2026-09-28 47.6097,-122.3422", 47.6205, -122.3493, 900));
+  double la = 47.6205, lo = -122.3493;
+  uint32_t ac = 900;
+  EXPECT_FALSE(autolocate::keepTighterFix("", locateMe, la, lo, ac));
 }

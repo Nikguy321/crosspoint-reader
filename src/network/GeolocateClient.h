@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "GeolocateProtocol.h"
+
 // The HTTPS half of "Locate me": one bounded request to a location service. X4 Pro only; on other
 // boards request() refuses (Transport) and no TLS code is linked for it.
 //
@@ -37,8 +39,25 @@ enum class Result : uint8_t {
   TooLarge,   // the body is longer than the buffer
 };
 
+struct Options {
+  uint32_t connectTimeoutMs = CONNECT_TIMEOUT_MS;
+  uint32_t requestTimeoutMs = REQUEST_TIMEOUT_MS;
+  // No error lines: a caller in the background (AutoLocate) logs its own one-line outcome.
+  bool quiet = false;
+};
+
+// A blocking station scan on the joined radio (through RadioPower, which never starts it here):
+// up to cap access points into out; returns how many, found = how many the scan saw. The scan's
+// own results are freed before it returns.
+size_t scanAccessPoints(geolocate::AccessPoint* out, size_t cap, int16_t& found);
+
+// Enough internal heap for one request (the check request() starts with): a caller can test it
+// before the work that leads up to a request (AutoLocate's scan).
+bool enoughHeap();
+
 // POST jsonBody (when not nullptr) or GET url. The body lands in out, NUL-terminated (cap bytes
 // including the terminator); status is the HTTP status code.
-Result request(const char* url, const char* jsonBody, char* out, size_t cap, size_t& length, int& status);
+Result request(const char* url, const char* jsonBody, char* out, size_t cap, size_t& length, int& status,
+               const Options& options = Options{});
 
 }  // namespace GeolocateClient

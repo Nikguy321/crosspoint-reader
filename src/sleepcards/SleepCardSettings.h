@@ -13,7 +13,27 @@ namespace sleepcards {
 
 enum class HuntMode : uint8_t { Off = 0, On = 1, Between = 2, Count };
 enum class LegalLightRule : uint8_t { ThirtyMinutes = 0, CivilTwilight = 1, Count };
-enum class QuoteSource : uint8_t { File = 0, Bookmarks = 1, Both = 2, Count };
+// Which categories feed the Quote card: the built-in set, "My quotes" (/quotes.txt) and the open
+// book's bookmarks. Stored by index (CrossPointSettings::quoteSources), in the order the setting
+// cycles through; append only.
+enum class QuoteSource : uint8_t {
+  All = 0,
+  BuiltInAndMine = 1,
+  MineAndBookmarks = 2,
+  BuiltInAndBookmarks = 3,
+  BuiltInOnly = 4,
+  MineOnly = 5,
+  BookmarksOnly = 6,
+  Count
+};
+constexpr uint8_t QUOTES_BUILT_IN = 1u << 0;
+constexpr uint8_t QUOTES_MINE = 1u << 1;
+constexpr uint8_t QUOTES_BOOKMARKS = 1u << 2;
+// The categories a setting enables (QUOTES_* bits; an out-of-range value reads as All).
+uint8_t quoteCategories(QuoteSource source);
+// The old "quoteSource" setting (0 quotes file, 1 bookmarks, 2 both) as a QuoteSource index:
+// file -> My quotes only, bookmarks -> Bookmarks only, both (or anything else) -> All.
+uint8_t migrateQuoteSource(uint8_t legacy);
 
 struct MonthDay {
   uint8_t month = 1;  // 1..12
@@ -32,7 +52,7 @@ struct SleepCardSettings {
   char ownerName[OWNER_LINE_CAP] = "";
   char ownerContact1[OWNER_LINE_CAP] = "";
   char ownerContact2[OWNER_LINE_CAP] = "";
-  QuoteSource quoteSource = QuoteSource::Both;
+  QuoteSource quoteSource = QuoteSource::All;
   uint16_t shuffleMask = 0;  // cardBit() of every card Shuffle may pick
 };
 

@@ -415,6 +415,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Where that location came from: typed in, or "Locate me" (Wi-Fi / internet address) with its
   // accuracy and date, naming the location it describes (sleepcards::LocationFix). "" = typed in.
   char sleepCardLocationFix[48] = "";
+  // While a book sync or "Sync clock now" already has Wi-Fi up, refresh a location not saved today
+  // from nearby Wi-Fi networks, at most once a day (beaconDB only; network/AutoLocate). Off unless
+  // turned on.
+  uint8_t autoLocateOnSync = 0;
   uint8_t huntingSeason = 0;  // sleepcards::HuntMode: Off / On / Between dates
   uint8_t huntStartMonth = 10;
   uint8_t huntStartDay = 1;
@@ -424,7 +428,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   char ownerName[48] = "";
   char ownerContact1[48] = "";
   char ownerContact2[48] = "";
-  uint8_t quoteSource = 2;  // sleepcards::QuoteSource: file / bookmarks / both
+  // sleepcards::QuoteSource: which of Built-in / My quotes (/quotes.txt) / Bookmarks feed the
+  // Quote card; 0 = all three. Replaces the old "quoteSource" key (migrated in fromJson).
+  uint8_t quoteSources = 0;
   // Cards Shuffle may pick.
   uint8_t shuffleNowReading = 1;
   uint8_t shuffleDay = 1;

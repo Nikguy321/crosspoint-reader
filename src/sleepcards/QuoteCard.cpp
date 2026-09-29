@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "BuiltInQuotes.h"
 #include "CardDraw.h"
 #include "fontIds.h"
 
@@ -23,6 +24,9 @@ bool isSpace(const unsigned char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\v' || c == '\f';
 }
 bool isContinuation(const unsigned char c) { return (c & 0xC0) == 0x80; }
+
+// The longest name an entry's last line may end with after " -- " ("Be kind. -- Plato").
+constexpr size_t MAX_INLINE_NAME = 80;
 
 // "--", an em dash (U+2014) or a horizontal bar (U+2015) opens an attribution line.
 bool isAttributionPrefix(const unsigned char* p, const size_t n) {
@@ -104,6 +108,32 @@ uint32_t hashInk(const char* s, const size_t n, uint32_t h) {
   return h;
 }
 
+void TextHasher::feed(unsigned char c) {
+  if (skip > 0) {
+    if (isContinuation(c)) {
+      skip--;
+      return;
+    }
+    skip = 0;
+  }
+  if (c == 0xE2) {
+    skip = 2;
+    return;
+  }
+  if (c < 0x80) {
+    if (c >= 'A' && c <= 'Z') c = static_cast<unsigned char>(c - 'A' + 'a');
+    const bool alnum = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+    if (!alnum) return;
+  }
+  h = (h ^ c) * 16777619u;
+}
+
+uint32_t hashQuoteText(const char* s, const size_t n) {
+  TextHasher hasher;
+  for (size_t i = 0; i < n; i++) hasher.feed(static_cast<unsigned char>(s[i]));
+  return hasher.h;
+}
+
 // ---- the scanner -----------------------------------------------------------------------------------
 
 void EntryScanner::feed(const char* data, const size_t n) {
@@ -117,20 +147,44 @@ void EntryScanner::feed(const char* data, const size_t n) {
       endLine();
       continue;
     }
-    if (isSpace(c)) continue;
+    if (isSpace(c)) {
+      spaceBefore_ = lineInk_ > 0;
+      continue;
+    }
     if (lineInk_ == 0) {
       lineFirstInk_ = pos_;
       lineHash_ = inEntry_ ? entry_.hash : HASH_SEED;
+      lineText_ = TextHasher{inEntry_ ? entry_.textHash : HASH_SEED, 0};
+      dashes_ = 0;
+      lineCut_ = false;
     }
+    // " -- " then a name (parseEntry's inline attribution): exactly two dashes between spaces,
+    // after some ink. Dashes do not change the text hash, so the hash before them is the text's.
+    if (spaceBefore_ && dashes_ == 2) {
+      lineCut_ = true;
+      cutHash_ = dashHash_;
+      cutPos_ = pos_;
+    }
+    if (c != '-') {
+      dashes_ = 0;
+    } else if (spaceBefore_) {
+      dashes_ = 1;
+      dashHash_ = lineText_.h;
+    } else if (dashes_ > 0 && dashes_ < 3) {
+      dashes_++;  // 3 = too many for " -- "
+    }
+    spaceBefore_ = false;
     if (lineInk_ < sizeof(prefix_)) prefix_[lineInk_] = c;
     if (lineInk_ < UINT16_MAX) lineInk_++;
     lineHash_ = (lineHash_ ^ c) * 16777619u;
+    lineText_.feed(c);
     lineInkEnd_ = pos_ + 1;
   }
 }
 
 void EntryScanner::endLine() {
-  const bool blank = lineInk_ == 0 || (lineInk_ == 1 && prefix_[0] == '%');
+  // "%" alone (fortune's separator) and a "# heading" line end an entry as a blank line does.
+  const bool blank = lineInk_ == 0 || (lineInk_ == 1 && prefix_[0] == '%') || prefix_[0] == '#';
   if (blank) {
     if (inEntry_) endEntry();
   } else {
@@ -145,15 +199,21 @@ void EntryScanner::endLine() {
       sawAttribution_ = true;
     } else if (!sawAttribution_) {
       entry_.hasText = true;
+      entry_.textHash = lineText_.h;
+      // The same text without a short name after its last " -- ", should this be the last line.
+      cutTextHash_ = lineCut_ && lineInkEnd_ - cutPos_ <= MAX_INLINE_NAME ? cutHash_ : lineText_.h;
     }
     entry_.hash = lineHash_;
     entry_.length = lineInkEnd_ - entry_.offset;
   }
   lineInk_ = 0;
+  spaceBefore_ = false;
 }
 
 void EntryScanner::endEntry() {
   inEntry_ = false;
+  // No attribution line: parseEntry takes an inline one off the last line, so the identity does.
+  if (!sawAttribution_ && entry_.hasText) entry_.textHash = cutTextHash_;
   if (callback_) callback_(user_, entry_);
 }
 
@@ -175,7 +235,6 @@ namespace {
 // attribution when both sides have something and the name is short (a name, not a sentence).
 void splitInlineAttribution(char* text, size_t& textLen, const size_t lastLineStart, char* attribution,
                             const size_t attributionCap) {
-  constexpr size_t MAX_INLINE_NAME = 80;
   const char* found = nullptr;
   for (const char* p = std::strstr(text + lastLineStart, " -- "); p != nullptr; p = std::strstr(p + 1, " -- ")) {
     found = p;
@@ -217,6 +276,7 @@ bool parseEntry(const char* raw, size_t n, char* text, const size_t textCap, cha
     while (end < n && raw[end] != '\n' && raw[end] != '\r') end++;
     size_t a = i;
     while (a < end && isSpace(static_cast<unsigned char>(raw[a]))) a++;
+    if (a < end && raw[a] == '#') a = end;  // a heading line: not part of any quote
     if (a < end) {
       const auto* line = reinterpret_cast<const unsigned char*>(raw + a);
       if (opensAttribution(line, end - a, firstLine)) {
@@ -284,17 +344,37 @@ bool snippetText(const char* summary, char* out, const size_t cap) {
 
 // ---- choosing --------------------------------------------------------------------------------------
 
-Pick chooseSource(const QuoteSource mode, const PoolStats file, const PoolStats bookmarks, uint32_t& rng) {
-  const bool hasFile = file.count > 0;
-  const bool hasBookmarks = bookmarks.count > 0;
-  if (!hasFile && !hasBookmarks) return Pick::None;
-  if (mode == QuoteSource::File) return hasFile ? Pick::File : Pick::Bookmarks;
-  if (mode == QuoteSource::Bookmarks) return hasBookmarks ? Pick::Bookmarks : Pick::File;
-  const bool freshFile = file.fresh > 0;
-  const bool freshBookmarks = bookmarks.fresh > 0;
-  if (freshFile != freshBookmarks) return freshFile ? Pick::File : Pick::Bookmarks;
-  if (hasFile != hasBookmarks) return hasFile ? Pick::File : Pick::Bookmarks;
-  return randomBelow(rng, 2) == 0 ? Pick::File : Pick::Bookmarks;
+uint8_t categoriesWithEntries(const uint8_t enabled, const Pools& pools) {
+  uint8_t with = 0;
+  if (pools.builtIn.count > 0) with |= QUOTES_BUILT_IN;
+  if (pools.mine.count > 0) with |= QUOTES_MINE;
+  if (pools.bookmarks.count > 0) with |= QUOTES_BOOKMARKS;
+  return with & enabled;
+}
+
+Pick chooseCategory(const uint8_t enabled, const Pools& pools, uint32_t& rng) {
+  const struct {
+    uint8_t bit;
+    Pick pick;
+    const PoolStats& stats;
+  } categories[] = {{QUOTES_BUILT_IN, Pick::BuiltIn, pools.builtIn},
+                    {QUOTES_MINE, Pick::Mine, pools.mine},
+                    {QUOTES_BOOKMARKS, Pick::Bookmarks, pools.bookmarks}};
+  Pick any[3];
+  Pick fresh[3];
+  uint32_t anyCount = 0;
+  uint32_t freshCount = 0;
+  for (const auto& c : categories) {
+    if ((enabled & c.bit) == 0 || c.stats.count == 0) continue;
+    any[anyCount++] = c.pick;
+    if (c.stats.fresh > 0) fresh[freshCount++] = c.pick;
+  }
+  if (freshCount > 0) return fresh[randomBelow(rng, freshCount)];
+  if (anyCount > 0) return any[randomBelow(rng, anyCount)];
+  // Nothing in the chosen categories: the reader's own quotes, else the built-in set.
+  if (pools.mine.count > 0) return Pick::Mine;
+  if (pools.builtIn.count > 0) return Pick::BuiltIn;
+  return Pick::None;
 }
 
 void FreshPicker::offer(const uint32_t hash, const uint32_t value, const uint32_t value2) {
@@ -325,10 +405,14 @@ int wrapLines(const char* text, const int width, const int fontIndex, const Meas
     return 0;
   }
   const size_t total = std::strlen(text);
+  const auto wordEnd = [&](size_t i) {
+    while (i < total && text[i] != ' ' && text[i] != '\n') i++;
+    return i;
+  };
   size_t pos = 0;
   int count = 0;
   while (true) {
-    while (pos < total && text[pos] == ' ') pos++;
+    while (pos < total && (text[pos] == ' ' || text[pos] == '\n')) pos++;
     if (pos >= total) break;
     if (count == maxLines) {
       overflow = true;
@@ -340,9 +424,8 @@ int wrapLines(const char* text, const int width, const int fontIndex, const Meas
     while (true) {
       size_t ws = p;
       while (ws < total && text[ws] == ' ') ws++;
-      if (ws >= total) break;
-      size_t we = ws;
-      while (we < total && text[we] != ' ') we++;
+      if (ws >= total || text[ws] == '\n') break;  // the end, or a line break of verse
+      const size_t we = wordEnd(ws);
       if (measure(user, fontIndex, text + start, we - start, false) <= width) {
         end = we;
         p = we;
@@ -422,6 +505,13 @@ bool fitText(const char* text, const int width, const int* lineHeights, const in
   return out.fontIndex >= 0 && out.lineCount > 0;
 }
 
+bool continuesVerseLine(const char* text, const FitResult& fit, const int i) {
+  if (!text || i <= 0 || i >= fit.lineCount || std::strchr(text, '\n') == nullptr) return false;
+  size_t p = fit.lines[i].start;
+  while (p > 0 && text[p - 1] == ' ') p--;
+  return p > 0 && text[p - 1] != '\n';
+}
+
 void splitAttribution(const char* attribution, char* name, const size_t nameCap, char* work, const size_t workCap) {
   if (!name || nameCap == 0 || !work || workCap == 0) return;
   name[0] = '\0';
@@ -476,6 +566,8 @@ constexpr Candidate CANDIDATES[] = {
     {SMALL_FONT_ID, EpdFontFamily::REGULAR, 100, false},        // up to ENTRY_CAP
 };
 constexpr int CANDIDATE_COUNT = static_cast<int>(sizeof(CANDIDATES) / sizeof(CANDIDATES[0]));
+static_assert(CANDIDATES[SERIF_WITH_MARK_COUNT - 1].mark && !CANDIDATES[SERIF_WITH_MARK_COUNT].mark,
+              "SERIF_WITH_MARK_COUNT counts the sizes with the opening mark");
 constexpr int CENTRE_MAX_LINES = 4;  // a quote this short is centred, a longer one flush left
 
 // The attribution: "- Name" (serif), the work (serif italic), and for a bookmark a note (UI).
@@ -494,11 +586,16 @@ constexpr size_t PART_CAP = 160;
 constexpr int SIDE = 44;         // left/right margin of the text
 constexpr int AREA_TOP = 48;     // the block is centred between these two
 constexpr int AREA_BOTTOM = 32;  // above the footer
+constexpr int VERSE_HANG = 28;   // indent of a wrapped verse line's continuation
+
+// Identity hashes kept for the dedupe (BuiltInQuotes.cpp holds fewer).
+constexpr size_t MAX_BUILT_IN = 64;
 
 // Everything the card needs besides the framebuffer, in one nothrow allocation (~6 KB) rather
 // than on the small task stack.
 struct Work {
   char chunk[READ_CHUNK];
+  uint32_t builtInIds[MAX_BUILT_IN];  // hashQuoteText() of each built-in quote
   char text[TEXT_CAP];
   char attribution[ATTRIBUTION_CAP];
   char name[PART_CAP];
@@ -549,13 +646,14 @@ const char* lineText(const char* text, const FitResult& fit, const int i, const 
 }
 
 void drawLines(GfxRenderer& r, const char* text, const FitResult& fit, Measure& m, const int x, const int y,
-               const int width, const int lineHeight, const draw::Align align) {
+               const int width, const int lineHeight, const draw::Align align, const int hang = 0) {
   if (fit.fontIndex < 0) return;
   const int fontId = m.fontIds[fit.fontIndex];
   const EpdFontFamily::Style style = m.styles[fit.fontIndex];
   for (int i = 0; i < fit.lineCount; i++) {
-    const char* s = lineText(text, fit, i, width, m);
-    int lx = x;
+    // Measured against the fit's width, so the ellipsis lands where the wrap did.
+    const char* s = lineText(text, fit, i, width - hang, m);
+    int lx = align == draw::Align::Left && continuesVerseLine(text, fit, i) ? x + hang : x;
     if (align != draw::Align::Left) {
       const int lw = r.getTextWidth(fontId, s, style);
       lx = align == draw::Align::Center ? x + (width - lw) / 2 : x + width - lw;
@@ -610,18 +708,33 @@ void writeLastHash(const CardIo& io, const uint32_t hash) {
   if (n > 0) io.writeFile(STATE_PATH, buf, static_cast<size_t>(n));
 }
 
+// One pass over My quotes: usable entries into the picker, minus those that repeat a built-in quote.
+struct FileScan {
+  FreshPicker* picker;
+  const uint32_t* skip;  // identity hashes to leave out; nullptr = none
+  size_t skipCount;
+  uint32_t repeats;
+};
+
 void onEntry(void* user, const EntrySpan& entry) {
+  auto* scan = static_cast<FileScan*>(user);
   if (!entry.hasText || entry.length == 0 || entry.length > ENTRY_CAP) return;
-  static_cast<FreshPicker*>(user)->offer(entry.hash, entry.offset, entry.length);
+  for (size_t i = 0; i < scan->skipCount; i++) {
+    if (scan->skip[i] == entry.textHash) {
+      scan->repeats++;
+      return;
+    }
+  }
+  scan->picker->offer(entry.hash, entry.offset, entry.length);
 }
 
 // Every usable entry of the quotes file into the picker: at most FILE_READ_CAP bytes in
 // READ_CHUNK reads, so at most 16 file opens.
-void scanQuotesFile(const CardIo& io, char* chunk, FreshPicker& picker) {
+void scanQuotesFile(const CardIo& io, char* chunk, FileScan& scan) {
   const int32_t size = io.fileSize(QUOTES_PATH);
   if (size <= 0) return;
   const uint32_t limit = std::min<uint32_t>(static_cast<uint32_t>(size), FILE_READ_CAP);
-  EntryScanner scanner(&onEntry, &picker);
+  EntryScanner scanner(&onEntry, &scan);
   uint32_t offset = 0;
   bool failed = false;
   for (int reads = 0; offset < limit && reads <= static_cast<int>(FILE_READ_CAP / READ_CHUNK); reads++) {
@@ -642,6 +755,11 @@ void scanQuotesFile(const CardIo& io, char* chunk, FreshPicker& picker) {
     if (static_cast<size_t>(got) < want) break;
   }
   scanner.finish(!failed && offset >= static_cast<uint32_t>(size));
+}
+
+// A built-in quote's "last shown" hash, in the same space as the file's and the bookmarks'.
+uint32_t builtInHash(const BuiltInQuote& q) {
+  return hashInk(q.attribution, std::strlen(q.attribution), hashInk(q.text, std::strlen(q.text)));
 }
 
 // Usable bookmarks of the open book into the picker (value = index into snippets).
@@ -682,74 +800,17 @@ void bookmarkAttribution(const CardIo& io, const CardSnippet& snippet, Work& w) 
 
 }  // namespace
 
-bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
-  if (!ctx.io) return false;
-  const CardIo& io = *ctx.io;
-  auto work = makeUniqueNoThrow<Work>();
-  if (!work) {
-    LOG_ERR("CARD", "quote: no memory");
-    return false;
-  }
-  Work& w = *work;
-  uint32_t rng = ctx.seed ^ 0x51C0FFEEu;
-  const uint32_t lastHash = readLastHash(io);
-  const QuoteSource mode = ctx.settings.quoteSource;
+namespace {
 
-  // The candidates: the Setting's source, and the other one only when that has nothing.
-  FreshPicker filePick(lastHash, rng);
-  FreshPicker bookmarkPick(lastHash, rng);
-  std::unique_ptr<CardSnippet[]> snippets;
-  bool fileScanned = false;
-  bool bookmarksScanned = false;
-  const auto scanFile = [&] {
-    if (fileScanned) return;
-    fileScanned = true;
-    scanQuotesFile(io, w.chunk, filePick);
-  };
-  const auto scanMarks = [&] {
-    if (bookmarksScanned) return;
-    bookmarksScanned = true;
-    if (!ctx.bookPath || !ctx.bookPath[0]) return;
-    snippets = makeUniqueNoThrow<CardSnippet[]>(MAX_BOOKMARKS);  // ~6 KB, only when bookmarks are wanted
-    if (snippets) scanBookmarks(io, snippets.get(), w.text, sizeof(w.text), bookmarkPick);
-  };
-  if (mode != QuoteSource::Bookmarks) scanFile();
-  if (mode != QuoteSource::File) scanMarks();
-  if (!filePick.has()) scanMarks();
-  if (!bookmarkPick.has()) scanFile();
+// "- Name" with an em dash (w.attribution is free again by then).
+void dashName(Work& w) {
+  if (!w.name[0]) return;
+  std::snprintf(w.attribution, sizeof(w.attribution), "\xE2\x80\x94 %s", w.name);
+  std::snprintf(w.name, sizeof(w.name), "%s", w.attribution);
+}
 
-  w.name[0] = w.work[0] = w.note[0] = '\0';
-  uint32_t shownHash = 0;
-  switch (chooseSource(mode, filePick.stats(), bookmarkPick.stats(), rng)) {
-    case Pick::File: {
-      const uint32_t offset = filePick.value();
-      const uint32_t length = std::min<uint32_t>(filePick.value2(), ENTRY_CAP);
-      const int32_t got = io.readFileAt(QUOTES_PATH, offset, w.chunk, length);
-      if (got <= 0 || !parseEntry(w.chunk, static_cast<size_t>(got), w.text, sizeof(w.text), w.attribution,
-                                  sizeof(w.attribution))) {
-        LOG_ERR("CARD", "quote: entry at %lu unreadable", static_cast<unsigned long>(offset));
-        return false;
-      }
-      splitAttribution(w.attribution, w.name, sizeof(w.name), w.work, sizeof(w.work));
-      shownHash = filePick.hash();
-      break;
-    }
-    case Pick::Bookmarks: {
-      const CardSnippet& snippet = snippets[bookmarkPick.value()];
-      if (!snippetText(snippet.text, w.text, sizeof(w.text))) return false;
-      bookmarkAttribution(io, snippet, w);
-      shownHash = bookmarkPick.hash();
-      break;
-    }
-    case Pick::None:
-      return false;  // nothing to quote: the logo screen
-  }
-  if (w.name[0]) {
-    // "- Name" with an em dash.
-    std::snprintf(w.attribution, sizeof(w.attribution), "\xE2\x80\x94 %s", w.name);
-    std::snprintf(w.name, sizeof(w.name), "%s", w.attribution);
-  }
-
+// w.text with w.name / w.work / w.note below it, laid out and drawn.
+bool drawQuote(GfxRenderer& renderer, Work& w, QuoteLayout* out) {
   // ---- layout ----
   const int screenW = renderer.getScreenWidth();
   const int screenH = renderer.getScreenHeight();
@@ -786,6 +847,11 @@ bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
   }
   Measure m{&renderer, fontIds, styles, w.line, sizeof(w.line)};
 
+  // Verse (the built-in set's '\n' line breaks): a verse line too long for the width goes on with
+  // a hanging indent, the way verse is set, so the quote's own lines stay readable.
+  const int hang = std::strchr(w.text, '\n') != nullptr ? VERSE_HANG : 0;
+  const int quoteW = textW - hang;
+
   // The attribution first, the quote gets what is left. When that pushes the quote past the
   // serif-with-mark sizes, a second pass sets the name smaller and closer to make room.
   int nameFont[] = {NAME_FONT};
@@ -805,7 +871,7 @@ bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
     for (int i = 0; i < CANDIDATE_COUNT; i++) {
       maxHeights[i] = avail - (CANDIDATES[i].mark && markH > 0 ? markH + MARK_GAP : 0);
     }
-    if (!fitText(w.text, textW, lineHeights, maxHeights, CANDIDATE_COUNT, &measureRun, &m, w.fit)) return false;
+    if (!fitText(w.text, quoteW, lineHeights, maxHeights, CANDIDATE_COUNT, &measureRun, &m, w.fit)) return false;
     if (CANDIDATES[w.fit.fontIndex].mark && !w.fit.truncated) break;
   }
   const Candidate& chosen = CANDIDATES[w.fit.fontIndex];
@@ -827,7 +893,7 @@ bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
     draw::drawTextScaled(renderer, MARK_FONT, inkX - ink.left, top - ink.top, OPEN_QUOTE, MARK_SCALE);
   }
   int y = top + markBlock;
-  drawLines(renderer, w.text, w.fit, m, textX, y, textW, lh, align);
+  drawLines(renderer, w.text, w.fit, m, textX, y, textW, lh, align, hang);
   y += textH + attributionGap;
   drawLines(renderer, w.name, w.nameFit, nameM, textX, y, textW, nameLh, attributionAlign);
   y += nameH;
@@ -835,8 +901,124 @@ bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
   y += workH;
   if (noteH > 0) drawLines(renderer, w.note, w.noteFit, noteM, textX, y + NOTE_GAP, textW, noteLh, attributionAlign);
 
+  if (out) {
+    out->fontIndex = w.fit.fontIndex;
+    out->lineCount = w.fit.lineCount;
+    out->truncated = w.fit.truncated;
+    out->mark = markBlock > 0;
+  }
+  return true;
+}
+
+}  // namespace
+
+bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
+  if (!ctx.io) return false;
+  const CardIo& io = *ctx.io;
+  auto work = makeUniqueNoThrow<Work>();
+  if (!work) {
+    LOG_ERR("CARD", "quote: no memory");
+    return false;
+  }
+  Work& w = *work;
+  uint32_t rng = ctx.seed ^ 0x51C0FFEEu;
+  const uint32_t lastHash = readLastHash(io);
+  const uint8_t enabled = quoteCategories(ctx.settings.quoteSource);
+
+  // The built-in set costs no I/O and is the last fallback: always offered.
+  FreshPicker builtInPick(lastHash, rng);
+  const size_t builtIns = std::min(builtInCount(), MAX_BUILT_IN);
+  for (size_t i = 0; i < builtIns; i++) {
+    const BuiltInQuote& q = *builtInQuote(i);
+    w.builtInIds[i] = hashQuoteText(q.text, std::strlen(q.text));
+    builtInPick.offer(builtInHash(q), static_cast<uint32_t>(i));
+  }
+  FreshPicker minePick(lastHash, rng);
+  FreshPicker bookmarkPick(lastHash, rng);
+  std::unique_ptr<CardSnippet[]> snippets;
+  bool mineScanned = false;
+  const auto scanMine = [&](const bool dedupe) {
+    mineScanned = true;
+    FileScan scan{&minePick, dedupe ? w.builtInIds : nullptr, dedupe ? builtIns : 0, 0};
+    scanQuotesFile(io, w.chunk, scan);
+    if (scan.repeats > 0)
+      LOG_DBG("CARD", "quote: %lu built-in repeats left out", static_cast<unsigned long>(scan.repeats));
+  };
+  if (enabled & QUOTES_MINE) scanMine((enabled & QUOTES_BUILT_IN) != 0);
+  if ((enabled & QUOTES_BOOKMARKS) && ctx.bookPath && ctx.bookPath[0]) {
+    snippets = makeUniqueNoThrow<CardSnippet[]>(MAX_BOOKMARKS);  // ~6 KB, only when bookmarks are wanted
+    if (snippets) scanBookmarks(io, snippets.get(), w.text, sizeof(w.text), bookmarkPick);
+  }
+  Pools pools{builtInPick.stats(), minePick.stats(), bookmarkPick.stats()};
+  // Nothing in the enabled categories: My quotes fill in before the built-in set.
+  if (categoriesWithEntries(enabled, pools) == 0 && !mineScanned) {
+    scanMine(false);
+    pools.mine = minePick.stats();
+  }
+
+  w.name[0] = w.work[0] = w.note[0] = '\0';
+  uint32_t shownHash = 0;
+  bool ready = false;
+  switch (chooseCategory(enabled, pools, rng)) {
+    case Pick::Mine: {
+      const uint32_t offset = minePick.value();
+      const uint32_t length = std::min<uint32_t>(minePick.value2(), ENTRY_CAP);
+      const int32_t got = io.readFileAt(QUOTES_PATH, offset, w.chunk, length);
+      if (got <= 0 || !parseEntry(w.chunk, static_cast<size_t>(got), w.text, sizeof(w.text), w.attribution,
+                                  sizeof(w.attribution))) {
+        // The file changed since the scan, or the card read failed: the built-in set stands in.
+        LOG_ERR("CARD", "quote: entry at %lu unreadable", static_cast<unsigned long>(offset));
+        break;
+      }
+      splitAttribution(w.attribution, w.name, sizeof(w.name), w.work, sizeof(w.work));
+      shownHash = minePick.hash();
+      ready = true;
+      break;
+    }
+    case Pick::Bookmarks: {
+      const CardSnippet& snippet = snippets[bookmarkPick.value()];
+      if (!snippetText(snippet.text, w.text, sizeof(w.text))) break;
+      bookmarkAttribution(io, snippet, w);
+      shownHash = bookmarkPick.hash();
+      ready = true;
+      break;
+    }
+    case Pick::BuiltIn:
+    case Pick::None:
+      break;
+  }
+  if (!ready) {
+    // Chosen, or standing in for a pick that could not be read. Empty only without a built-in set.
+    if (!builtInPick.has()) return false;  // nothing to quote: the logo screen
+    const BuiltInQuote& q = *builtInQuote(builtInPick.value());
+    std::snprintf(w.text, sizeof(w.text), "%s", q.text);
+    splitAttribution(q.attribution, w.name, sizeof(w.name), w.work, sizeof(w.work));
+    shownHash = builtInPick.hash();
+  }
+  dashName(w);
+  if (!drawQuote(renderer, w, nullptr)) return false;
   if (shownHash != lastHash) writeLastHash(io, shownHash);  // unchanged: no SD write
   return true;
 }
+
+namespace quote {
+
+bool renderQuoteText(GfxRenderer& renderer, const char* text, const char* attribution, QuoteLayout* layout) {
+  if (layout) *layout = QuoteLayout{};
+  if (!text) return false;
+  auto work = makeUniqueNoThrow<Work>();
+  if (!work) {
+    LOG_ERR("CARD", "quote: no memory");
+    return false;
+  }
+  Work& w = *work;
+  std::snprintf(w.text, sizeof(w.text), "%s", text);
+  w.name[0] = w.work[0] = w.note[0] = '\0';
+  splitAttribution(attribution, w.name, sizeof(w.name), w.work, sizeof(w.work));
+  dashName(w);
+  return drawQuote(renderer, w, layout);
+}
+
+}  // namespace quote
 
 }  // namespace sleepcards

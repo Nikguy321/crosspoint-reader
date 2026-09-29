@@ -13,9 +13,10 @@
 //
 //   "wifi 80 2026-09-29 47.6100,-122.3300"     source accuracy-m date location
 //   "typed 0 2026-09-29 47.6100,-122.3300"     accuracy 0 = none; date "-" = unknown
+//   "wifi-auto 80 2026-09-29 ..."              refreshed from Wi-Fi during a sync (AutoLocate)
 namespace sleepcards {
 
-enum class LocationSource : uint8_t { Typed = 0, Wifi = 1, Internet = 2 };
+enum class LocationSource : uint8_t { Typed = 0, Wifi = 1, Internet = 2, WifiAuto = 3 };
 
 constexpr size_t LOCATION_FIX_CAP = 48;
 constexpr uint32_t MAX_FIX_ACCURACY_M = 999999;
@@ -50,8 +51,9 @@ LocationFix describeLocation(const char* record, const char* location);
 // "80 m", "2.5 km", "25 km" (rounded to what the number can honestly claim).
 void formatAccuracy(uint32_t meters, char* out, size_t cap);
 
-// The line under the Location row: "From Wi-Fi, ±80 m, Sep 29", "From internet address, city
-// level, Sep 29" (an address lookup has no measured accuracy), "Typed in, Sep 29", "Typed in".
+// The line under the Location row: "From Wi-Fi, ±80 m, Sep 29", "From Wi-Fi (auto), ±80 m, Sep 29",
+// "From internet address, city level, Sep 29" (an address lookup has no measured accuracy),
+// "Typed in, Sep 29", "Typed in".
 // "" when the location is not set.
 void formatFixLine(const LocationFix& fix, char* out, size_t cap);
 

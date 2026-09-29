@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "CardPreview.h"
+#include "src/sleepcards/BuiltInQuotes.h"
 #include "src/sleepcards/QuoteCard.h"
 
 using namespace sleepcards;
@@ -22,6 +24,9 @@ class FakeIo final : public CardIo {
   mutable int reads = 0;
   mutable int writes = 0;
   mutable uint32_t maxReadEnd = 0;
+  // Fail the n-th read of /quotes.txt (1-based; 0 = never): the file changed or the card faltered.
+  int failQuotesReadAt = 0;
+  mutable int quotesReads = 0;
 
   int32_t fileSize(const char* path) const override {
     const auto it = files.find(path);
@@ -29,6 +34,7 @@ class FakeIo final : public CardIo {
   }
   int32_t readFileAt(const char* path, const uint32_t offset, char* buf, const size_t cap) const override {
     reads++;
+    if (std::strcmp(path, QUOTES_PATH) == 0 && ++quotesReads == failQuotesReadAt) return -1;
     const auto it = files.find(path);
     if (it == files.end()) return -1;
     if (offset > it->second.size()) return 0;
@@ -101,6 +107,28 @@ CardContext fakeContext(FakeIo& io, const QuoteSource source, const uint32_t see
 
 const char* const THREE_QUOTES =
     "First quote, short.\n -- Author One\n\nSecond quote here.\n-- Author Two\n\nThird one, no attribution.\n";
+
+// The hash the card saved as "shown last" (0 when none).
+uint32_t shownHash(const FakeIo& io) {
+  const auto it = io.files.find(STATE_PATH);
+  if (it == io.files.end()) return 0;
+  return static_cast<uint32_t>(std::strtoul(it->second.c_str(), nullptr, 16));
+}
+
+bool isBuiltInHash(const uint32_t hash) {
+  for (size_t i = 0; i < builtInCount(); i++) {
+    const BuiltInQuote& q = *builtInQuote(i);
+    if (hashInk(q.attribution, std::strlen(q.attribution), hashInk(q.text, std::strlen(q.text))) == hash) return true;
+  }
+  return false;
+}
+
+bool isFileEntry(const uint32_t hash, const std::string& file) {
+  for (const EntrySpan& e : scanAll(file, file.size())) {
+    if (e.hash == hash) return true;
+  }
+  return false;
+}
 
 }  // namespace
 
@@ -277,22 +305,56 @@ TEST(SleepCardQuote, SnippetTextTidiesBookmarkSummaries) {
 
 // ---- choosing ---------------------------------------------------------------------------------------
 
-TEST(SleepCardQuote, ChooseSourcePrefersTheSettingAndFallsBack) {
+TEST(SleepCardQuote, QuoteSourceCategoriesAndMigration) {
+  EXPECT_EQ(quoteCategories(QuoteSource::All), QUOTES_BUILT_IN | QUOTES_MINE | QUOTES_BOOKMARKS);
+  EXPECT_EQ(quoteCategories(QuoteSource::BuiltInAndMine), QUOTES_BUILT_IN | QUOTES_MINE);
+  EXPECT_EQ(quoteCategories(QuoteSource::MineAndBookmarks), QUOTES_MINE | QUOTES_BOOKMARKS);
+  EXPECT_EQ(quoteCategories(QuoteSource::BuiltInAndBookmarks), QUOTES_BUILT_IN | QUOTES_BOOKMARKS);
+  EXPECT_EQ(quoteCategories(QuoteSource::BuiltInOnly), QUOTES_BUILT_IN);
+  EXPECT_EQ(quoteCategories(QuoteSource::MineOnly), QUOTES_MINE);
+  EXPECT_EQ(quoteCategories(QuoteSource::BookmarksOnly), QUOTES_BOOKMARKS);
+  EXPECT_EQ(quoteCategories(static_cast<QuoteSource>(200)), QUOTES_BUILT_IN | QUOTES_MINE | QUOTES_BOOKMARKS);
+  // Every choice enables something, and no two choices are the same.
+  uint8_t seen = 0;
+  for (uint8_t i = 0; i < static_cast<uint8_t>(QuoteSource::Count); i++) {
+    const uint8_t mask = quoteCategories(static_cast<QuoteSource>(i));
+    EXPECT_NE(mask, 0) << int(i);
+    EXPECT_EQ(seen & (1u << mask), 0) << int(i);
+    seen |= static_cast<uint8_t>(1u << mask);
+  }
+  // The old setting: 0 quotes file, 1 bookmarks, 2 both.
+  EXPECT_EQ(migrateQuoteSource(0), static_cast<uint8_t>(QuoteSource::MineOnly));
+  EXPECT_EQ(migrateQuoteSource(1), static_cast<uint8_t>(QuoteSource::BookmarksOnly));
+  EXPECT_EQ(migrateQuoteSource(2), static_cast<uint8_t>(QuoteSource::All));
+  EXPECT_EQ(migrateQuoteSource(9), static_cast<uint8_t>(QuoteSource::All));
+  // A new install: all three.
+  EXPECT_EQ(SleepCardSettings{}.quoteSource, QuoteSource::All);
+}
+
+TEST(SleepCardQuote, ChooseCategoryPrefersFreshEnabledAndFallsBack) {
   uint32_t rng = 7;
   const PoolStats none{0, 0}, some{3, 3}, stale{1, 0};
-  EXPECT_EQ(chooseSource(QuoteSource::File, none, none, rng), Pick::None);
-  EXPECT_EQ(chooseSource(QuoteSource::Both, none, none, rng), Pick::None);
-  EXPECT_EQ(chooseSource(QuoteSource::File, some, some, rng), Pick::File);
-  EXPECT_EQ(chooseSource(QuoteSource::File, none, some, rng), Pick::Bookmarks);
-  EXPECT_EQ(chooseSource(QuoteSource::Bookmarks, some, some, rng), Pick::Bookmarks);
-  EXPECT_EQ(chooseSource(QuoteSource::Bookmarks, some, none, rng), Pick::File);
-  EXPECT_EQ(chooseSource(QuoteSource::File, stale, some, rng), Pick::File);  // its own source, even if stale
-  EXPECT_EQ(chooseSource(QuoteSource::Both, stale, some, rng), Pick::Bookmarks);
-  EXPECT_EQ(chooseSource(QuoteSource::Both, some, stale, rng), Pick::File);
-  EXPECT_EQ(chooseSource(QuoteSource::Both, stale, none, rng), Pick::File);
-  int file = 0;
-  for (int i = 0; i < 1000; i++) file += chooseSource(QuoteSource::Both, some, some, rng) == Pick::File;
-  EXPECT_NEAR(file, 500, 80);
+  const uint8_t all = QUOTES_BUILT_IN | QUOTES_MINE | QUOTES_BOOKMARKS;
+  EXPECT_EQ(chooseCategory(all, Pools{none, none, none}, rng), Pick::None);
+  EXPECT_EQ(chooseCategory(QUOTES_MINE, Pools{some, some, some}, rng), Pick::Mine);
+  EXPECT_EQ(chooseCategory(QUOTES_BOOKMARKS, Pools{some, some, some}, rng), Pick::Bookmarks);
+  EXPECT_EQ(chooseCategory(QUOTES_BUILT_IN, Pools{some, some, some}, rng), Pick::BuiltIn);
+  // Its own category even when stale.
+  EXPECT_EQ(chooseCategory(QUOTES_MINE, Pools{some, stale, some}, rng), Pick::Mine);
+  // Fresh wins among the enabled ones.
+  EXPECT_EQ(chooseCategory(QUOTES_MINE | QUOTES_BOOKMARKS, Pools{some, stale, some}, rng), Pick::Bookmarks);
+  EXPECT_EQ(chooseCategory(all, Pools{stale, stale, some}, rng), Pick::Bookmarks);
+  // Nothing in the enabled categories: My quotes, then the built-in set.
+  EXPECT_EQ(chooseCategory(QUOTES_BOOKMARKS, Pools{some, some, none}, rng), Pick::Mine);
+  EXPECT_EQ(chooseCategory(QUOTES_BOOKMARKS, Pools{some, none, none}, rng), Pick::BuiltIn);
+  EXPECT_EQ(chooseCategory(QUOTES_MINE, Pools{some, none, some}, rng), Pick::BuiltIn);
+  EXPECT_EQ(chooseCategory(QUOTES_MINE | QUOTES_BOOKMARKS, Pools{stale, none, none}, rng), Pick::BuiltIn);
+  EXPECT_EQ(categoriesWithEntries(all, Pools{some, none, stale}), QUOTES_BUILT_IN | QUOTES_BOOKMARKS);
+  EXPECT_EQ(categoriesWithEntries(QUOTES_MINE, Pools{some, none, stale}), 0);
+  // A coin between the enabled categories, whatever their sizes.
+  int hits[4] = {};
+  for (int i = 0; i < 3000; i++) hits[static_cast<int>(chooseCategory(all, Pools{some, some, some}, rng))]++;
+  for (const Pick p : {Pick::BuiltIn, Pick::Mine, Pick::Bookmarks}) EXPECT_NEAR(hits[static_cast<int>(p)], 1000, 120);
 }
 
 TEST(SleepCardQuote, FreshPickerIsUniformAndAvoidsTheLastOne) {
@@ -446,17 +508,17 @@ TEST(SleepCardQuote, PreviewVariants) {
   for (const auto& f : FILES) {
     FakeIo io;
     io.files[QUOTES_PATH] = f.file;
-    const double ms = preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::File), f.name, &declined);
+    const double ms = preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::MineOnly), f.name, &declined);
     EXPECT_FALSE(declined) << f.name;
     EXPECT_LT(ms, preview::HOST_RUNAWAY_MS) << f.name;
     std::printf("%s: %.2f ms\n", f.name, ms);
   }
   FakeIo io;
   io.bookmarks = {snippet("It is not down in any map; true places never are.", "Kokovoko", 0.071f)};
-  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::Bookmarks), "quote_bookmark", &declined);
+  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::BookmarksOnly), "quote_bookmark", &declined);
   EXPECT_FALSE(declined);
   io.bookmarks = {snippet("Call me Ishmael. Some years ago - never mind how long precisely - having", "", 0.002f)};
-  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::Bookmarks), "quote_bookmark_cut", &declined);
+  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::BookmarksOnly), "quote_bookmark_cut", &declined);
   EXPECT_FALSE(declined);
 }
 
@@ -472,7 +534,8 @@ TEST(SleepCardQuote, LongestEntryStillFitsInBudget) {
   FakeIo io;
   io.files[QUOTES_PATH] = entry;
   bool declined = true;
-  const double ms = preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::File), "quote_max", &declined);
+  const double ms =
+      preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::MineOnly), "quote_max", &declined);
   EXPECT_FALSE(declined);
   EXPECT_LT(ms, preview::HOST_RUNAWAY_MS);
   std::printf("quote_max (%zu bytes): %.2f ms\n", entry.size(), ms);
@@ -483,7 +546,7 @@ TEST(SleepCardQuote, NeverTheSameTwiceInARow) {
   io.files[QUOTES_PATH] = THREE_QUOTES;
   std::string last;
   for (uint32_t seed = 0; seed < 30; seed++) {
-    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::File, seed), preview::renderer()));
+    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly, seed), preview::renderer()));
     const std::string now = io.files[STATE_PATH];
     EXPECT_EQ(now.size(), 9u);
     EXPECT_NE(now, last) << "seed " << seed;
@@ -494,30 +557,36 @@ TEST(SleepCardQuote, NeverTheSameTwiceInARow) {
 TEST(SleepCardQuote, OneQuoteIsShownAgain) {
   FakeIo io;
   io.files[QUOTES_PATH] = "Only me.\n";
-  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer()));
-  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer()));
+  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
+  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
 }
 
-TEST(SleepCardQuote, FallsBackBetweenSourcesThenDeclines) {
+TEST(SleepCardQuote, FallsBackToMyQuotesThenTheBuiltInSet) {
   FakeIo io;
-  io.bookmarks = {snippet("It is not down in any map; true places never are.", "", 0.07f)};
-  // File wanted, no file: the bookmark.
-  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer()));
-  // Bookmarks wanted, no book: the file.
   io.hasBook = false;
   io.files[QUOTES_PATH] = THREE_QUOTES;
-  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::Bookmarks), preview::renderer()));
-  // Nothing anywhere: decline (the logo screen), and nothing written.
+  // Bookmarks wanted, no book: My quotes.
+  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BookmarksOnly), preview::renderer()));
+  EXPECT_TRUE(isFileEntry(shownHash(io), THREE_QUOTES));
+  // Nothing anywhere: the built-in set, in every mode - never the logo screen.
   io.files.clear();
-  io.writes = 0;
-  bool declined = false;
-  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::Both), "quote_none", &declined);
-  EXPECT_TRUE(declined);
-  EXPECT_EQ(io.writes, 0);
-  // Bookmarks whose summaries are empty do not count.
+  for (uint8_t mode = 0; mode < static_cast<uint8_t>(QuoteSource::Count); mode++) {
+    io.files.erase(STATE_PATH);
+    bool declined = true;
+    preview::renderCardPng(CardId::Quote, fakeContext(io, static_cast<QuoteSource>(mode), mode), "quote_none",
+                           &declined);
+    EXPECT_FALSE(declined) << int(mode);
+    EXPECT_TRUE(isBuiltInHash(shownHash(io))) << int(mode);
+  }
+  // My quotes only, the file empty or absent: the built-in set.
+  io.files[QUOTES_PATH] = "\n\n";
+  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
+  EXPECT_TRUE(isBuiltInHash(shownHash(io)));
+  // Bookmarks whose summaries are empty do not count either.
   io.hasBook = true;
   io.bookmarks = {snippet(""), snippet("  ")};
-  EXPECT_FALSE(renderQuoteCard(fakeContext(io, QuoteSource::Both), preview::renderer()));
+  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BookmarksOnly), preview::renderer()));
+  EXPECT_TRUE(isBuiltInHash(shownHash(io)));
 }
 
 TEST(SleepCardQuote, JunkFilesAreHarmless) {
@@ -527,10 +596,11 @@ TEST(SleepCardQuote, JunkFilesAreHarmless) {
   uint32_t s = 9;
   for (auto& c : junk) c = static_cast<char>(nextRandom(s));
   io.files[QUOTES_PATH] = junk;
-  renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer());  // whatever it decides, no crash
-  // Only attributions and an entry over the size cap: nothing usable.
+  renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer());  // whatever it decides, no crash
+  // Only attributions and an entry over the size cap: nothing usable, the built-in set instead.
   io.files[QUOTES_PATH] = "-- a\n\n-- b\n\n" + std::string(ENTRY_CAP + 1, 'x') + "\n";
-  EXPECT_FALSE(renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer()));
+  EXPECT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
+  EXPECT_TRUE(isBuiltInHash(shownHash(io)));
 }
 
 TEST(SleepCardQuote, BigFilesAreReadOnlyUpToTheCap) {
@@ -539,8 +609,313 @@ TEST(SleepCardQuote, BigFilesAreReadOnlyUpToTheCap) {
   for (int i = 0; big.size() < 3 * FILE_READ_CAP; i++) big += "Quote number " + std::to_string(i) + ".\n\n";
   io.files[QUOTES_PATH] = big;
   io.reads = 0;
-  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::File), preview::renderer()));
+  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
   EXPECT_LE(io.maxReadEnd, FILE_READ_CAP);
   // 16 chunks of the file + the chosen entry + the state file.
   EXPECT_LE(io.reads, static_cast<int>(FILE_READ_CAP / READ_CHUNK) + 2);
+}
+
+// ---- the built-in set ---------------------------------------------------------------------------------
+
+namespace {
+bool validUtf8(const char* s) {
+  const auto* p = reinterpret_cast<const unsigned char*>(s);
+  while (*p) {
+    int extra = 0;
+    if (*p < 0x80) {
+      extra = 0;
+    } else if ((*p & 0xE0) == 0xC0) {
+      extra = 1;
+    } else if ((*p & 0xF0) == 0xE0) {
+      extra = 2;
+    } else if ((*p & 0xF8) == 0xF0) {
+      extra = 3;
+    } else {
+      return false;
+    }
+    p++;
+    for (int i = 0; i < extra; i++, p++) {
+      if ((*p & 0xC0) != 0x80) return false;
+    }
+  }
+  return true;
+}
+}  // namespace
+
+TEST(SleepCardQuote, BuiltInSetIsSound) {
+  ASSERT_GE(builtInCount(), 30u);
+  ASSERT_LE(builtInCount(), 64u);  // QuoteCard.cpp's MAX_BUILT_IN
+  EXPECT_EQ(builtInQuote(builtInCount()), nullptr);
+  std::vector<uint32_t> ids;
+  for (size_t i = 0; i < builtInCount(); i++) {
+    const BuiltInQuote& q = *builtInQuote(i);
+    SCOPED_TRACE(q.text);
+    ASSERT_NE(q.text, nullptr);
+    ASSERT_NE(q.attribution, nullptr);
+    EXPECT_TRUE(validUtf8(q.text));
+    EXPECT_TRUE(validUtf8(q.attribution));
+    const size_t len = std::strlen(q.text);
+    EXPECT_GT(len, 10u);
+    EXPECT_LT(len, TEXT_CAP);
+    // Tidy text: no leading/trailing space, single spaces, no blank verse lines, no file syntax.
+    EXPECT_NE(q.text[0], ' ');
+    EXPECT_NE(q.text[len - 1], ' ');
+    EXPECT_EQ(std::strstr(q.text, "  "), nullptr);
+    EXPECT_EQ(std::strstr(q.text, "\n\n"), nullptr);
+    EXPECT_EQ(std::strstr(q.text, " \n"), nullptr);
+    EXPECT_EQ(std::strstr(q.text, "\n "), nullptr);
+    EXPECT_EQ(std::strstr(q.text, "--"), nullptr);
+    // Every entry has an attribution that splits into the author and the work.
+    char name[160], work[160];
+    splitAttribution(q.attribution, name, sizeof(name), work, sizeof(work));
+    EXPECT_GT(std::strlen(name), 3u);
+    EXPECT_GT(std::strlen(work), 3u);
+    EXPECT_EQ(std::strstr(q.attribution, "--"), nullptr);
+    // It survives the quotes-file format too (a line each, then the attribution line).
+    const std::string asEntry = std::string(q.text) + "\n-- " + q.attribution;
+    char text[TEXT_CAP], attribution[ATTRIBUTION_CAP];
+    ASSERT_TRUE(parseEntry(asEntry.data(), asEntry.size(), text, sizeof(text), attribution, sizeof(attribution)));
+    EXPECT_STREQ(attribution, q.attribution);
+    ids.push_back(hashQuoteText(q.text, len));
+  }
+  // No two alike.
+  for (size_t i = 0; i < ids.size(); i++) {
+    for (size_t j = i + 1; j < ids.size(); j++) EXPECT_NE(ids[i], ids[j]) << i << " " << j;
+  }
+}
+
+// Every built-in quote fits the card whole in one of the serif sizes with the opening mark; each is
+// written to build/cards/quote_builtin_NN.png.
+TEST(SleepCardQuote, EveryBuiltInQuoteFitsTheCard) {
+  GfxRenderer& r = preview::renderer();
+  int largestStep = 0;
+  for (size_t i = 0; i < builtInCount(); i++) {
+    const BuiltInQuote& q = *builtInQuote(i);
+    SCOPED_TRACE(q.text);
+    r.clearScreen();
+    QuoteLayout layout;
+    ASSERT_TRUE(renderQuoteText(r, q.text, q.attribution, &layout));
+    EXPECT_FALSE(layout.truncated);
+    EXPECT_TRUE(layout.mark);
+    EXPECT_LT(layout.fontIndex, SERIF_WITH_MARK_COUNT);
+    largestStep = std::max(largestStep, layout.fontIndex);
+    char name[64];
+    std::snprintf(name, sizeof(name), "/quote_builtin_%02zu.png", i);
+    ASSERT_TRUE(preview::writeFramePng(preview::outputDir() + name));
+  }
+  std::printf("built-in quotes: %zu, smallest size used: step %d of %d\n", builtInCount(), largestStep,
+              SERIF_WITH_MARK_COUNT - 1);
+}
+
+TEST(SleepCardQuote, BuiltInOnlyCardRenders) {
+  FakeIo io;
+  io.files[QUOTES_PATH] = THREE_QUOTES;
+  bool declined = true;
+  const double ms =
+      preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::BuiltInOnly), "quote_builtin", &declined);
+  EXPECT_FALSE(declined);
+  EXPECT_LT(ms, preview::HOST_RUNAWAY_MS);
+  EXPECT_TRUE(isBuiltInHash(shownHash(io)));
+  // Never the same twice in a row, over the whole set.
+  uint32_t last = shownHash(io);
+  for (uint32_t seed = 1; seed < 40; seed++) {
+    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BuiltInOnly, seed), preview::renderer()));
+    EXPECT_NE(shownHash(io), last);
+    last = shownHash(io);
+  }
+}
+
+TEST(SleepCardQuote, VerseLineBreaksAreKept) {
+  const char* text = "aa bb\ncc\ndd ee ff";
+  LineSpan lines[8];
+  bool overflow = false;
+  // Wide enough for everything on one line: the breaks still hold.
+  const int n = wrapLines(text, 1000, 0, &fakeMeasure, nullptr, lines, 8, overflow);
+  ASSERT_EQ(n, 3);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(lineOf(text, lines[0]), "aa bb");
+  EXPECT_EQ(lineOf(text, lines[1]), "cc");
+  EXPECT_EQ(lineOf(text, lines[2]), "dd ee ff");
+  // Narrow: a verse line wraps inside itself, and the next one still starts a line.
+  EXPECT_EQ(wrapLines(text, 50, 0, &fakeMeasure, nullptr, lines, 8, overflow), 4);
+  EXPECT_EQ(lineOf(text, lines[2]), "dd ee");
+  EXPECT_EQ(lineOf(text, lines[3]), "ff");
+  EXPECT_EQ(wrapLines("\n\nx\n", 50, 0, &fakeMeasure, nullptr, lines, 8, overflow), 1);
+}
+
+// ---- My quotes: repeats of the built-in set, and headings --------------------------------------------
+
+TEST(SleepCardQuote, TextHashIgnoresSpacingPunctuationAndCase) {
+  const std::string a = "Nature\xE2\x80\x99s peace will flow into you\nas sunshine flows into trees.";
+  const std::string b = "nature's  peace will flow into you as sunshine flows into trees";
+  EXPECT_EQ(hashQuoteText(a.data(), a.size()), hashQuoteText(b.data(), b.size()));
+  const std::string c = "Nature's peace will flow into me as sunshine flows into trees.";
+  EXPECT_NE(hashQuoteText(a.data(), a.size()), hashQuoteText(c.data(), c.size()));
+  // Letters outside ASCII count.
+  EXPECT_NE(hashQuoteText("caf\xC3\xA9", 5), hashQuoteText("caf", 3));
+  // The scanner's text hash leaves the attribution out.
+  const auto entries =
+      scanAll("Early to bed and early to rise,\nmakes a man healthy, wealthy, and wise.\n-- Someone\n", 7);
+  ASSERT_EQ(entries.size(), 1u);
+  const BuiltInQuote* franklin = nullptr;
+  for (size_t i = 0; i < builtInCount(); i++) {
+    if (std::strstr(builtInQuote(i)->text, "Early to bed")) franklin = builtInQuote(i);
+  }
+  ASSERT_NE(franklin, nullptr);
+  EXPECT_EQ(entries[0].textHash, hashQuoteText(franklin->text, std::strlen(franklin->text)));
+}
+
+TEST(SleepCardQuote, MyQuotesThatRepeatABuiltInAreLeftOut) {
+  // Built-in wording, straight apostrophe, re-wrapped, own attribution style.
+  const std::string repeat =
+      "Climb the mountains and get their good tidings.\nNature's peace will flow into you as "
+      "sunshine flows into trees.\n -- John Muir\n";
+  FakeIo io;
+  io.files[QUOTES_PATH] = repeat;
+  const uint32_t repeatHash = scanAll(repeat, repeat.size())[0].hash;
+  // With the built-in set on, the file's copy never shows (the built-in one may).
+  for (uint32_t seed = 0; seed < 30; seed++) {
+    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BuiltInAndMine, seed), preview::renderer()));
+    EXPECT_NE(shownHash(io), repeatHash) << seed;
+  }
+  // Without it, the file is all there is: its copy shows.
+  ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::MineOnly), preview::renderer()));
+  EXPECT_EQ(shownHash(io), repeatHash);
+  // Its own quotes still show beside the built-in set.
+  const std::string mine = repeat + "\nA quote of my own.\n-- Me\n";
+  io.files[QUOTES_PATH] = mine;
+  const uint32_t ownHash = scanAll(mine, mine.size())[1].hash;
+  int own = 0;
+  for (uint32_t seed = 0; seed < 60; seed++) {
+    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BuiltInAndMine, seed), preview::renderer()));
+    EXPECT_NE(shownHash(io), repeatHash) << seed;
+    own += shownHash(io) == ownHash;
+  }
+  EXPECT_GT(own, 10);
+}
+
+TEST(SleepCardQuote, AStarterFileOfBuiltInsCountsOnce) {
+  // Public-domain entries as a starter /quotes.txt spells them (plain apostrophes, no works, a
+  // comma less): each is recognised as its built-in quote.
+  const std::string starter =
+      "We need the tonic of wildness.\n-- Henry David Thoreau, Walden\n\n"
+      "Heaven is under our feet as well as over our heads.\n-- Henry David Thoreau, Walden\n\n"
+      "In wildness is the preservation of the world.\n-- Henry David Thoreau, Walking\n\n"
+      "Climb the mountains and get their good tidings. Nature's peace will flow into you as sunshine flows into "
+      "trees.\n-- John Muir, Our National Parks\n\n"
+      "The woods are lovely, dark and deep,\nBut I have promises to keep,\nAnd miles to go before I sleep.\n"
+      "-- Robert Frost\n\n"
+      "I travel not to go anywhere, but to go. I travel for travel's sake. The great affair is to move.\n"
+      "-- Robert Louis Stevenson, Travels with a Donkey in the Cevennes\n\n"
+      "Nature always wears the colors of the spirit.\n-- Ralph Waldo Emerson, Nature\n\n"
+      "The poetry of earth is never dead.\n-- John Keats\n\n"
+      "Early to bed and early to rise, makes a man healthy, wealthy, and wise.\n-- Benjamin Franklin\n\n"
+      "One touch of nature makes the whole world kin.\n-- William Shakespeare, Troilus and Cressida\n\n"
+      "# Mine\n"
+      "A line nobody else wrote.\n-- Me\n";
+  std::vector<uint32_t> builtIn;
+  for (size_t i = 0; i < builtInCount(); i++) {
+    builtIn.push_back(hashQuoteText(builtInQuote(i)->text, std::strlen(builtInQuote(i)->text)));
+  }
+  const auto entries = scanAll(starter, 97);
+  ASSERT_EQ(entries.size(), 11u);
+  int repeats = 0;
+  for (const EntrySpan& e : entries) {
+    for (const uint32_t id : builtIn) repeats += e.textHash == id;
+  }
+  EXPECT_EQ(repeats, 10);
+}
+
+TEST(SleepCardQuote, HeadingLinesGroupWithoutShowing) {
+  const std::string text = "# BattleTech\nFirst of mine.\n-- Someone\n# Another group\nSecond of mine.\n\n#\nThird.\n";
+  const auto entries = scanAll(text, 5);
+  ASSERT_EQ(entries.size(), 3u);
+  EXPECT_EQ(sliceOf(text, entries[0]), "First of mine.\n-- Someone");
+  EXPECT_EQ(sliceOf(text, entries[1]), "Second of mine.");
+  EXPECT_EQ(sliceOf(text, entries[2]), "Third.");
+  char out[64], attribution[64];
+  const std::string raw = "# Group\nSome text.\n-- A";
+  ASSERT_TRUE(parseEntry(raw.data(), raw.size(), out, sizeof(out), attribution, sizeof(attribution)));
+  EXPECT_STREQ(out, "Some text.");
+  EXPECT_STREQ(attribution, "A");
+  const std::string onlyHeading = "# Nothing here";
+  EXPECT_FALSE(parseEntry(onlyHeading.data(), onlyHeading.size(), out, sizeof(out), attribution, sizeof(attribution)));
+  EXPECT_TRUE(scanAll(onlyHeading, 3).empty());
+}
+
+TEST(SleepCardQuote, WrappedVerseLinesAreMarkedForTheHangingIndent) {
+  const char* verse = "aaaa bbb ccc\ndddd eee ff";
+  bool overflow = false;
+  FitResult fit;
+  fit.lineCount = wrapLines(verse, 80, 0, &fakeMeasure, nullptr, fit.lines, MAX_LINES, overflow);  // 8 bytes a line
+  ASSERT_EQ(fit.lineCount, 4);
+  EXPECT_EQ(lineOf(verse, fit.lines[1]), "ccc");
+  EXPECT_FALSE(continuesVerseLine(verse, fit, 0));
+  EXPECT_TRUE(continuesVerseLine(verse, fit, 1));   // "ccc" goes on from "aaaa bbb"
+  EXPECT_FALSE(continuesVerseLine(verse, fit, 2));  // "dddd" starts a verse line
+  EXPECT_TRUE(continuesVerseLine(verse, fit, 3));
+  // Prose never hangs.
+  const char* prose = "aaaa bbb ccc dddd";
+  fit.lineCount = wrapLines(prose, 80, 0, &fakeMeasure, nullptr, fit.lines, MAX_LINES, overflow);
+  EXPECT_FALSE(continuesVerseLine(prose, fit, 1));
+}
+
+TEST(SleepCardQuote, AnInlineAttributionIsNotPartOfTheIdentity) {
+  // The scanner's identity of an entry is the hash of the text parseEntry shows, whichever way the
+  // attribution is written (own line, inline after " -- ", none) and however the bytes arrive.
+  const std::string name80(80, 'n');
+  const std::string name81(81, 'n');
+  const std::vector<std::string> entries = {
+      "We need the tonic of wildness. -- Henry David Thoreau",
+      "Be kind. -- Plato",
+      "a -- b -- Name",
+      "text -- -- Name",
+      "text --- Name",
+      "text --Name",
+      "text -- -Name",
+      "Line one\nline two -- Name",
+      "Line one -- X\nline two",
+      "Tabbed\t--\tName",
+      "Own line.\n-- Someone -- Else",
+      "Own line.\n  -- Someone",
+      "x -- " + name80,
+      "x -- " + name81,
+      "-- only a name",
+      "  Spaced   out  --   Name  ",
+  };
+  for (const std::string& entry : entries) {
+    char text[TEXT_CAP];
+    char attribution[ATTRIBUTION_CAP];
+    const bool parsed = parseEntry(entry.data(), entry.size(), text, sizeof(text), attribution, sizeof(attribution));
+    for (const size_t chunk : {size_t{1}, size_t{3}, size_t{100}}) {
+      const auto spans = scanAll(entry, chunk);
+      ASSERT_EQ(spans.size(), 1u) << entry;
+      EXPECT_EQ(spans[0].hasText, parsed) << entry;
+      if (parsed) EXPECT_EQ(spans[0].textHash, hashQuoteText(text, std::strlen(text))) << entry << " / " << chunk;
+    }
+  }
+}
+
+TEST(SleepCardQuote, ARepeatWithAnInlineAttributionIsLeftOut) {
+  const std::string repeat = "We need the tonic of wildness. -- Henry David Thoreau\n";
+  FakeIo io;
+  io.files[QUOTES_PATH] = repeat;
+  const uint32_t repeatHash = scanAll(repeat, repeat.size())[0].hash;
+  for (uint32_t seed = 0; seed < 20; seed++) {
+    ASSERT_TRUE(renderQuoteCard(fakeContext(io, QuoteSource::BuiltInAndMine, seed), preview::renderer()));
+    EXPECT_NE(shownHash(io), repeatHash) << seed;
+  }
+}
+
+TEST(SleepCardQuote, AnUnreadableEntryFallsBackToTheBuiltInSet) {
+  // The file is scanned, then its chosen entry cannot be read back (rewritten over USB meanwhile,
+  // or the card read failed): the built-in set stands in, never the logo screen.
+  FakeIo io;
+  io.files[QUOTES_PATH] = THREE_QUOTES;
+  io.failQuotesReadAt = 2;  // read 1 = the scan, read 2 = the chosen entry
+  bool declined = true;
+  preview::renderCardPng(CardId::Quote, fakeContext(io, QuoteSource::MineOnly), "quote_unreadable", &declined);
+  EXPECT_FALSE(declined);
+  EXPECT_EQ(io.quotesReads, 2);
+  EXPECT_TRUE(isBuiltInHash(shownHash(io)));
 }

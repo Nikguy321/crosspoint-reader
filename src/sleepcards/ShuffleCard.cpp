@@ -6,8 +6,6 @@
 #include <cstdio>
 #include <cstring>
 
-#include "QuoteCard.h"
-
 namespace sleepcards {
 namespace shuffle {
 namespace {
@@ -38,12 +36,8 @@ bool isPickable(const CardId id) { return (pickableMask() & cardBit(id)) != 0; }
 
 bool timeSet(const CardContext& ctx) { return ctx.timeValid && plausibleTime(ctx.utcNow); }
 
-bool quoteUsable(const CardContext& ctx) {
-  // The Quote card falls back from its chosen source to the other one, so either will do.
-  if (ctx.io->fileSize(quote::QUOTES_PATH) > 0) return true;
-  if (ctx.bookPath == nullptr || ctx.bookPath[0] == '\0') return false;
-  return ctx.io->hasBookmarks();
-}
+// The Quote card always has its built-in set to fall back on.
+bool quoteUsable(const CardContext&) { return true; }
 
 ShuffleState readState(const CardIo& io) {
   ShuffleState state;

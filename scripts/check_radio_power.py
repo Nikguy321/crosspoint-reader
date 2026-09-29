@@ -34,6 +34,11 @@ So this fails on:
   MUTATIONS each of those guards removed from the real source, one at a time: the check must
             then fail (a guard deleted with the suite still green is the failure this exists for).
 
+  AUTO-LOCATE "Update location when syncing" (src/network/AutoLocate.cpp) rides a sync's Wi-Fi
+            and must never ask the internet-address lookup: the file names no ipwho.is /
+            parseIpWhoisResponse / FixSource::Ip / IP_ACCURACY, and every GeolocateClient::request
+            in it is passed BEACONDB_URL, which is beaconDB's geolocate endpoint. Mutated too.
+
 Comments and string literals are blanked first. A self-test runs first, so a pattern that has
 quietly stopped matching fails loudly.
 
@@ -330,6 +335,25 @@ def contract_failures(owner: str, power: str, policy: str):
     return fails
 
 
+AUTOLOCATE = ROOT / "src" / "network" / "AutoLocate.cpp"
+AUTOLOCATE_IP = re.compile(r"ipwho|FixSource\s*::\s*Ip\b|IP_ACCURACY", re.I)
+BEACONDB_DEF = 'constexpr const char* BEACONDB_URL = "https://api.beacondb.net/v1/geolocate";'
+
+
+def autolocate_failures(text: str):
+    """AutoLocate.cpp asks beaconDB only (never the internet-address lookup)."""
+    rel = "src/network/AutoLocate.cpp"
+    fails = []
+    if AUTOLOCATE_IP.search(text):
+        fails.append(f"{rel}: names the internet-address lookup (auto-locate is beaconDB only)")
+    if BEACONDB_DEF not in text:
+        fails.append(f"{rel}: BEACONDB_URL is not beaconDB's geolocate endpoint")
+    urls = re.findall(r"GeolocateClient\s*::\s*request\s*\(\s*([^,\s)]+)", strip_code(text))
+    if not urls or any(u != "BEACONDB_URL" for u in urls):
+        fails.append(f"{rel}: a GeolocateClient::request not passed BEACONDB_URL ({', '.join(urls) or 'none'})")
+    return fails
+
+
 def self_test():
     must_hit = [
         "WiFi.mode(WIFI_STA);", "WiFi.mode (WIFI_AP);", "WiFi.mode(m);", "WiFi.begin(ssid, pw);",
@@ -459,6 +483,25 @@ def main() -> int:
         print(f)
         failed = True
 
+    autolocate = AUTOLOCATE.read_text(encoding="utf-8")
+    for f in autolocate_failures(autolocate):
+        print(f)
+        failed = True
+    ip_request = "GeolocateClient::request(IPWHOIS_URL, nullptr"
+    auto_muts = [
+        ("auto-locate asks the address lookup", autolocate.replace("GeolocateClient::request(BEACONDB_URL,", ip_request + ",", 1)),
+        ("auto-locate parses an address answer",
+         autolocate.replace("geolocate::parseBeaconDbResponse(", "geolocate::parseIpWhoisResponse(", 1)),
+        ("auto-locate's URL points elsewhere", autolocate.replace("api.beacondb.net/v1/geolocate", "ipwho.is/", 1)),
+    ]
+    for desc, text in auto_muts:
+        if text == autolocate:
+            print(f"mutation did not apply (the source changed; update the check): {desc}")
+            failed = True
+        elif not autolocate_failures(text):
+            print(f"mutation NOT caught: {desc}")
+            failed = True
+
     muts = mutations(owner, power, policy)
     for desc, o, p, y in muts:
         if (o, p, y) == (owner, power, policy):
@@ -470,7 +513,7 @@ def main() -> int:
 
     if failed:
         return 1
-    print(f"check_radio_power: OK ({len(muts)} mutations caught)")
+    print(f"check_radio_power: OK ({len(muts) + len(auto_muts)} mutations caught)")
     return 0
 
 

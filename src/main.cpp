@@ -199,6 +199,8 @@ static void silentRestartTo(const uint32_t target, const char* targetName) {
 
 void silentRestart() { silentRestartTo(SILENT_REBOOT_TARGET_HOME, "home"); }
 
+bool deepSleepStarting() { return deepSleepInProgress; }
+
 void silentRestartToReader() { silentRestartTo(SILENT_REBOOT_TARGET_READER, "reader"); }
 
 void silentRestartToSettings() { silentRestartTo(SILENT_REBOOT_TARGET_SETTINGS, "settings"); }

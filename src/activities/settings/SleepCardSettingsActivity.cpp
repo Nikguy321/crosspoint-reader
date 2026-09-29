@@ -29,6 +29,7 @@ namespace {
 enum Row : uint8_t {
   LOCATION,
   LOCATE_ME,
+  AUTO_LOCATE,
   HUNTING,
   SEASON_START,
   SEASON_END,
@@ -47,11 +48,11 @@ enum Row : uint8_t {
 };
 
 const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_LOCATION,         StrId::STR_LOCATE_ME,     StrId::STR_HUNTING_SEASON,      StrId::STR_SEASON_START,
-    StrId::STR_SEASON_END,       StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,          StrId::STR_OWNER_CONTACT_1,
-    StrId::STR_OWNER_CONTACT_2,  StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING, StrId::STR_SHUFFLE_DAY,
-    StrId::STR_SHUFFLE_CALENDAR, StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,       StrId::STR_SHUFFLE_SKY,
-    StrId::STR_SHUFFLE_PICTURES};
+    StrId::STR_LOCATION,        StrId::STR_LOCATE_ME,        StrId::STR_AUTO_LOCATE,   StrId::STR_HUNTING_SEASON,
+    StrId::STR_SEASON_START,    StrId::STR_SEASON_END,       StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,
+    StrId::STR_OWNER_CONTACT_1, StrId::STR_OWNER_CONTACT_2,  StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING,
+    StrId::STR_SHUFFLE_DAY,     StrId::STR_SHUFFLE_CALENDAR, StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,
+    StrId::STR_SHUFFLE_SKY,     StrId::STR_SHUFFLE_PICTURES};
 
 uint8_t CrossPointSettings::* shuffleField(const int row) {
   switch (row) {
@@ -248,8 +249,11 @@ void SleepCardSettingsActivity::activateIndex(const int index) {
           static_cast<uint8_t>((SETTINGS.legalLightRule + 1) % static_cast<uint8_t>(sleepcards::LegalLightRule::Count));
       break;
     case QUOTE_SOURCE:
-      SETTINGS.quoteSource =
-          static_cast<uint8_t>((SETTINGS.quoteSource + 1) % static_cast<uint8_t>(sleepcards::QuoteSource::Count));
+      SETTINGS.quoteSources =
+          static_cast<uint8_t>((SETTINGS.quoteSources + 1) % static_cast<uint8_t>(sleepcards::QuoteSource::Count));
+      break;
+    case AUTO_LOCATE:
+      SETTINGS.autoLocateOnSync = SETTINGS.autoLocateOnSync ? 0 : 1;
       break;
     default: {
       const auto field = shuffleField(index);
@@ -271,8 +275,15 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
 
   static constexpr StrId HUNT_LABELS[] = {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES};
   static constexpr StrId LEGAL_LABELS[] = {StrId::STR_LEGAL_LIGHT_30_MIN, StrId::STR_LEGAL_LIGHT_CIVIL};
-  static constexpr StrId QUOTE_LABELS[] = {StrId::STR_QUOTE_SOURCE_FILE, StrId::STR_QUOTE_SOURCE_BOOKMARKS,
-                                           StrId::STR_QUOTE_SOURCE_BOTH};
+  // In sleepcards::QuoteSource order.
+  static constexpr StrId QUOTE_LABELS[] = {StrId::STR_QUOTE_SOURCE_ALL,
+                                           StrId::STR_QUOTE_SOURCE_BUILT_IN_MINE,
+                                           StrId::STR_QUOTE_SOURCE_MINE_BOOKMARKS,
+                                           StrId::STR_QUOTE_SOURCE_BUILT_IN_BOOKMARKS,
+                                           StrId::STR_QUOTE_SOURCE_BUILT_IN,
+                                           StrId::STR_QUOTE_SOURCE_MINE,
+                                           StrId::STR_QUOTE_SOURCE_BOOKMARKS};
+  static_assert(std::size(QUOTE_LABELS) == static_cast<size_t>(sleepcards::QuoteSource::Count));
   const auto pick = [](const StrId* labels, const size_t count, const uint8_t value) {
     return I18N.get(labels[value < count ? value : 0]);
   };
@@ -283,6 +294,9 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
                             locationSource_, sizeof(locationSource_));
   rowItems_[LOCATION].subtitle = locationSource_[0] != '\0' ? locationSource_ : nullptr;
   rowValues_[LOCATE_ME].clear();
+  rowValues_[AUTO_LOCATE] = SETTINGS.autoLocateOnSync ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  // What turning it on sends, and to whom.
+  rowItems_[AUTO_LOCATE].subtitle = tr(STR_AUTO_LOCATE_HINT);
   rowValues_[HUNTING] = pick(HUNT_LABELS, std::size(HUNT_LABELS), SETTINGS.huntingSeason);
   rowValues_[SEASON_START] = monthDayLabel(SETTINGS.huntStartMonth, SETTINGS.huntStartDay);
   rowValues_[SEASON_END] = monthDayLabel(SETTINGS.huntEndMonth, SETTINGS.huntEndDay);
@@ -290,7 +304,7 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   rowValues_[OWNER_NAME] = textOrNotSet(SETTINGS.ownerName);
   rowValues_[OWNER_CONTACT_1] = textOrNotSet(SETTINGS.ownerContact1);
   rowValues_[OWNER_CONTACT_2] = textOrNotSet(SETTINGS.ownerContact2);
-  rowValues_[QUOTE_SOURCE] = pick(QUOTE_LABELS, std::size(QUOTE_LABELS), SETTINGS.quoteSource);
+  rowValues_[QUOTE_SOURCE] = pick(QUOTE_LABELS, std::size(QUOTE_LABELS), SETTINGS.quoteSources);
   for (int row = SHUFFLE_NOW_READING; row <= SHUFFLE_PICTURES; row++) {
     rowValues_[row] = SETTINGS.*shuffleField(row) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
   }

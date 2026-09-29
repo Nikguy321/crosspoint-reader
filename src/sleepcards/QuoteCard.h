@@ -5,13 +5,17 @@
 
 #include "SleepCard.h"
 
-// QUOTE: a random entry of /quotes.txt or a random bookmark snippet of the open book, per
-// Settings > Quote Source, wrapped in the largest serif size that fits, attribution below.
+// QUOTE: a random quote from the categories Settings > Quote Source enables - the built-in set
+// (BuiltInQuotes.h), "My quotes" (/quotes.txt) and the open book's bookmarks - wrapped in the
+// largest serif size that fits, attribution below. When none of the enabled categories has an
+// entry, My quotes fill in, then the built-in set, so the card always has a quote to show.
 // Entry point: sleepcards::renderQuoteCard() (declared in SleepCard.h).
 //
 // /quotes.txt: plain UTF-8 text (LF, CRLF or CR line ends). Entries are separated by blank lines
-// (a line holding only "%", the fortune(6) separator, counts as blank too). An optional
-// attribution goes on its own line starting with "--" (or an em dash); leading spaces are fine:
+// (a line holding only "%", the fortune(6) separator, counts as blank too). A line starting with
+// "#" is a heading for the reader of the file ("# BattleTech"): the card skips it, and it ends the
+// entry before it. An optional attribution goes on its own line starting with "--" (or an em
+// dash); leading spaces are fine:
 //
 //     Adopt the pace of nature: her secret is patience.
 //      -- Ralph Waldo Emerson
@@ -21,6 +25,10 @@
 //
 // Lines of one entry are joined with spaces (so hard-wrapped prose reflows). Only the first
 // FILE_READ_CAP bytes are read, and an entry longer than ENTRY_CAP bytes is skipped.
+//
+// An entry of My quotes whose text matches a built-in quote (letters and digits compared, see
+// hashQuoteText) is left out while the built-in set is enabled too, so a file that repeats them
+// does not show them twice as often.
 //
 // The card remembers the last quote it showed (a hash in STATE_PATH) and does not show it twice
 // in a row while there is another one to choose from.
@@ -49,12 +57,23 @@ uint32_t randomBelow(uint32_t& state, uint32_t n);
 constexpr uint32_t HASH_SEED = 2166136261u;
 uint32_t hashInk(const char* s, size_t n, uint32_t h = HASH_SEED);
 
+// A quote's identity for deduplication: its letters and digits only (ASCII folded to lower case),
+// so spacing, line breaks, straight or curly quotes and dashes do not matter. General Punctuation
+// and the blocks after it (UTF-8 lead byte 0xE2) are skipped; other non-ASCII characters count.
+struct TextHasher {
+  uint32_t h = HASH_SEED;
+  uint8_t skip = 0;  // continuation bytes of a skipped character still to come
+  void feed(unsigned char c);
+};
+uint32_t hashQuoteText(const char* s, size_t n);
+
 // ---- the quotes file, streamed ------------------------------------------------------------------
 struct EntrySpan {
-  uint32_t offset = 0;   // file offset of the entry's first non-blank byte
-  uint32_t length = 0;   // up to the end of its last non-blank line
-  uint32_t hash = 0;     // hashInk() of the entry
-  bool hasText = false;  // has a line that is not attribution
+  uint32_t offset = 0;    // file offset of the entry's first non-blank byte
+  uint32_t length = 0;    // up to the end of its last non-blank line
+  uint32_t hash = 0;      // hashInk() of the entry
+  uint32_t textHash = 0;  // hashQuoteText() of its text lines (the attribution, own-line or inline, left out)
+  bool hasText = false;   // has a line that is not attribution
 };
 
 // Feed the file's bytes in order, in chunks of any size; each complete entry is reported once.
@@ -80,6 +99,7 @@ class EntryScanner {
   uint32_t lineFirstInk_ = 0;
   uint32_t lineInkEnd_ = 0;  // one past its last non-whitespace byte
   uint32_t lineHash_ = HASH_SEED;
+  TextHasher lineText_;
   uint16_t lineInk_ = 0;
   uint8_t prefix_[3] = {0, 0, 0};  // its first ink bytes
   // the entry being read
@@ -87,6 +107,14 @@ class EntryScanner {
   EntrySpan entry_;
   bool sawAttribution_ = false;
   bool lastWasCr_ = false;
+  // " -- Name" on the line being read (the inline attribution parseEntry splits off)
+  bool spaceBefore_ = false;  // whitespace since the line's last ink byte
+  uint8_t dashes_ = 0;        // dashes in the run that followed a space (0 = not in one)
+  uint32_t dashHash_ = 0;     // the text hash before that run
+  bool lineCut_ = false;      // the line has " -- " before more ink ...
+  uint32_t cutHash_ = 0;      // ... the text hash before the last one ...
+  uint32_t cutPos_ = 0;       // ... and where the name after it starts
+  uint32_t cutTextHash_ = 0;  // the entry's text hash with its last line's inline name left out
 };
 
 // One raw entry -> the quote (lines joined, whitespace collapsed) and its attribution (leading
@@ -100,14 +128,22 @@ bool parseEntry(const char* raw, size_t n, char* text, size_t textCap, char* att
 bool snippetText(const char* summary, char* out, size_t cap);
 
 // ---- choosing ------------------------------------------------------------------------------------
-enum class Pick : uint8_t { None, File, Bookmarks };
+enum class Pick : uint8_t { None, BuiltIn, Mine, Bookmarks };
 struct PoolStats {
   uint32_t count = 0;  // usable candidates
   uint32_t fresh = 0;  // of those, not the one shown last time
 };
-// Which source to show this time. The Setting's source is preferred, the other one fills in when
-// it has nothing; Both tosses a coin between sources that have something fresh.
-Pick chooseSource(QuoteSource mode, PoolStats file, PoolStats bookmarks, uint32_t& rng);
+struct Pools {
+  PoolStats builtIn;
+  PoolStats mine;
+  PoolStats bookmarks;
+};
+// The enabled categories (QUOTES_* bits) that have an entry.
+uint8_t categoriesWithEntries(uint8_t enabled, const Pools& pools);
+// Which category to show this time: a coin among the enabled ones that have something not shown
+// last time (else among those with anything); when none has an entry, My quotes, then the
+// built-in set. None only when every pool is empty.
+Pick chooseCategory(uint8_t enabled, const Pools& pools, uint32_t& rng);
 
 // Uniform choice in one pass (reservoir sampling) that avoids lastHash while any other candidate
 // exists. value is the caller's payload (an offset, an index ...).
@@ -138,8 +174,9 @@ struct LineSpan {
 // Width in px of text[0..n) in candidate font fontIndex, with "..." appended when ellipsis.
 using MeasureFn = int (*)(void* user, int fontIndex, const char* s, size_t n, bool ellipsis);
 
-// Greedy word wrap of single-spaced text into lines no wider than width. A word wider than a
-// line is split between characters. Fills at most maxLines; overflow = the text did not fit.
+// Greedy word wrap of single-spaced text into lines no wider than width. A '\n' ends a line (verse
+// in the built-in set). A word wider than a line is split between characters. Fills at most
+// maxLines; overflow = the text did not fit.
 int wrapLines(const char* text, int width, int fontIndex, MeasureFn measure, void* user, LineSpan* lines, int maxLines,
               bool& overflow);
 
@@ -158,9 +195,28 @@ struct FitResult {
 bool fitText(const char* text, int width, const int* lineHeights, const int* maxHeights, int count, MeasureFn measure,
              void* user, FitResult& out);
 
+// Does line i of a fit continue a verse line wrapped on the line before it? (Set with a hanging
+// indent.) Never for the first line or for text without '\n' line breaks.
+bool continuesVerseLine(const char* text, const FitResult& fit, int i);
+
 // "Henry David Thoreau, Walden" -> name "Henry David Thoreau", work "Walden": split at the first
 // ", " when what follows has at least 4 visible characters and is not "Jr."/"Sr." ("" work when
 // not split). Outputs are terminated and whole-character.
 void splitAttribution(const char* attribution, char* name, size_t nameCap, char* work, size_t workCap);
+
+// ---- drawing -------------------------------------------------------------------------------------
+// How a quote was set: the candidate size (0 = the largest serif with the opening mark), its line
+// count, and whether even the smallest size ran out of room.
+struct QuoteLayout {
+  int fontIndex = -1;
+  int lineCount = 0;
+  bool truncated = false;
+  bool mark = false;  // the size carries the opening mark
+};
+// The candidate sizes; fontIndex < SERIF_WITH_MARK_COUNT = one of the serif sizes with the mark.
+constexpr int SERIF_WITH_MARK_COUNT = 4;
+// One quote drawn exactly as the card sets it (text, "Name, Work" attribution), into the cleared
+// frame; layout (when not nullptr) says how it fitted. False when nothing fits or out of memory.
+bool renderQuoteText(GfxRenderer& renderer, const char* text, const char* attribution, QuoteLayout* layout);
 
 }  // namespace sleepcards::quote

@@ -14,6 +14,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/AutoLocate.h"
 #include "network/RadioPower.h"
 
 void ClockSyncActivity::onEnter() {
@@ -91,6 +92,12 @@ void ClockSyncActivity::loop() {
     // requestUpdateAndWait below forces the render before we block on WiFi.
     requestUpdateAndWait();
     runSync();
+    // The clock just synced over the internet (and dates the record): a due location refresh
+    // rides the same connection while the result shows.
+    if (state == SUCCESS && AutoLocate::due(true)) {
+      requestUpdateAndWait();
+      AutoLocate::run();
+    }
     // The result screen needs no radio; a session this activity started ends here.
     if (shouldTearDownWifiOnExit) RadioPower::stop();
     return;

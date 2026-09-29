@@ -78,12 +78,18 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   // whether the mode still reads on after that is the Arduino core's business, not this rule's.
   bool wifiActivated = false;
 
+  // The last KOSync request got an HTTP answer: the network works, so "Update location when
+  // syncing" may ride it (AutoLocate); after a network failure it does not add its own wait.
+  bool reachedServer = false;
+
   void onWifiSelectionComplete(bool success);
   void performSync();
   void performUpload();
   bool smartSyncEnabled() const;
   void markAutoReturn();
   void completeAlreadySynced();
+  // A due AutoLocate run with the current result on screen; true when it ran (and drew it).
+  bool refreshLocationWhileShowing();
   void ensureEpubLoaded();
   void saveProgressAndReturn(int spineIndex, int page);
   void returnToReader();

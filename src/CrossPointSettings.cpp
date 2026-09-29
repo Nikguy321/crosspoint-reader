@@ -200,6 +200,13 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     }
   }
 
+  // The Quote Source setting became a choice of categories: the old "quoteSource" (quotes file /
+  // bookmarks / both) maps to My quotes only / Bookmarks only / all three.
+  if (doc["quoteSources"].isNull() && doc["quoteSource"].is<uint8_t>()) {
+    quoteSources = sleepcards::migrateQuoteSource(doc["quoteSource"].as<uint8_t>());
+    needsResave = true;
+  }
+
   if (doc["sleepTimeoutMinutes"].isNull() && !doc["sleepTimeout"].isNull()) {
     const uint8_t legacyValue =
         clamp(doc["sleepTimeout"] | (uint8_t)SLEEP_10_MIN, SLEEP_TIMEOUT_COUNT, (uint8_t)SLEEP_10_MIN);

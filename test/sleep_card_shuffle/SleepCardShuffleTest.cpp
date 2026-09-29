@@ -33,6 +33,7 @@ class MemIo final : public CardIo {
   int bookmarks = 0;
   int writes = 0;
   bool failWrites = false;
+  bool bookLoads = true;  // false: the book is on the card but cannot be read (Now Reading declines)
 
   int32_t fileSize(const char* path) const override {
     const auto it = files.find(path);
@@ -53,7 +54,7 @@ class MemIo final : public CardIo {
     self->files[path] = std::string(data, len);
     return true;
   }
-  bool loadBook(CardBook& out) const override { return preview::hostIo().loadBook(out); }
+  bool loadBook(CardBook& out) const override { return bookLoads && preview::hostIo().loadBook(out); }
   bool drawBookCover(GfxRenderer& r, int x, int y, int w, int h) const override {
     return preview::hostIo().drawBookCover(r, x, y, w, h);
   }
@@ -242,18 +243,18 @@ TEST(SleepCardShuffle, UsableMaskFollowsTheDevice) {
   noBook.bookPath = "";
   io.files.erase(quote::QUOTES_PATH);
   io.bookmarks = 3;
-  // No book: no Now Reading, and no bookmarks to quote either.
-  EXPECT_EQ(shuffleUsableMask(noBook, ALL), ALL & ~bits({CardId::NowReading, CardId::Quote}));
+  // No book: no Now Reading; Quote still has its built-in set.
+  EXPECT_EQ(shuffleUsableMask(noBook, ALL), ALL & ~bits({CardId::NowReading}));
   // A book path that is no longer on the card.
   CardContext stale = ctx;
   stale.bookPath = "/Books/Gone.epub";
   EXPECT_FALSE(shuffleUsableMask(stale, ALL) & cardBit(CardId::NowReading));
-  // Quote: bookmarks alone will do; no bookmarks and no file will not; an empty file will not.
+  // Quote: always, whatever the card holds (the built-in set is its fallback).
   EXPECT_TRUE(shuffleUsableMask(ctx, ALL) & cardBit(CardId::Quote));
   io.bookmarks = 0;
-  EXPECT_FALSE(shuffleUsableMask(ctx, ALL) & cardBit(CardId::Quote));
+  EXPECT_TRUE(shuffleUsableMask(ctx, ALL) & cardBit(CardId::Quote));
   io.files[quote::QUOTES_PATH] = "";
-  EXPECT_FALSE(shuffleUsableMask(ctx, ALL) & cardBit(CardId::Quote));
+  EXPECT_TRUE(shuffleUsableMask(ctx, ALL) & cardBit(CardId::Quote));
 
   EXPECT_TRUE(hasInk("x", 1));
   EXPECT_FALSE(hasInk(" \r\n", 8));
@@ -355,13 +356,13 @@ TEST(SleepCardShuffle, ExcludingSkipsADeclinedCard) {
   EXPECT_EQ(pickShuffleCardExcluding(ctx, bits({CardId::Day, CardId::Sky})), CardId::None);
 }
 
-// A pick that declines when drawn (here a /quotes.txt holding only an attribution line, which
-// looks usable but has no quote) hands over to the next card instead of the logo screen.
+// A pick that declines when drawn (here a book that is on the card but cannot be read, which
+// looks usable to Now Reading) hands over to the next card instead of the logo screen.
 TEST(SleepCardShuffle, RenderMovesOnWhenThePickDeclines) {
   MemIo io;
   CardContext ctx = memContext(io);
-  io.files[quote::QUOTES_PATH] = " -- Nobody\n";
-  ctx.settings.shuffleMask = bits({CardId::Quote, CardId::Day});
+  io.bookLoads = false;
+  ctx.settings.shuffleMask = bits({CardId::NowReading, CardId::Day});
   for (int i = 0; i < 6; i++) {
     ctx.seed = 0x5EED1234u + static_cast<uint32_t>(i);
     CardId shown = CardId::None;
@@ -369,12 +370,15 @@ TEST(SleepCardShuffle, RenderMovesOnWhenThePickDeclines) {
     EXPECT_EQ(shown, CardId::Day) << i;
   }
   // Only the declining card ticked: nothing drawn, the caller falls back to the logo.
-  ctx.settings.shuffleMask = bits({CardId::Quote});
+  ctx.settings.shuffleMask = bits({CardId::NowReading});
   CardId shown = CardId::None;
   EXPECT_FALSE(renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown));
   // A card asked for by name is drawn or declines on its own; no shuffling.
-  EXPECT_FALSE(renderCardOrShuffle(CardId::Quote, ctx, preview::renderer(), shown));
-  EXPECT_EQ(shown, CardId::Quote);
+  EXPECT_FALSE(renderCardOrShuffle(CardId::NowReading, ctx, preview::renderer(), shown));
+  EXPECT_EQ(shown, CardId::NowReading);
+  // The Quote card never declines: an attribution-only file still leaves the built-in set.
+  io.files[quote::QUOTES_PATH] = " -- Nobody\n";
+  EXPECT_TRUE(renderCardOrShuffle(CardId::Quote, ctx, preview::renderer(), shown));
   // Pictures is handed back undrawn.
   ctx.settings.shuffleMask = bits({CardId::Pictures});
   EXPECT_FALSE(renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown));

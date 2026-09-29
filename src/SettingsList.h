@@ -466,6 +466,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::String(StrId::STR_LOCATION, &SETTINGS.sleepCardLocation[0], sizeof(SETTINGS.sleepCardLocation),
                             "sleepCardLocation", StrId::STR_SLEEP_CARDS)
             .withNormalizer(&sleepcards::normalizeLocation),
+        SettingInfo::Toggle(StrId::STR_AUTO_LOCATE, &CrossPointSettings::autoLocateOnSync, "autoLocateOnSync",
+                            StrId::STR_SLEEP_CARDS),
         SettingInfo::Enum(StrId::STR_HUNTING_SEASON, &CrossPointSettings::huntingSeason,
                           {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES}, "huntingSeason",
                           StrId::STR_SLEEP_CARDS),
@@ -487,9 +489,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::String(StrId::STR_OWNER_CONTACT_2, &SETTINGS.ownerContact2[0], sizeof(SETTINGS.ownerContact2),
                             "ownerContact2", StrId::STR_SLEEP_CARDS),
         SettingInfo::Enum(
-            StrId::STR_QUOTE_SOURCE, &CrossPointSettings::quoteSource,
-            {StrId::STR_QUOTE_SOURCE_FILE, StrId::STR_QUOTE_SOURCE_BOOKMARKS, StrId::STR_QUOTE_SOURCE_BOTH},
-            "quoteSource", StrId::STR_SLEEP_CARDS),
+            StrId::STR_QUOTE_SOURCE, &CrossPointSettings::quoteSources,
+            {StrId::STR_QUOTE_SOURCE_ALL, StrId::STR_QUOTE_SOURCE_BUILT_IN_MINE, StrId::STR_QUOTE_SOURCE_MINE_BOOKMARKS,
+             StrId::STR_QUOTE_SOURCE_BUILT_IN_BOOKMARKS, StrId::STR_QUOTE_SOURCE_BUILT_IN, StrId::STR_QUOTE_SOURCE_MINE,
+             StrId::STR_QUOTE_SOURCE_BOOKMARKS},
+            "quoteSources", StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_NOW_READING, &CrossPointSettings::shuffleNowReading, "shuffleNowReading",
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_DAY, &CrossPointSettings::shuffleDay, "shuffleDay",

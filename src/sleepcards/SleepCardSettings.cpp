@@ -59,6 +59,38 @@ bool parseCoordinate(const char*& p, const bool latitude, double& out) {
 
 }  // namespace
 
+uint8_t quoteCategories(const QuoteSource source) {
+  switch (source) {
+    case QuoteSource::BuiltInAndMine:
+      return QUOTES_BUILT_IN | QUOTES_MINE;
+    case QuoteSource::MineAndBookmarks:
+      return QUOTES_MINE | QUOTES_BOOKMARKS;
+    case QuoteSource::BuiltInAndBookmarks:
+      return QUOTES_BUILT_IN | QUOTES_BOOKMARKS;
+    case QuoteSource::BuiltInOnly:
+      return QUOTES_BUILT_IN;
+    case QuoteSource::MineOnly:
+      return QUOTES_MINE;
+    case QuoteSource::BookmarksOnly:
+      return QUOTES_BOOKMARKS;
+    case QuoteSource::All:
+    case QuoteSource::Count:
+      break;
+  }
+  return QUOTES_BUILT_IN | QUOTES_MINE | QUOTES_BOOKMARKS;
+}
+
+uint8_t migrateQuoteSource(const uint8_t legacy) {
+  switch (legacy) {
+    case 0:
+      return static_cast<uint8_t>(QuoteSource::MineOnly);
+    case 1:
+      return static_cast<uint8_t>(QuoteSource::BookmarksOnly);
+    default:
+      return static_cast<uint8_t>(QuoteSource::All);
+  }
+}
+
 bool parseLocation(const char* text, double& lat, double& lon) {
   if (text == nullptr) return false;
   const char* p = text;

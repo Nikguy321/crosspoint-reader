@@ -219,7 +219,7 @@ The Settings screen allows you to configure the device's behavior. There are a f
   - "Quick resume" - The text of the last page read will be displayed on the sleep screen and a moon icon is shown on the edge of the screen. Waking up the device will return to the same page of the opened book. This is useful for quickly resuming reading without waiting for the device to fully wake up and load the book.
   - "Transparent" - A transparent overlay image drawn over the current screen; see [Sleep Screen](#37-sleep-screen) below for more information
   - X4 Pro only: "Now Reading", "Day Card", "Month Calendar", "Quote", "Owner Card", "Tonight's Sky" and "Shuffle"; see [Sleep screen cards (X4 Pro)](#sleep-screen-cards-x4-pro) below
-- **Sleep Screen Cards** (X4 Pro only, right under Sleep Screen): the cards' options - Location (typed, or found with **Locate Me** from nearby Wi-Fi or your internet address over a saved Wi-Fi network), Hunting Season, Season Start/End, Legal Light, Owner Name and Contacts, Quote Source, and which cards Shuffle may pick.
+- **Sleep Screen Cards** (X4 Pro only, right under Sleep Screen): the cards' options - Location (typed, or found with **Locate Me** from nearby Wi-Fi or your internet address over a saved Wi-Fi network), **Update Location When Syncing**, Hunting Season, Season Start/End, Legal Light, Owner Name and Contacts, Quote Source, and which cards Shuffle may pick.
 - **Sleep Screen Cover Mode**: How to display the book cover when "Cover" sleep screen is selected:
   
   - "Fit" (default) - Scale the image down to fit centered on the screen, padding with white borders as necessary
@@ -550,7 +550,7 @@ On the X4 Pro the Dark and Light screens show the X4 Pro mark, and the Sleep Scr
 | **Now Reading** | The open book's cover, title, author, progress, chapter and page, and the reading time left in the chapter and the book (from your own page-turn pace, once it has a few pages to go on). |
 | **Day Card** | The date, sunrise, sunset and day length, and the moon's phase with the next full moon. With **Hunting Season** on (or between its dates) it adds the day's legal shooting light. |
 | **Month Calendar** | The month with today circled, the moon's quarters, hunting-season days marked, and the next full moon. |
-| **Quote** | A random entry from `/quotes.txt` at the root of the SD card, or a bookmark's text from the open book (**Quote Source**). |
+| **Quote** | A random quote from the built-in set (short public-domain passages about the outdoors, reading, travel and night), your own `/quotes.txt` ("My quotes") or a bookmark's text from the open book, as **Quote Source** chooses. |
 | **Owner Card** | "If found, please return to" with the name and contacts you typed in **Sleep Screen Cards**. |
 | **Tonight's Sky** | Moonrise and moonset, and when Venus, Mars, Jupiter and Saturn rise, stand highest and set, with a map of the sky for the evening. |
 | **Shuffle** | A different ticked card each time (Custom pictures can be one of them). |
@@ -559,14 +559,26 @@ Sun, moon and planet times need **Location** (decimal degrees, latitude first, e
 
 Instead of typing the location, **Locate Me** (under Location in **Sleep Screen Cards**) finds it over a saved Wi-Fi network. Nothing is sent until you tap **Locate**. It sends up to 20 nearby Wi-Fi access points (their hardware addresses and signal strengths, never their names) to [beaconDB](https://beacondb.net); hidden networks, networks whose name ends in `_nomap` or `_optout`, and phone hotspots or other randomised addresses are left out. If that gives nothing (or nothing within 5 km), it asks [ipwho.is](https://ipwhois.io) where your internet address is, which is only city level and can be far off on a phone hotspot or a VPN. You see the place and its accuracy before choosing **Save**; the Location row then reads, for example, "From Wi-Fi, ±80 m, Sep 29". The reader restarts back to Sleep Screen Cards when you leave. Details: [docs/sleep-screen-cards.md](docs/sleep-screen-cards.md#locate-me).
 
-`/quotes.txt` is plain text: entries separated by blank lines, the attribution on its own line starting with `--` or at the end of the last line after ` -- `:
+**Update Location When Syncing** (off by default) keeps the location current without a separate step: when a book sync or **Sync clock now** (Settings > Clock) already has Wi-Fi up and working, and the location was not saved today, the reader sends the nearby Wi-Fi access points (hardware addresses and signal strengths, never names) to [beaconDB](https://beacondb.net), the same Wi-Fi lookup as Locate Me, and saves the answer only if it is within 1,000 m. It tries at most once a day, never uses your internet address, never turns Wi-Fi on by itself, is skipped on the sync peer's or hub's hotspot and after a sync that could not reach its server, and adds at most about 15 seconds to that sync while its result stays on screen; if anything fails the sync simply carries on. **It replaces a typed-in location** (turn it off while you want a typed one kept, such as a camp you entered ahead of a trip); a Locate Me fix that is tighter than the new answer and agrees with it is kept and just re-dated. The Location row then reads, for example, "From Wi-Fi (auto), ±80 m, Sep 29".
+
+**Quote Source** picks which categories the Quote card draws from: **All** (the default), **Built-in + My Quotes**, **My Quotes + Bookmarks**, **Built-in + Bookmarks**, **Built-in Only**, **My Quotes Only** or **Bookmarks Only**. If none of the chosen ones has anything (no `/quotes.txt`, no book open), your own quotes fill in, then the built-in set, so the card always shows a quote.
+
+"My quotes" is `/quotes.txt` at the root of the SD card. It stays on your card; nothing in it goes into the firmware. It is plain text: entries separated by blank lines, the attribution on its own line starting with `--` (a comma separates the author from the work) or at the end of the last line after ` -- `. A line starting with `#` is a heading for grouping your quotes; the card skips it:
 
 ```text
+# Outdoors
 Adopt the pace of nature: her secret is patience.
  -- Ralph Waldo Emerson
 
 Be kind. -- Plato
+
+# Another group
+A long passage may be wrapped over
+several lines; they are joined.
+-- Someone, Their Book
 ```
+
+With the built-in set also chosen, a quote of yours whose words match a built-in one is shown only once, not twice as often.
 
 #### Cover settings
 

@@ -10,7 +10,7 @@
 namespace sleepcards {
 namespace {
 
-constexpr const char* SOURCE_WORDS[] = {"typed", "wifi", "ip"};
+constexpr const char* SOURCE_WORDS[] = {"typed", "wifi", "ip", "wifi-auto"};
 constexpr size_t SOURCE_COUNT = sizeof(SOURCE_WORDS) / sizeof(SOURCE_WORDS[0]);
 
 bool validDate(const LocationFix& fix) {
@@ -181,6 +181,7 @@ void formatFixLine(const LocationFix& fix, char* out, const size_t cap) {
 
   const char* source = tr(STR_LOCATION_TYPED);
   if (fix.source == LocationSource::Wifi) source = tr(STR_LOCATION_FROM_WIFI);
+  if (fix.source == LocationSource::WifiAuto) source = tr(STR_LOCATION_FROM_WIFI_AUTO);
   if (fix.source == LocationSource::Internet) source = tr(STR_LOCATION_FROM_IP);
   const char* separator = tr(STR_LIST_SEPARATOR);
 
@@ -188,7 +189,7 @@ void formatFixLine(const LocationFix& fix, char* out, const size_t cap) {
   char accuracy[32] = "";
   if (fix.source == LocationSource::Internet) {
     std::snprintf(accuracy, sizeof(accuracy), "%s%s", separator, tr(STR_LOCATION_CITY_LEVEL));
-  } else if (fix.source == LocationSource::Wifi && fix.accuracyM > 0) {
+  } else if ((fix.source == LocationSource::Wifi || fix.source == LocationSource::WifiAuto) && fix.accuracyM > 0) {
     char amount[16];
     formatAccuracy(fix.accuracyM, amount, sizeof(amount));
     char withSign[24];
