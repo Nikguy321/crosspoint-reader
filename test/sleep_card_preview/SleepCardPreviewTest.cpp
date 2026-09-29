@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 #include "CardPreview.h"
 #include "src/fontIds.h"
@@ -60,6 +61,71 @@ TEST(SleepCardPreview, EveryCardRendersWithinBudget) {
     EXPECT_TRUE(anyInk()) << cardName(id);
     EXPECT_FALSE(declined) << cardName(id);
   }
+}
+
+// The Inverted filter: every card white on black -> build/cards/dark_<name>.png. The page turns
+// black; the moon and the book cover keep their tones.
+TEST(SleepCardPreview, DarkCards) {
+  const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote, CardId::Owner, CardId::Sky};
+  const uint32_t size = display.getBufferSize();
+  for (const CardId id : cards) {
+    CardContext ctx = preview::sampleContext();
+    if (id == CardId::Owner) {
+      std::snprintf(ctx.settings.ownerName, sizeof(ctx.settings.ownerName), "Sam Example");
+      std::snprintf(ctx.settings.ownerContact1, sizeof(ctx.settings.ownerContact1), "555-0100");
+    }
+    GfxRenderer& r = preview::renderer();
+    ASSERT_TRUE(renderCard(id, ctx, r)) << cardName(id);
+    const std::vector<uint8_t> light(display.getFrameBuffer(), display.getFrameBuffer() + size);
+    ctx.dark = true;
+    bool declined = false;
+    preview::renderCardPng(id, ctx, std::string("dark_") + cardName(id), &declined);
+    ASSERT_FALSE(declined) << cardName(id);
+    // Every pixel flipped but the kept pictures: the same card, the other way round.
+    const uint8_t* fb = display.getFrameBuffer();
+    uint32_t same = 0;
+    uint32_t inkBits = 0;
+    for (uint32_t i = 0; i < size; i++) {
+      same += __builtin_popcount(static_cast<uint8_t>(~(fb[i] ^ light[i])));
+      inkBits += __builtin_popcount(static_cast<uint8_t>(~fb[i]));
+    }
+    EXPECT_GT(inkBits, size * 8 / 2) << cardName(id) << ": the page should be black";
+    if (id == CardId::Quote || id == CardId::Owner) EXPECT_EQ(same, 0u) << cardName(id) << " has no pictures";
+    if (id == CardId::NowReading || id == CardId::Day || id == CardId::Calendar || id == CardId::Sky) {
+      EXPECT_GT(same, 0u) << cardName(id) << ": its cover or moon should keep its tones";
+    }
+  }
+}
+
+// On a dark card the moon still reads as the moon: its lit part white, a new moon dark inside a
+// white ring (never the white disc of a full moon), and the page around it black.
+TEST(SleepCardPreview, DarkMoonKeepsItsTones) {
+  GfxRenderer& r = preview::renderer();
+  const int radius = 40;
+  const int cx = 120;
+  const int cy = 200;
+  const int nx = 360;  // a new moon beside it
+  r.clearScreen();
+  draw::clearKeptTones();
+  draw::drawMoon(r, cx, cy, radius, 0.5, true, false, draw::DITHER_LEVELS);  // first quarter: right half lit
+  draw::drawMoon(r, nx, cy, radius, 0.0, true, false, draw::DITHER_LEVELS);
+  draw::keepTonesRect(200, 400, 40, 20);
+  r.fillRect(200, 400, 20, 20, true);  // a picture: left half ink
+  draw::invertKeepingTones(r);
+  ASSERT_TRUE(preview::writeFramePng(preview::outputDir() + "/_dark_moon.png"));
+
+  EXPECT_TRUE(r.readPixel(10, 10)) << "page";
+  EXPECT_TRUE(r.readPixel(cx, cy - radius - 3)) << "page just outside the ring";
+  EXPECT_FALSE(r.readPixel(cx + radius / 2, cy)) << "lit side";
+  EXPECT_TRUE(r.readPixel(cx - radius / 2, cy)) << "shadow side";
+  EXPECT_FALSE(r.readPixel(cx + radius, cy)) << "ring";
+  EXPECT_FALSE(r.readPixel(cx - radius, cy)) << "ring";
+  EXPECT_TRUE(r.readPixel(nx, cy)) << "new moon: dark";
+  EXPECT_TRUE(r.readPixel(nx + radius / 2, cy)) << "new moon: dark";
+  EXPECT_FALSE(r.readPixel(nx - radius, cy)) << "new moon: white ring";
+  EXPECT_TRUE(r.readPixel(205, 405)) << "picture ink kept";
+  EXPECT_FALSE(r.readPixel(230, 405)) << "picture paper kept";
+  EXPECT_TRUE(r.readPixel(245, 405)) << "page beside the picture";
 }
 
 // Without a location, sun and moon times cannot be computed; cards must still render (or decline)

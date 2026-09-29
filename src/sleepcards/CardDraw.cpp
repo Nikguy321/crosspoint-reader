@@ -158,7 +158,58 @@ void drawMoon(GfxRenderer& r, const int cx, const int cy, const int radius, cons
       r.drawPixel(x, y, lit ? false : ditherInk(x, y, darkLevel));
     }
   }
-  drawCircle(r, cx, cy, radius, radius >= 24 ? 2 : 1, true);
+  const int ring = radius >= 24 ? 2 : 1;
+  drawCircle(r, cx, cy, radius, ring, true);
+  // Inside the ring (drawEllipse's inner edge): on a dark card the ring turns white and outlines
+  // the dark limb against the black page.
+  if (radius > ring) keepTonesDisc(cx, cy, radius - ring);
+}
+
+// ---- dark cards ---------------------------------------------------------------------------------
+
+namespace {
+struct KeptTones {
+  bool disc;
+  int x, y;  // disc: centre; rect: top-left
+  int w, h;  // disc: w = radius
+};
+// A card has at most a cover or a few moons (the calendar's four phases, the sky's two).
+constexpr int MAX_KEPT_TONES = 8;
+KeptTones keptTones[MAX_KEPT_TONES];
+int keptToneCount = 0;
+
+void keepTones(const KeptTones& k) {
+  if (keptToneCount < MAX_KEPT_TONES) keptTones[keptToneCount++] = k;
+}
+
+void invertPixel(GfxRenderer& r, const int x, const int y) { r.drawPixel(x, y, !r.readPixel(x, y)); }
+}  // namespace
+
+void clearKeptTones() { keptToneCount = 0; }
+
+void keepTonesRect(const int x, const int y, const int w, const int h) {
+  if (w > 0 && h > 0) keepTones({false, x, y, w, h});
+}
+
+void keepTonesDisc(const int cx, const int cy, const int radius) {
+  if (radius >= 0) keepTones({true, cx, cy, radius, 0});
+}
+
+void invertKeepingTones(GfxRenderer& r) {
+  r.invertScreen();
+  for (int i = 0; i < keptToneCount; i++) {
+    const KeptTones& k = keptTones[i];
+    if (k.disc) {
+      for (int dy = -k.w; dy <= k.w; dy++) {
+        const int hw = ellipseHalfWidth(k.w, k.w, dy);
+        for (int dx = -hw; dx <= hw; dx++) invertPixel(r, k.x + dx, k.y + dy);
+      }
+    } else {
+      for (int y = k.y; y < k.y + k.h; y++) {
+        for (int x = k.x; x < k.x + k.w; x++) invertPixel(r, x, y);
+      }
+    }
+  }
 }
 
 // ---- bars ---------------------------------------------------------------------------------------

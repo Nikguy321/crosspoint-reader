@@ -30,6 +30,13 @@ that pretends to be live.
 All of them are ordinary `settings.json` keys and, apart from `sleepCardLocationFix`, appear
 on the web settings page under "Sleep Screen Cards".
 
+**White on black.** Settings > Display > Sleep Screen Cover Filter = **Inverted**
+(`sleepScreenCoverFilter` 2) also turns every card, and the logo screen a card falls back to,
+white on black. The moon and the Now Reading cover keep their real tones: the lit part of the
+moon stays white inside a white ring (a new moon is a dark disc, never the white disc of a full
+moon), and the cover is never a negative. **Contrast** changes nothing on the cards (they are
+black and white already); it still applies to the picture frame.
+
 ### Locate Me
 
 A screen says what will be sent where (beaconDB, and ipwho.is for the fallback) and that the
@@ -140,8 +147,10 @@ add a line on a connect failure; they name the host, never a place or a network.
 
 - `src/sleepcards/SleepCard.h`: `CardContext` (the moment, local date, DST-aware offset
   function, 12/24 h, battery, location, a settings snapshot, the open book's path, a
-  random seed, `CardIo`), the registry, and `renderCard()` which clears the frame, runs
-  the card and adds the shared footer.
+  random seed, `CardIo`, `dark`), the registry, and `renderCard()` which clears the frame,
+  runs the card, adds the shared footer and, for a dark card, inverts the frame except the
+  areas a picture kept (`draw::keepTonesRect`/`keepTonesDisc`: `drawMoon` keeps its disc
+  inside the ring, Now Reading its cover).
 - One file pair per card: `NowReadingCard`, `DayCard`, `CalendarCard`, `QuoteCard`,
   `OwnerCard`, `SkyCard`, `ShuffleCard` (`pickShuffleCard()`; `renderCardOrShuffle()` moves on
   to the next ticked card when Shuffle's pick declines).

@@ -37,9 +37,22 @@ void fillCircleDithered(GfxRenderer& r, int cx, int cy, int radius, uint8_t leve
 // illuminated fraction 0..1; waxing = lit on the right as seen from the northern hemisphere
 // (southern = true mirrors it). Pure; the terminator is the ellipse x = (1 - 2 illum) * half-width.
 void moonLitSpan(double illum, bool waxing, bool southern, int radius, int dy, int& litLeft, int& litRight);
-// A moon as seen: lit part white, dark part dithered at darkLevel, outline ring.
+// A moon as seen: lit part white, dark part dithered at darkLevel, outline ring. Its disc inside
+// the ring keeps its tones on a dark card (keepTonesDisc).
 void drawMoon(GfxRenderer& r, int cx, int cy, int radius, double illum, bool waxing, bool southern = false,
               uint8_t darkLevel = 11);
+
+// ---- dark cards ---------------------------------------------------------------------------------
+// A dark card (CardContext::dark) is drawn as usual and then inverted whole: white on black. A
+// picture whose tones mean something - the moon (its lit part is the bright part; a new moon must
+// not read as full) and a book cover (no negatives) - registers its area while it draws and is
+// inverted back, so it shows as it is. renderCard() clears the list before each card.
+void clearKeptTones();
+void keepTonesRect(int x, int y, int w, int h);
+// The pixels of fillCircle(cx, cy, radius).
+void keepTonesDisc(int cx, int cy, int radius);
+// Invert the frame, then invert every kept area back.
+void invertKeepingTones(GfxRenderer& r);
 
 // ---- bars ---------------------------------------------------------------------------------------
 // Outline box with the first `fraction` (0..1, clamped) filled.

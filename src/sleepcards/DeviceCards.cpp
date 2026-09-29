@@ -249,6 +249,10 @@ SleepCardSettings snapshotSettings() {
 
 }  // namespace
 
+bool cardsDark() {
+  return SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE;
+}
+
 void buildDeviceContext(CardContext& ctx) {
   ctx = CardContext{};
   time_t now = 0;
@@ -268,6 +272,7 @@ void buildDeviceContext(CardContext& ctx) {
   ctx.bookPath = APP_STATE.openEpubPath.c_str();
   ctx.fromReader = APP_STATE.lastSleepFromReader;
   ctx.seed = esp_random();
+  ctx.dark = cardsDark();
   ctx.io = &deviceIo;
 }
 

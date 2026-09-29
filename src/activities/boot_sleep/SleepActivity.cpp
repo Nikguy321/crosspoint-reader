@@ -655,11 +655,11 @@ void SleepActivity::renderDefaultSleepScreen() const {
   }
 
   // Make sleep screen dark unless light is selected in settings. A card's
-  // fallback stays light, like the cards themselves.
-  if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT &&
-      !CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)) {
-    renderer.invertScreen();
-  }
+  // fallback matches the cards: light, or dark under the Inverted filter.
+  const bool dark = CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)
+                        ? BoardConfig::isX4Pro() && sleepcards::cardsDark()
+                        : SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT;
+  if (dark) renderer.invertScreen();
 
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }

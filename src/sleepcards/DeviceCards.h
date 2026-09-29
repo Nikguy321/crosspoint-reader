@@ -14,6 +14,10 @@ enum class CardOutcome : uint8_t {
   Declined,  // the card had nothing true to show; the frame is cleared: draw the logo screen
 };
 
+// The Sleep Screen Cover Filter's "Inverted": the cards, and the logo a card falls back to, are
+// white on black ("Contrast" changes nothing here: the cards are pure black and white already).
+bool cardsDark();
+
 // Fill ctx from the live device: settings, RTC, battery, the open book, the device CardIo.
 void buildDeviceContext(CardContext& ctx);
 

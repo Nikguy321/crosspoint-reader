@@ -119,6 +119,10 @@ struct CardContext {
 
   uint32_t seed = 0;  // fresh randomness for this sleep (fixed on the host)
 
+  // White on black (Sleep Screen Cover Filter = Inverted): renderCard inverts the finished card,
+  // pictures excepted (draw::invertKeepingTones). Cards draw the same either way.
+  bool dark = false;
+
   const CardIo* io = nullptr;  // never null while a card renders
 };
 
@@ -151,8 +155,9 @@ CardId cardForSleepMode(uint8_t sleepScreenMode);
 CardId cardByName(const char* name);
 const char* cardName(CardId id);
 
-// Clear the frame, run the card, and on success draw the shared footer. False = the card
-// declined; the frame is then cleared again (white) for the caller's fallback.
+// Clear the frame, run the card, and on success draw the shared footer (then invert it all when
+// ctx.dark). False = the card declined; the frame is then cleared again (white) for the
+// caller's fallback.
 bool renderCard(CardId id, const CardContext& ctx, GfxRenderer& renderer);
 
 // Shuffle (ShuffleCard.cpp): the card to show this time among the ticked ones in

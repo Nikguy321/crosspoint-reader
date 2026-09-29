@@ -172,6 +172,7 @@ bool renderNowReadingCard(const CardContext& ctx, GfxRenderer& r) {
       r.fillRect((w - coverW) / 2, y, coverW, coverH, false);  // a half-drawn cover goes; the text is centred
       y = blockTop(textH);
     } else {
+      draw::keepTonesRect((w - coverW) / 2, y, coverW, coverH);  // never a negative on a dark card
       y += coverH + COVER_GAP;
     }
   }

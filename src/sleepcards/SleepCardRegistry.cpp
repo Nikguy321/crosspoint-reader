@@ -71,12 +71,14 @@ const char* cardName(const CardId id) {
 bool renderCard(const CardId id, const CardContext& ctx, GfxRenderer& renderer) {
   const CardInfo* info = cardInfo(id);
   if (info == nullptr || info->render == nullptr || ctx.io == nullptr) return false;
+  draw::clearKeptTones();
   renderer.clearScreen();
   if (!info->render(ctx, renderer)) {
     renderer.clearScreen();
     return false;
   }
   draw::drawSleepFooter(ctx, renderer);
+  if (ctx.dark) draw::invertKeepingTones(renderer);
   return true;
 }
 
