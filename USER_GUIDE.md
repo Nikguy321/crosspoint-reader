@@ -219,7 +219,7 @@ The Settings screen allows you to configure the device's behavior. There are a f
   - "Quick resume" - The text of the last page read will be displayed on the sleep screen and a moon icon is shown on the edge of the screen. Waking up the device will return to the same page of the opened book. This is useful for quickly resuming reading without waiting for the device to fully wake up and load the book.
   - "Transparent" - A transparent overlay image drawn over the current screen; see [Sleep Screen](#37-sleep-screen) below for more information
   - X4 Pro only: "Now Reading", "Day Card", "Month Calendar", "Quote", "Owner Card", "Tonight's Sky" and "Shuffle"; see [Sleep screen cards (X4 Pro)](#sleep-screen-cards-x4-pro) below
-- **Sleep Screen Cards** (X4 Pro only, right under Sleep Screen): the cards' options - Location, Hunting Season, Season Start/End, Legal Light, Owner Name and Contacts, Quote Source, and which cards Shuffle may pick.
+- **Sleep Screen Cards** (X4 Pro only, right under Sleep Screen): the cards' options - Location (typed, or found with **Locate Me** from nearby Wi-Fi or your internet address over a saved Wi-Fi network), Hunting Season, Season Start/End, Legal Light, Owner Name and Contacts, Quote Source, and which cards Shuffle may pick.
 - **Sleep Screen Cover Mode**: How to display the book cover when "Cover" sleep screen is selected:
   
   - "Fit" (default) - Scale the image down to fit centered on the screen, padding with white borders as necessary
@@ -556,6 +556,8 @@ On the X4 Pro the Dark and Light screens show the X4 Pro mark, and the Sleep Scr
 | **Shuffle** | A different ticked card each time (Custom pictures can be one of them). |
 
 Sun, moon and planet times need **Location** (decimal degrees, latitude first, e.g. `51.48, -0.00` or `51.48 N 0.00 W`); until it is set those lines read "Set location in Settings". A card with nothing to show (no book, no clock time) falls back to the X4 Pro logo.
+
+Instead of typing the location, **Locate Me** (under Location in **Sleep Screen Cards**) finds it over a saved Wi-Fi network. Nothing is sent until you tap **Locate**. It sends up to 20 nearby Wi-Fi access points (their hardware addresses and signal strengths, never their names) to [beaconDB](https://beacondb.net); hidden networks, networks whose name ends in `_nomap` or `_optout`, and phone hotspots or other randomised addresses are left out. If that gives nothing (or nothing within 5 km), it asks [ipwho.is](https://ipwhois.io) where your internet address is, which is only city level and can be far off on a phone hotspot or a VPN. You see the place and its accuracy before choosing **Save**; the Location row then reads, for example, "From Wi-Fi, ±80 m, Sep 29". The reader restarts back to Sleep Screen Cards when you leave. Details: [docs/sleep-screen-cards.md](docs/sleep-screen-cards.md#locate-me).
 
 `/quotes.txt` is plain text: entries separated by blank lines, the attribution on its own line starting with `--` or at the end of the last line after ` -- `:
 

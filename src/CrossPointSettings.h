@@ -412,6 +412,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // personal default: the location starts unset and the owner lines empty.
   // Decimal degrees "lat,lon" (sleepcards::normalizeLocation), "" = not set.
   char sleepCardLocation[32] = "";
+  // Where that location came from: typed in, or "Locate me" (Wi-Fi / internet address) with its
+  // accuracy and date, naming the location it describes (sleepcards::LocationFix). "" = typed in.
+  char sleepCardLocationFix[48] = "";
   uint8_t huntingSeason = 0;  // sleepcards::HuntMode: Off / On / Between dates
   uint8_t huntStartMonth = 10;
   uint8_t huntStartDay = 1;

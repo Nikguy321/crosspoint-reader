@@ -1,21 +1,26 @@
 #include "SleepCardSettingsActivity.h"
 
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <I18n.h>
 #include <Logging.h>
 #include <Memory.h>
 
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <iterator>
 #include <memory>
 #include <utility>
 
 #include "CrossPointSettings.h"
+#include "LocateMeActivity.h"
 #include "MappedInputManager.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "sleepcards/CardText.h"
+#include "sleepcards/CardTime.h"
+#include "sleepcards/LocationFix.h"
 #include "sleepcards/SleepCardSettings.h"
 
 namespace fui = freeink::ui;
@@ -23,6 +28,7 @@ namespace fui = freeink::ui;
 namespace {
 enum Row : uint8_t {
   LOCATION,
+  LOCATE_ME,
   HUNTING,
   SEASON_START,
   SEASON_END,
@@ -41,10 +47,11 @@ enum Row : uint8_t {
 };
 
 const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_LOCATION,      StrId::STR_HUNTING_SEASON,      StrId::STR_SEASON_START,    StrId::STR_SEASON_END,
-    StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,          StrId::STR_OWNER_CONTACT_1, StrId::STR_OWNER_CONTACT_2,
-    StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING, StrId::STR_SHUFFLE_DAY,     StrId::STR_SHUFFLE_CALENDAR,
-    StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,       StrId::STR_SHUFFLE_SKY,     StrId::STR_SHUFFLE_PICTURES};
+    StrId::STR_LOCATION,         StrId::STR_LOCATE_ME,     StrId::STR_HUNTING_SEASON,      StrId::STR_SEASON_START,
+    StrId::STR_SEASON_END,       StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,          StrId::STR_OWNER_CONTACT_1,
+    StrId::STR_OWNER_CONTACT_2,  StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING, StrId::STR_SHUFFLE_DAY,
+    StrId::STR_SHUFFLE_CALENDAR, StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,       StrId::STR_SHUFFLE_SKY,
+    StrId::STR_SHUFFLE_PICTURES};
 
 uint8_t CrossPointSettings::* shuffleField(const int row) {
   switch (row) {
@@ -92,6 +99,27 @@ std::string locationLabel(const char* stored) {
 }
 
 void copyField(char* dest, const size_t cap, const std::string& text) { std::snprintf(dest, cap, "%s", text.c_str()); }
+
+// A location entered on this screen: a new one is recorded as typed in, today (when the clock is
+// set); one confirmed unchanged keeps the record of where it came from.
+void recordTypedLocation(const char* before) {
+  uint16_t year = 0;
+  uint8_t month = 0;
+  uint8_t day = 0;
+  time_t now = 0;
+  struct tm local{};
+  if (halClock.utcEpoch(now) && sleepcards::plausibleTime(static_cast<int64_t>(now)) && halClock.localTime(local)) {
+    year = static_cast<uint16_t>(local.tm_year + 1900);
+    month = static_cast<uint8_t>(local.tm_mon + 1);
+    day = static_cast<uint8_t>(local.tm_mday);
+  }
+  char record[sizeof(SETTINGS.sleepCardLocationFix)];
+  if (!sleepcards::recordForTypedLocation(before, SETTINGS.sleepCardLocation, SETTINGS.sleepCardLocationFix, year,
+                                          month, day, record, sizeof(record))) {
+    record[0] = '\0';
+  }
+  std::snprintf(SETTINGS.sleepCardLocationFix, sizeof(SETTINGS.sleepCardLocationFix), "%s", record);
+}
 }  // namespace
 
 SleepCardSettingsActivity::SleepCardSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -125,7 +153,12 @@ void SleepCardSettingsActivity::applyText(const int row, const std::string& text
     case LOCATION: {
       char stored[sizeof(SETTINGS.sleepCardLocation)];
       ok = sleepcards::normalizeLocation(text.c_str(), stored, sizeof(stored));
-      if (ok) copyField(SETTINGS.sleepCardLocation, sizeof(SETTINGS.sleepCardLocation), stored);
+      if (ok) {
+        char before[sizeof(SETTINGS.sleepCardLocation)];
+        std::snprintf(before, sizeof(before), "%s", SETTINGS.sleepCardLocation);
+        copyField(SETTINGS.sleepCardLocation, sizeof(SETTINGS.sleepCardLocation), stored);
+        recordTypedLocation(before);
+      }
       break;
     }
     case SEASON_START:
@@ -175,6 +208,19 @@ void SleepCardSettingsActivity::activateIndex(const int index) {
         std::snprintf(initial, sizeof(initial), "%.4f, %.4f", lat, lon);
       }
       editText(index, tr(STR_LOCATION_ENTRY), initial, 31);
+      return;
+    }
+    case LOCATE_ME: {
+      auto locate = makeUniqueNoThrow<LocateMeActivity>(renderer, mappedInput);
+      if (!locate) {
+        LOG_ERR("SCS", "OOM: LocateMeActivity");
+        return;
+      }
+      // Returns here only when no radio ran (the exit otherwise reboots back to this screen).
+      startActivityForResult(std::move(locate), [this](const ActivityResult&) {
+        invalid_[LOCATION] = false;
+        requestUpdate();
+      });
       return;
     }
     case SEASON_START:
@@ -233,6 +279,10 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   const auto textOrNotSet = [](const char* value) -> std::string { return value[0] ? value : tr(STR_NOT_SET); };
 
   rowValues_[LOCATION] = locationLabel(SETTINGS.sleepCardLocation);
+  sleepcards::formatFixLine(sleepcards::describeLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation),
+                            locationSource_, sizeof(locationSource_));
+  rowItems_[LOCATION].subtitle = locationSource_[0] != '\0' ? locationSource_ : nullptr;
+  rowValues_[LOCATE_ME].clear();
   rowValues_[HUNTING] = pick(HUNT_LABELS, std::size(HUNT_LABELS), SETTINGS.huntingSeason);
   rowValues_[SEASON_START] = monthDayLabel(SETTINGS.huntStartMonth, SETTINGS.huntStartDay);
   rowValues_[SEASON_END] = monthDayLabel(SETTINGS.huntEndMonth, SETTINGS.huntEndDay);

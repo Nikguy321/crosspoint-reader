@@ -17,6 +17,8 @@ that pretends to be live.
 | Row | Stored as | Notes |
 |---|---|---|
 | Location | `sleepCardLocation` | decimal degrees, latitude first: `51.4779, -0.0015`, `51.48 N 0.00 W`. Empty = not set; sun and moon times then read "Set location in Settings" (the moon's phase needs no place). |
+| (under Location) | `sleepCardLocationFix` | where the location came from, shown as the Location row's second line ("From Wi-Fi, ±80 m, Sep 29", "From internet address, city level, Sep 29", "Typed in, Sep 29"). Stored as `wifi 80 2026-09-29 47.6205,-122.3493` (source, accuracy in m, date saved, the location it describes): a location changed anywhere else reads as typed in, and one confirmed unchanged on the keyboard keeps its record. An internal key: saved in `settings.json` but not shown on the web settings page. |
+| Locate Me | - | finds the location from the internet; see below |
 | Hunting Season | `huntingSeason` | Off / On / Between Dates |
 | Season Start / End | `huntStartMonth` `huntStartDay` `huntEndMonth` `huntEndDay` | typed as month-day (`10-01`); a season may run past New Year |
 | Legal Light | `legalLightRule` | sunrise - 30 min .. sunset + 30 min, or civil twilight; always rounded inward to the minute |
@@ -24,8 +26,60 @@ that pretends to be live.
 | Quote Source | `quoteSource` | `/quotes.txt` on the card, the open book's bookmarks, or both |
 | Shuffle: ... | `shuffleNowReading` ... `shufflePictures` | default on: Now Reading, Day, Calendar, Quote, Sky |
 
-All of them are ordinary `settings.json` keys (and appear on the web settings page under
-"Sleep Screen Cards").
+All of them are ordinary `settings.json` keys and, apart from `sleepCardLocationFix`, appear
+on the web settings page under "Sleep Screen Cards".
+
+### Locate Me
+
+A screen says what will be sent where (beaconDB, and ipwho.is for the fallback) and that the
+reader restarts afterwards, before anything leaves the reader; nothing is sent without the
+Locate tap, and nothing runs in the background.
+
+1. **Join** a saved Wi-Fi network through `WifiSelectionActivity`'s auto-connect (the last
+   network, then any saved one in range; the network list only when none is). Every radio start
+   goes through `RadioPower` (full clock, no light sleep while it is up).
+2. **Scan** (a blocking station scan on the joined radio) and send up to 20 access points, the
+   strongest first, to [beaconDB](https://beacondb.net) (`POST https://api.beacondb.net/v1/geolocate`,
+   the MLS / Ichnaea geolocate API, `considerIp:false`, a `CrossPoint-X4Pro/<version>` user agent
+   as beaconDB asks). Hidden networks, SSIDs ending in `_nomap` or `_optout`, and locally
+   administered (randomised / hotspot) or group BSSIDs are never sent; fewer than two left means
+   no Wi-Fi lookup. beaconDB keeps no record of the access points queried or the location
+   returned ([privacy notice](https://beacondb.net/privacy/)); its web logs (with the IP address)
+   go after 28 days.
+3. **Fall back** to the internet address when beaconDB fails, has too few access points, or
+   answers vaguer than 5 km: [ipwho.is](https://ipwhois.io/docs) (`GET https://ipwho.is/?fields=...`,
+   free, no key, HTTPS, commercial use allowed, 1,000 requests a day per address). It gives a
+   city and region but no accuracy, so it is shown as "city level", never as a distance: on a
+   phone hotspot or a VPN the address belongs to the carrier's or the VPN's city, which can be
+   100 km or more away, and the result screen says so.
+4. **Result**: the place ("Seattle, Washington" with its coordinates, or "Near 47.62, -122.35" for
+   a Wi-Fi fix) and how sure it is ("About 80 m, from Wi-Fi" / "City level, from your internet
+   address"). **Save** stores the location in the usual `sleepCardLocation` form (the same check a
+   typed entry passes) and the source record above; **Cancel** changes nothing.
+5. **Failures** (`geolocate::classifyFailure`, host-tested): "No saved Wi-Fi in range" (the
+   network list was left without joining); "Couldn't reach the location service" (neither
+   service was heard from: the network may not reach the internet, e.g. a sync peer's or a
+   hub's hotspot - **Choose Wi-Fi Network** opens the list and tries again on the one picked);
+   "Not enough Wi-Fi networks nearby" (the internet works, fewer than two access points);
+   "No location found" (the services answered without a location); "Not enough memory".
+6. After the lookups the RF is stopped (`RadioPower::stop()`) for the result screen, or the radio
+   is turned fully off (`RadioPower::off()`) on a failure. Leaving reboots back to Sleep Screen
+   Cards (over Settings) like every network activity, and the Location row shows the new line.
+   The lookup logs only `located: wifi|ip, accuracy N m`, the scan's network count and, on a
+   failed connect, the error class (DNS, TCP, TLS, certificate flags). The dev build's Wi-Fi join
+   (`WifiSelectionActivity`, every network activity) additionally logs the joined network's name
+   and BSSID at debug level, and the last lines of the log are kept in `/crash_report.txt` after
+   a panic; the release build (`LOG_LEVEL=1`) logs neither.
+
+Both requests use `esp_http_client` with the framework's certificate bundle
+(`esp_crt_bundle_attach`): the chain and the host name are verified. The fork's wolfSSL client
+is not used here because it has no CA bundle and checks no host name. The client is compiled
+for the X4 Pro only (`FREEINK_DEVICE_X4PRO`), so the other boards link no TLS stack or bundle
+for it. Limits: 10 s for the connect and for each blocking handshake read, 15 s from the
+connect for the rest of the request, a 4 KB response cap, and the request is not started below
+56 KB of free internal RAM (mbedTLS's record buffers live there). DNS comes before those
+timeouts, so on a network that does not reach the internet one request can take ~30 s and the
+two about a minute; the buttons wait meanwhile, and the screen says it can take up to a minute.
 
 ## How a card is built
 

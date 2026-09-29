@@ -10,6 +10,8 @@
 void silentRestart();            // home screen
 void silentRestartToReader();    // currently-open EPUB (APP_STATE.openEpubPath)
 void silentRestartToSettings();  // settings screen
+// Settings > Display > Sleep Screen Cards, over Settings (Back returns there). Locate Me's exit.
+void silentRestartToSleepCards();
 
 // Reboots immediately after an activity releases exclusive raw storage. The
 // RTC target ensures setup() lands on Home instead of resuming a reader.

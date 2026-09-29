@@ -14,6 +14,7 @@
 #include "ReaderFontSizes.h"
 #include "SettingsList.h"
 #include "fontIds.h"
+#include "sleepcards/LocationFix.h"
 
 namespace {
 
@@ -99,6 +100,11 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   // Dictionary folder name — uses dynamic getter/setter in SettingsList, save manually
   if (dictionaryName[0] != '\0') {
     doc["dictionaryName"] = dictionaryName;
+  }
+  // Where the sleep-card location came from (Locate Me): an internal record, kept off the web
+  // settings page, so not in SettingsList.
+  if (sleepCardLocationFix[0] != '\0') {
+    doc["sleepCardLocationFix"] = sleepCardLocationFix;
   }
 
   // Language -- managed by LanguageSelectActivity, not in SettingsList.
@@ -248,6 +254,11 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
   }
   // Dictionary folder name — uses dynamic getter/setter in SettingsList, load manually
   copyToField(dictionaryName, doc["dictionaryName"] | "", sizeof(dictionaryName));
+  // A record that does not read back is dropped: the Location row then shows "Typed in".
+  if (!sleepcards::normalizeLocationFix(doc["sleepCardLocationFix"] | "", sleepCardLocationFix,
+                                        sizeof(sleepCardLocationFix))) {
+    sleepCardLocationFix[0] = '\0';
+  }
 
   // Language -- stored as code string for stability across enum reorders.
   if (doc["language"].is<const char*>()) {

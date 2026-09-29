@@ -89,6 +89,8 @@ class ActivityManager {
   void goToFileTransfer();
   void goToUsbDrive();
   void goToSettings();
+  // Settings with Sleep Screen Cards open over it (X4 Pro).
+  void goToSleepCardSettings();
   void goToFileBrowser(std::string path = {});
   void goToLibrary();
   void goToBrowser();

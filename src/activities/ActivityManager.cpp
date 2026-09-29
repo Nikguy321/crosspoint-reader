@@ -25,6 +25,7 @@
 #include "reader/ReaderActivity.h"
 #include "settings/OpdsServerListActivity.h"
 #include "settings/SettingsActivity.h"
+#include "settings/SleepCardSettingsActivity.h"
 #include "util/BmpViewerActivity.h"
 #include "util/FrontlightPanelActivity.h"
 #include "util/FullScreenMessageActivity.h"
@@ -268,6 +269,19 @@ void ActivityManager::goToUsbDrive() {
 }
 
 void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
+
+void ActivityManager::goToSleepCardSettings() {
+  goToSettings();
+  // Settings must already be current (the boot route, with no activity yet) for the push to land
+  // over it; a deferred replace would be clobbered by the push.
+  if (pendingActivity) return;
+  auto cards = makeUniqueNoThrow<SleepCardSettingsActivity>(renderer, mappedInput);
+  if (!cards) {
+    LOG_ERR("ACT", "OOM: SleepCardSettingsActivity");
+    return;  // Settings alone
+  }
+  pushActivity(std::move(cards));
+}
 
 void ActivityManager::goToFileBrowser(std::string path) {
   replaceActivity(std::make_unique<FileBrowserActivity>(renderer, mappedInput, std::move(path)));

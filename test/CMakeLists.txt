@@ -88,6 +88,8 @@ add_subdirectory(sleep_card_quote)
 add_subdirectory(sleep_card_owner)
 add_subdirectory(sleep_card_sky)
 add_subdirectory(sleep_card_shuffle)
+add_subdirectory(sleep_card_location)
+add_subdirectory(geolocate)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)
