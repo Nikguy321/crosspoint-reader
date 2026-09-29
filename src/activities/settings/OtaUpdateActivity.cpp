@@ -10,6 +10,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/OtaUpdater.h"
+#include "network/RadioPower.h"
 
 void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
@@ -35,6 +36,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
       RenderLock lock(*this);
       state = NO_UPDATE;
     }
+    RadioPower::stop();  // the result screen needs no radio
     return;
   }
   if (res != OtaUpdater::OK) {
@@ -43,6 +45,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
       RenderLock lock(*this);
       state = FAILED;
     }
+    RadioPower::stop();  // the result screen needs no radio
     return;
   }
 
@@ -52,6 +55,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
       RenderLock lock(*this);
       state = NO_UPDATE;
     }
+    RadioPower::stop();  // the result screen needs no radio
     return;
   }
 
@@ -77,7 +81,7 @@ void OtaUpdateActivity::onEnter() {
 
   // Turn on WiFi immediately
   LOG_DBG("OTA", "Turning on WiFi...");
-  WiFi.mode(WIFI_STA);
+  RadioPower::mode(WIFI_STA);
 
   // Launch WiFi selection subactivity
   LOG_DBG("OTA", "Launching WifiSelectionActivity...");
@@ -92,7 +96,7 @@ void OtaUpdateActivity::onExit() {
   // (loop() above) so the new firmware boots normally. Back-out paths land
   // here with wifi still active; silent-restart to free the LWIP/mbedTLS
   // fragmentation, same as the other wifi activities.
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot()) {
     WiFi.disconnect(false);
     delay(30);
     silentRestart();
@@ -195,6 +199,7 @@ void OtaUpdateActivity::runUpdateInstall() {
       failedDetail = res == OtaUpdater::WRONG_DEVICE_ERROR ? tr(STR_FIRMWARE_WRONG_DEVICE) : nullptr;
       state = FAILED;
     }
+    RadioPower::stop();  // the result screen needs no radio
     requestUpdate();
     return;
   }

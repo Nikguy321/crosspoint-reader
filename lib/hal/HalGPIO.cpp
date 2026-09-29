@@ -172,11 +172,40 @@ bool HalGPIO::wasAnyReleased() const { return inputMgr.wasAnyReleased(); }
 
 bool HalGPIO::rawInputActive() {
   if (inputMgr.isPowerButtonPhysicallyPressed()) return true;
+  // Digital keys (X4 Pro page keys GPIO0/GPIO7), active-LOW with INPUT_PULLUP:
+  // the pins InputManager::getState() reads for this input style. On the
+  // ADC-ladder boards the input fields are ladder indices, not pins (4 and 5
+  // there are the display's DC and RST lines), so none is read.
+  const auto& in = BoardConfig::ACTIVE.input;
+  const auto style = BoardConfig::ACTIVE.inputStyle;
+  if (style != BoardConfig::InputStyle::XteinkAdcLadder) {
+    const bool pageKeysOnly = style == BoardConfig::InputStyle::OnePageAdcLadder;
+    const bool backConfirm = !pageKeysOnly && style != BoardConfig::InputStyle::DigitalConfirmBackHold &&
+                             style != BoardConfig::InputStyle::DigitalConfirmPowerHold;
+    const int8_t pins[] = {backConfirm ? in.back : int8_t{-1},
+                           backConfirm ? in.confirm : int8_t{-1},
+                           pageKeysOnly ? int8_t{-1} : in.left,
+                           pageKeysOnly ? int8_t{-1} : in.right,
+                           in.up,
+                           in.down};
+    for (const int8_t pin : pins) {
+      if (pin >= 0 && digitalRead(pin) == LOW) return true;
+    }
+  }
   InputManager::ButtonAdcSample g1{}, g2{};
   inputMgr.readButtonAdc(g1, g2);
   // The Xteink ladder idles at the ADC full-scale rail (~4095); every button band sits below 3900.
   constexpr int kIdleRailMin = 4000;
   return (g1.raw >= 0 && g1.raw < kIdleRailMin) || (g2.raw >= 0 && g2.raw < kIdleRailMin);
+}
+
+bool HalGPIO::isDebouncePending() const { return inputMgr.isDebouncePending(); }
+
+bool HalGPIO::touchActive() const {
+#if CROSSPOINT_BENCH_CONSOLE
+  if (benchInjectionBusy()) return true;
+#endif
+  return inputMgr.isTouchPressed();
 }
 
 unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }

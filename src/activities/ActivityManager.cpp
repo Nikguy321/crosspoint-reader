@@ -65,16 +65,21 @@ void ActivityManager::renderTaskTrampoline(void* param) {
 void ActivityManager::renderTaskLoop() {
   while (true) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    // Taken but not drawn: the idle loop may hold the RenderLock this waits on,
+    // and must not light-sleep on top of it (renderQueued()).
+    renderTaken.store(true);
     // Acquire the lock before reading currentActivity to avoid a TOCTOU race
     // where the main task deletes the activity between the null-check and render().
     RenderLock lock;
     if (currentActivity) {
       HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
+      renders.fetch_add(1);
       // Night mode is a global output polarity applied to every activity.
       // The sleep screen forces normal polarity itself (SleepActivity).
       display.setInverted(SETTINGS.screenInverted != 0);
       currentActivity->render(std::move(lock));
     }
+    renderTaken.store(false);
     // Notify any task blocked in requestUpdateAndWait() that the render is done.
     TaskHandle_t waiter = nullptr;
     taskENTER_CRITICAL(&activityManagerSpinlock);
@@ -390,6 +395,11 @@ bool ActivityManager::benchRenderIdle() const {
   return !RenderLock::peek();
 }
 #endif
+
+bool ActivityManager::renderQueued() const {
+  if (requestedUpdate.load() || renderTaken.load() || pendingAction != PendingAction::None) return true;
+  return renderTaskHandle && ulTaskNotifyValueClear(renderTaskHandle, 0) != 0;
+}
 
 bool ActivityManager::handleForcedRefresh() { return currentActivity && currentActivity->handleForcedRefresh(); }
 

@@ -74,8 +74,8 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
 
   // Tracks whether this session activated WiFi. Set in onEnter past the credentials
   // check; checked in onExit to decide whether to silent-reboot. Can't rely on
-  // WiFi.getMode() because performUpload() calls esp_wifi_stop() on the way out,
-  // which makes WiFi.getMode() return WIFI_MODE_NULL.
+  // WiFi.getMode() alone: performUpload() stops the RF (RadioPower::stop()) on the way out, and
+  // whether the mode still reads on after that is the Arduino core's business, not this rule's.
   bool wifiActivated = false;
 
   void onWifiSelectionComplete(bool success);

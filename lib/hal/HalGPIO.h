@@ -89,9 +89,15 @@ class HalGPIO {
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
   // True when any button contact is closed right now, read straight from the
-  // hardware (ADC ladder off its idle rail, or the power GPIO asserted), without
-  // going through the debounced state. Cheap enough to call every few ms.
+  // hardware (ADC ladder off its idle rail, a digital key or the power GPIO
+  // asserted), without going through the debounced state. Cheap enough to call
+  // every few ms.
   bool rawInputActive();
+  // A raw key sample differs from the committed state (a press or release is
+  // still inside the debounce window): the next poll must come quickly.
+  bool isDebouncePending() const;
+  // A touch contact is down (or a bench-injected one is playing).
+  bool touchActive() const;
   bool hasTouch() const;
   // Capacitive Home key reported by the touch controller (X4 Pro). The tap
   // event fires on release and excludes a long hold.
@@ -135,6 +141,8 @@ class HalGPIO {
 
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;
+  // isUsbConnected() as the last update() read it (no second read).
+  bool usbConnectedAtUpdate() const { return lastUsbConnected; }
 
   // Timer: the auto power-off timer armed by HalPowerManager::startDeepSleep();
   // setup() normally cuts the rail before this is ever asked.

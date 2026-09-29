@@ -22,6 +22,7 @@
 #include "components/icons/search32.h"
 #include "fontIds.h"
 #include "network/HttpDownloader.h"
+#include "network/RadioPower.h"
 #include "util/BookCacheUtils.h"
 #include "util/OpdsFilename.h"
 #include "util/StringUtils.h"
@@ -75,7 +76,7 @@ void OpdsBookBrowserActivity::onExit() {
   entries.clear();
   navigationHistory.clear();
 
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot()) {
     WiFi.disconnect(false);
     delay(30);
     silentRestart();

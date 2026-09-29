@@ -16,6 +16,7 @@
 #include "activities/network/CalibreConnectActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 #include "util/QrUtils.h"
 #include "util/TaskWatchdog.h"
 
@@ -107,7 +108,7 @@ void CrossPointWebServerActivity::onExit() {
   MDNS.end();
 
   // Skip reboot if WiFi was never activated (e.g. user backed out of mode selection).
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot()) {
     if (isApMode) {
       WiFi.softAPdisconnect(true);
     } else {
@@ -163,7 +164,7 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
   if (mode == NetworkMode::JOIN_NETWORK) {
     // STA mode - launch WiFi selection
     LOG_DBG("WEBACT", "Turning on WiFi (STA mode)...");
-    WiFi.mode(WIFI_STA);
+    RadioPower::mode(WIFI_STA);
 
     state = WebServerActivityState::WIFI_SELECTION;
     LOG_DBG("WEBACT", "Launching WifiSelectionActivity...");
@@ -197,7 +198,9 @@ void CrossPointWebServerActivity::onWifiSelectionComplete(const bool connected) 
     // Start the web server
     startWebServer();
   } else {
-    // User cancelled - go back to mode selection
+    // User cancelled - go back to mode selection. The radio stays as the
+    // selection left it: a Hotspot pick switches the same driver to AP, and
+    // leaving reboots (a WIFI_OFF here would re-initialise the driver in one boot).
     state = WebServerActivityState::MODE_SELECTION;
 
     startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
@@ -216,16 +219,16 @@ void CrossPointWebServerActivity::startAccessPoint() {
   LOG_DBG("WEBACT", "Free heap before AP start: %d bytes", ESP.getFreeHeap());
 
   // Configure and start the AP
-  WiFi.mode(WIFI_AP);
+  RadioPower::mode(WIFI_AP);
   delay(100);
 
   // Start soft AP
   bool apStarted;
   if (AP_PASSWORD && strlen(AP_PASSWORD) >= 8) {
-    apStarted = WiFi.softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, false, AP_MAX_CONNECTIONS);
+    apStarted = RadioPower::softAP(AP_SSID, AP_PASSWORD, AP_CHANNEL, false, AP_MAX_CONNECTIONS);
   } else {
     // Open network (no password)
-    apStarted = WiFi.softAP(AP_SSID, nullptr, AP_CHANNEL, false, AP_MAX_CONNECTIONS);
+    apStarted = RadioPower::softAP(AP_SSID, nullptr, AP_CHANNEL, false, AP_MAX_CONNECTIONS);
   }
 
   if (!apStarted) {

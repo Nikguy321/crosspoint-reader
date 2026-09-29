@@ -66,6 +66,11 @@ class ActivityManager {
   // This variable must only be set by the main loop, to avoid race conditions
   std::atomic<bool> requestedUpdate{false};
 
+  // Renders run since boot (the power ledger's rnd=).
+  std::atomic<uint32_t> renders{0};
+  // The render task took a notification and has not finished that render.
+  std::atomic<bool> renderTaken{false};
+
  public:
   explicit ActivityManager(GfxRenderer& renderer, MappedInputManager& mappedInput)
       : renderer(renderer), mappedInput(mappedInput), renderingMutex(xSemaphoreCreateMutex()) {
@@ -107,6 +112,10 @@ class ActivityManager {
   bool handleForcedRefresh();
   bool skipLoopDelay() const;
   ScreenshotInfo getScreenshotInfo() const;
+  uint32_t renderCount() const { return renders.load(); }
+  // A render is requested, queued for or in the hands of the render task, or a
+  // switch is pending (the idle loop must not light-sleep on top of it).
+  bool renderQueued() const;
 
   // If immediate is true, the update will be triggered immediately.
   // Otherwise, it will be deferred until the end of the current loop iteration.

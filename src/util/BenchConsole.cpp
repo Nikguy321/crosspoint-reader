@@ -344,6 +344,16 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
   reply("STATE sleep_ms=%lu sleep_left=%ld held=%s orient=%s w=%d h=%d inv=%d exclusive=%d", timeoutMs, left, held,
         orientationName(renderer.getOrientation()), renderer.getScreenWidth(), renderer.getScreenHeight(),
         display.isInverted() ? 1 : 0, exclusive ? 1 : 0);
+  // Idle light sleep since boot: ls = enabled (LS on|off), lsn = sleeps,
+  // lsw = sleeps ended by a key or STAT (the rest end on the 50 ms timer),
+  // lsms = time asleep, lsblk = why the last idle pass did not sleep (always
+  // "host" while this console is attached), mhz = CPU clock now, radio = the
+  // radio lock or Wi-Fi is up.
+  reply("STATE ls=%d lsn=%lu lsw=%lu lsms=%llu lsblk=%s mhz=%lu radio=%d", powerManager.lightSleepEnabled() ? 1 : 0,
+        static_cast<unsigned long>(powerManager.lightSleepCount()),
+        static_cast<unsigned long>(powerManager.lightSleepGpioWakes()),
+        static_cast<unsigned long long>(powerManager.lightSleepMicros() / 1000ULL), powerManager.lightSleepBlockName(),
+        static_cast<unsigned long>(getCpuFrequencyMhz()), powerManager.radioActive() ? 1 : 0);
   reply("OK STATE");
 }
 
@@ -524,7 +534,23 @@ void emitShot(const bool settled) {
   reply("OK SHOT");
 }
 
+// LS on|off: idle light sleep for A/B runs, in RAM until the next boot (a
+// deep-sleep wake is a boot: it comes back on). Any other LS argument is a path.
+bool cmdLightSleep(const char* args) {
+  bool on = false;
+  if (strcmp(args, "on") == 0) {
+    on = true;
+  } else if (strcmp(args, "off") != 0) {
+    return false;
+  }
+  powerManager.setLightSleepEnabled(on);
+  LOG_INF("BENCH", "Idle light sleep %s", on ? "on" : "off");
+  reply("OK LS lightsleep=%s", on ? "on" : "off");
+  return true;
+}
+
 void cmdLs(char* args, const bool exclusive) {
+  if (cmdLightSleep(args)) return;
   static char root[] = "/";
   char* path = *args ? args : root;
   bench::trimTrailingSlashes(path);

@@ -14,6 +14,7 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 
 void ClockSyncActivity::onEnter() {
   Activity::onEnter();
@@ -32,7 +33,7 @@ void ClockSyncActivity::onEnter() {
 void ClockSyncActivity::onExit() {
   Activity::onExit();
 
-  if (shouldTearDownWifiOnExit && WiFi.getMode() != WIFI_MODE_NULL) {
+  if (shouldTearDownWifiOnExit && (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot())) {
     WiFi.disconnect(false);
     delay(30);
     silentRestart();
@@ -90,6 +91,8 @@ void ClockSyncActivity::loop() {
     // requestUpdateAndWait below forces the render before we block on WiFi.
     requestUpdateAndWait();
     runSync();
+    // The result screen needs no radio; a session this activity started ends here.
+    if (shouldTearDownWifiOnExit) RadioPower::stop();
     return;
   }
 

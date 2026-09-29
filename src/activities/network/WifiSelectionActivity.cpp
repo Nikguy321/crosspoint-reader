@@ -15,6 +15,7 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 
 namespace fui = freeink::ui;
 
@@ -189,12 +190,12 @@ void WifiSelectionActivity::startWifiScan(const bool autoScan) {
   requestUpdate();
 
   // Set WiFi mode to station
-  WiFi.mode(WIFI_STA);
+  RadioPower::mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
 
   // Start async scan
-  WiFi.scanNetworks(true);  // true = async scan
+  RadioPower::scanNetworks(true);  // true = async scan
 }
 
 void WifiSelectionActivity::processWifiScanResults() {
@@ -467,7 +468,7 @@ void WifiSelectionActivity::attemptConnection() {
   requestUpdate();
 
   WiFi.persistent(false);  // Credentials are managed by WifiCredentialStore; suppress SDK NVS auto-connect
-  WiFi.mode(WIFI_STA);
+  RadioPower::mode(WIFI_STA);
   WiFi.disconnect(true, true);  // Abort any in-progress SDK auto-connect and clear NVS-saved SSID
   delay(100);
 
@@ -489,9 +490,9 @@ void WifiSelectionActivity::attemptConnection() {
   }
 
   if (selectedRequiresPassword && !enteredPassword.empty()) {
-    WiFi.begin(selectedSSID.c_str(), enteredPassword.c_str());
+    RadioPower::begin(selectedSSID.c_str(), enteredPassword.c_str());
   } else {
-    WiFi.begin(selectedSSID.c_str());
+    RadioPower::begin(selectedSSID.c_str());
   }
 }
 

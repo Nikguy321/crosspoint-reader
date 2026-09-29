@@ -16,6 +16,7 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py push ~/books /Books  # add-only
   scripts/x4bench.py open "/Books/My Book.epub"
   scripts/x4bench.py card day --shot /tmp/day.png   # sleep card preview
+  scripts/x4bench.py lightsleep off       # A/B power run (RAM, until the next boot)
   scripts/x4bench.py sleep                # end of a bench session
 
 Protocol (proto=1)
@@ -39,7 +40,19 @@ Verbs
                               0 ignore 1 sleep 2 page turn ...), dblclick
                               (power double-click = frontlight), sleep_ms
                               sleep_left held (why auto-sleep waits: host,
-                              activity, never, usbdrive, none), orient w h inv
+                              activity, never, usbdrive, none), orient w h inv,
+                              ls (idle light sleep on) lsn lsms (naps and time
+                              asleep since boot) lsw (naps ended by a key or
+                              the charger line, not the 50 ms timer) lsblk (why
+                              the last idle pass did not nap: host while this
+                              cable is attached, radio, light, charging, input,
+                              lock, postwake, render, activity, refused, off)
+                              mhz radio (radio initialised: full clock)
+  LS on|off                idle light sleep on or off until the next boot (a
+                           deep-sleep wake is a boot: it comes back on);
+                           OK LS lightsleep=on|off. For A/B power runs: the
+                           naps only happen with no computer on the cable, so
+                           read the result from /sleep.log's pwr lines.
   KEY <name> [holdMs] [force]
                            OK KEY <name> req=<ms> held=<delivered ms> [late=1]
                            after the release. late=1: the main loop was
@@ -651,6 +664,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("name", help="now_reading day calendar quote owner sky pictures shuffle default")
     s.add_argument("--shot", help="also save a screenshot of it here (PNG)")
     sub.add_parser("awake")
+    s = sub.add_parser("lightsleep", help="idle light sleep on|off until the next boot")
+    s.add_argument("state", choices=("on", "off"))
     sub.add_parser("sleep")
     s = sub.add_parser("cmd", help="raw passthrough: prints every console line")
     s.add_argument("text", nargs=argparse.REMAINDER)
@@ -730,6 +745,9 @@ def run(args, link: Link, out=sys.stdout) -> int:
     elif op == "awake":
         link.command("AWAKE", t or 5)
         print("awake", file=out)
+    elif op == "lightsleep":
+        rest, _ = link.command(f"LS {args.state}", t or 5)
+        print(rest, file=out)
     elif op == "sleep":
         link.command("SLEEP", t or 5)
         print("sleeping (press Power to wake)", file=out)

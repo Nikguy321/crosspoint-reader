@@ -11,6 +11,7 @@
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
@@ -55,7 +56,7 @@ void CalibreConnectActivity::onExit() {
 
   MDNS.end();
 
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot()) {
     WiFi.disconnect(false);
     delay(30);
     silentRestart();

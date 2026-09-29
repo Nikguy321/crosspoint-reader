@@ -12,9 +12,11 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 
 void KOReaderAuthActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
+    RadioPower::stop();  // the selection's scan left it up
     {
       RenderLock lock(*this);
       state = FAILED;
@@ -51,6 +53,8 @@ void KOReaderAuthActivity::performAuthentication() {
           result == KOReaderSyncClient::USER_EXISTS ? tr(STR_USERNAME_TAKEN) : KOReaderSyncClient::errorString(result);
     }
   }
+  // The result screen needs no radio; exit restarts as before.
+  RadioPower::stop();
   requestUpdate();
 }
 
@@ -71,7 +75,7 @@ void KOReaderAuthActivity::onEnter() {
 void KOReaderAuthActivity::onExit() {
   Activity::onExit();
 
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
+  if (WiFi.getMode() != WIFI_MODE_NULL || RadioPower::ranThisBoot()) {
     WiFi.disconnect(false);
     delay(30);
     silentRestart();

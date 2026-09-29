@@ -23,6 +23,7 @@
 #include "WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 
 void WifiSelectionActivity::setPatientWindowMs(const uint32_t windowMs) { patience.arm(windowMs, millis()); }
 
@@ -102,10 +103,10 @@ bool WifiSelectionActivity::patientLoop() {
     autoAttemptedSsids.clear();
     autoConnecting = true;
     manualNetworkListRequested = false;
-    WiFi.mode(WIFI_STA);
+    RadioPower::mode(WIFI_STA);
     WiFi.disconnect();
     delay(100);
-    WiFi.scanNetworks(true);
+    RadioPower::scanNetworks(true);
   }
   return true;
 }

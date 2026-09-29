@@ -49,6 +49,7 @@ class FakeDevice(threading.Thread):
         self.puts = []
         self.keys = []
         self.cards = []
+        self.lightsleep = "on"
         self.fb = b""
         self.shot = {}
         self.stop = False
@@ -150,6 +151,9 @@ class FakeDevice(threading.Thread):
         elif verb == "MKDIR":
             self.dirs.add(rest)
             self.emit(f"OK MKDIR created {rest}")
+        elif verb == "LS" and rest in ("on", "off"):
+            self.lightsleep = rest
+            self.emit(f"OK LS lightsleep={rest}")
         elif verb == "LS":
             base = rest.rstrip("/")
             names = sorted(p for p in self.files if p.rsplit("/", 1)[0] == base)
@@ -323,6 +327,20 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(self.dev.cards, ["day", "default"])
         code, _ = self.cli("card", "bogus")
         self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_lightsleep_toggles_and_ls_still_lists(self):
+        self.ser.close()
+        code, out = self.cli("lightsleep", "off")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out, "lightsleep=off\n")
+        self.assertEqual(self.dev.lightsleep, "off")
+        code, out = self.cli("lightsleep", "on")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(self.dev.lightsleep, "on")
+        self.dev.files["/Books/a.epub"] = b"x"
+        code, out = self.cli("ls", "/Books")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("a.epub", out)
 
     def test_no_port_exit_code(self):
         sock = socket.socket()

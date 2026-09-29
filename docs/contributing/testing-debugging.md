@@ -60,6 +60,17 @@ python3 scripts/x4bench.py sleep
 - `python3 scripts/x4bench.py card <name> --shot /tmp/card.png` shows a sleep-screen card
   exactly as the sleep screen draws it, without sleeping, and screenshots it; the next key
   or tap returns. See [Sleep screen cards](../sleep-screen-cards.md).
+- X4 Pro idle light sleep: the reader naps in 50 ms slices between page turns, but never
+  while a computer is attached, so the bench cannot watch it live. `state` reports
+  `ls lsn lsw lsms lsblk` (naps since boot, naps ended by a key or the charger line,
+  and why the last idle pass did not nap: `host` while the cable is in); `/sleep.log`
+  gets a `pwr` line every 5 min while awake (`src/util/PowerLedger.h`).
+  `python3 scripts/x4bench.py lightsleep off|on` switches the naps for an A/B run until
+  the next boot. The design and its guards: [Awake power](../awake-power.md).
+- `python3 scripts/check_radio_power.py` (also a ctest, `check_radio_power`) fails if a
+  radio start appears outside `src/network/RadioPower.cpp`, which holds the full CPU
+  clock from before a radio starts until it is off, or if a clock change or light sleep
+  appears outside `lib/hal/HalPowerManager.cpp`.
 
 ## Useful bug report contents
 

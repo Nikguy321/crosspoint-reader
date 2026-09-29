@@ -17,6 +17,7 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <PowerManager.h>
+#include <PowerPolicy.h>
 #include <SPI.h>
 #include <VectorFontSupport.h>
 #include <WiFi.h>
@@ -39,12 +40,14 @@
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 #include "platform/UsbSerialJtagHandoff.h"
 #include "util/AutoPowerOff.h"
 #include "util/BenchConsole.h"
 #include "util/BookSyncHooks.h"
 #include "util/ButtonNavigator.h"
 #include "util/PowerButtonTiming.h"
+#include "util/PowerLedger.h"
 #include "util/ScreenshotUtil.h"
 #include "util/SleepLedger.h"
 #include "util/Timezones.h"
@@ -280,7 +283,16 @@ constexpr uint32_t RAIL_CUT_MAGIC = 0x52414943;  // 'RAIC'
 // Append one line to the sleep ledger on the card (format: util/SleepLedger.h).
 // Best effort: a card that is not mounted or refuses the write costs nothing,
 // and it must never keep the device awake.
+static void appendLedgerLine(const char* line, const size_t len) {
+  if (len == 0 || !Storage.ready()) return;
+  HalFile f = Storage.open(sleep_ledger::PATH, O_WRONLY | O_CREAT | O_APPEND);
+  if (f) f.write(line, len);
+}
+
 static void sleepLedger(const char* event, const int extra) {
+  // The boot's wake cause, taken on the first (boot) line: idle light sleeps
+  // overwrite esp_sleep_get_wakeup_cause() later on.
+  static const int bootWakeCause = static_cast<int>(esp_sleep_get_wakeup_cause());
   if (!Storage.ready()) return;
   sleep_ledger::Entry e;
   time_t now = 0;
@@ -288,15 +300,49 @@ static void sleepLedger(const char* event, const int extra) {
   e.event = event;
   e.uptimeS = static_cast<uint32_t>(millis() / 1000UL);
   e.resetReason = static_cast<int>(esp_reset_reason());
-  e.wakeCause = static_cast<int>(esp_sleep_get_wakeup_cause());
+  e.wakeCause = bootWakeCause;
   e.extra = extra;
   e.socPercent = powerManager.getBatteryPercentage();
   e.millivolts = powerManager.getBatteryMillivolts();
   char line[sleep_ledger::LINE_CAP];
-  const size_t len = sleep_ledger::formatLine(line, sizeof line, e);
-  if (len == 0) return;
-  HalFile f = Storage.open(sleep_ledger::PATH, O_WRONLY | O_CREAT | O_APPEND);
-  if (f) f.write(line, len);
+  appendLedgerLine(line, sleep_ledger::formatLine(line, sizeof line, e));
+}
+
+// Every power_ledger::WINDOW_MS while awake (not in USB Drive): one "pwr" line
+// with what the window cost and what kept the chip awake (util/PowerLedger.h).
+static void powerLedgerTick(const bool usbHost) {
+  static uint32_t windowStartMs = millis();
+  static uint32_t rendersAtStart = 0;
+  static uint32_t sleepsAtStart = 0;
+  static uint64_t sleptUsAtStart = 0;
+  static power_ledger::WindowLatch latch;
+  latch.note((Frontlight.present() && Frontlight.isOn()) ? Frontlight.brightness() : 0, powerManager.radioActive(),
+             gpio.usbConnectedAtUpdate(), usbHost);
+  const uint32_t now = millis();
+  const uint32_t windowMs = now - windowStartMs;
+  if (windowMs < power_ledger::WINDOW_MS) return;
+
+  power_ledger::Window w;
+  time_t unixNow = 0;
+  if (halClock.utcEpoch(unixNow)) w.unixTime = static_cast<uint32_t>(unixNow);
+  w.uptimeS = now / 1000UL;
+  w.socPercent = powerManager.getBatteryPercentage();
+  w.millivolts = powerManager.getBatteryMillivolts();
+  w.cpuMhz = getCpuFrequencyMhz();
+  latch.applyTo(w);
+  w.renders = activityManager.renderCount() - rendersAtStart;
+  w.lightSleeps = powerManager.lightSleepCount() - sleepsAtStart;
+  w.lightSleepPermille = power_ledger::permille(powerManager.lightSleepMicros() - sleptUsAtStart,
+                                                static_cast<uint64_t>(windowMs) * 1000ULL);
+  w.lightSleepEnabled = powerManager.lightSleepEnabled();
+  char line[power_ledger::LINE_CAP];
+  appendLedgerLine(line, power_ledger::formatLine(line, sizeof line, w));
+
+  windowStartMs = now;
+  latch = power_ledger::WindowLatch{};
+  rendersAtStart = activityManager.renderCount();
+  sleepsAtStart = powerManager.lightSleepCount();
+  sleptUsAtStart = powerManager.lightSleepMicros();
 }
 
 // Boot only (the sleep and cut paths stay tiny): roll the ledger over once it
@@ -331,6 +377,7 @@ static void rotateSleepLedger() {
 // The ledger is an X4 Pro diagnostic; no other board writes it.
 static void sleepLedger(const char*, int) {}
 static void rotateSleepLedger() {}
+static void powerLedgerTick(bool) {}
 #endif
 
 // Enter deep sleep mode
@@ -362,10 +409,7 @@ void enterDeepSleep(bool fromTimeout = false) {
 
   // Tear down WiFi so the modem power domain isn't held alive across deep sleep.
   // Wake from deep sleep is effectively a chip reset, so no state needs to survive.
-  if (WiFi.getMode() != WIFI_MODE_NULL) {
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-  }
+  RadioPower::off();
 
   halTiltSensor.deepSleep();
   display.deepSleep();
@@ -519,6 +563,8 @@ void setup() {
     // "sleep" never happened (boot line x bit 1).
     const auto aborted = freeink::PowerManager::takeAbortedSleepInfo();
     if (aborted.aborted) {
+      // cause= is whatever the wake-cause register held at the abort: after an
+      // idle light sleep that is the last nap's cause, not the abort's.
       LOG_ERR("PWR", "Previous sleep entry aborted: cause=%d powerPin=%d", aborted.wakeupCause, aborted.wakePinLevel);
     }
     rotateSleepLedger();
@@ -701,6 +747,21 @@ void setup() {
   }
 
   allowSleepAt = millis() + 2000;
+}
+
+// A computer on the USB cable (SOF frames), sampled once per loop pass. The
+// bench console tracks it in dev builds; release builds read the same monitor.
+static bool usbHostAttached() {
+#if CROSSPOINT_BENCH_CONSOLE
+  return BenchConsole::hostPresent();
+#elif ARDUINO_USB_MODE && SOC_USB_SERIAL_JTAG_SUPPORTED
+  static power_policy::HostSeen seen;
+  const uint32_t now = millis();
+  seen.update(now, HWCDC::isPlugged());
+  return seen.present(now);
+#else
+  return false;
+#endif
 }
 
 void loop() {
@@ -933,6 +994,9 @@ void loop() {
     activityManager.requestUpdate();
   }
 
+  const bool usbHost = usbHostAttached();
+  powerLedgerTick(usbHost);
+
   const unsigned long activityStartTime = millis();
   activityManager.loop();
   const unsigned long activityDuration = millis() - activityStartTime;
@@ -963,16 +1027,32 @@ void loop() {
     powerManager.setPowerSaving(false);  // Make sure we're at full performance when skipLoopDelay is requested
     yield();                             // Give FreeRTOS a chance to run tasks, but return immediately
   } else {
-    if (millis() - lastActivityTime >= HalPowerManager::IDLE_POWER_SAVING_MS) {
+    if (millis() - lastActivityTime >= HalPowerManager::idlePowerSavingMs()) {
       // If we've been inactive for a while, increase the delay to save power
       powerManager.setPowerSaving(true);  // Lower CPU frequency after extended inactivity
-      // Sleep in short slices and wake the poll as soon as a button contact closes.
-      // InputManager commits a press only when two consecutive polls agree, so a
-      // press shorter than one 50 ms sleep could land in a single sample and be lost.
-      const unsigned long idleStart = millis();
-      while (millis() - idleStart < 50) {
-        delay(10);
-        if (gpio.rawInputActive()) break;
+      // X4 Pro: one light-sleep slice, holding the RenderLock so no render,
+      // SPI or SD transfer is frozen mid-flight. lightSleep() refuses
+      // under every guard in power_policy (radio, USB, light, input, ...).
+      bool slept = false;
+      {
+        RenderLock lock(RenderLock::Mode::Try);
+        if (lock.ownsLock()) {
+          HalPowerManager::LightSleepContext ctx;
+          ctx.usbHost = usbHost;
+          ctx.activityBusy = activityManager.preventAutoSleep() || activityManager.skipLoopDelay();
+          ctx.renderQueued = activityManager.renderQueued();
+          slept = powerManager.lightSleep(gpio, ctx);
+        }
+      }
+      if (!slept) {
+        // Sleep in short slices and wake the poll as soon as a button contact closes.
+        // InputManager commits a press only when two consecutive polls agree, so a
+        // press shorter than one 50 ms sleep could land in a single sample and be lost.
+        const unsigned long idleStart = millis();
+        while (millis() - idleStart < 50) {
+          delay(10);
+          if (gpio.rawInputActive()) break;
+        }
       }
     } else {
       // Short delay to prevent tight loop while still being responsive

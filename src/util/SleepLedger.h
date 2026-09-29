@@ -22,6 +22,7 @@
 //   power-off (battery);  rst=5 wake=7 x=2 instead = USB kept the SoC alive.
 //   A sleep -> boot pair with no cut line = the timer never fired (Never, or the
 //   card did not mount in the cut path, which then cannot write its line).
+//   The same file carries a "pwr" line every 5 min while awake: util/PowerLedger.h.
 namespace sleep_ledger {
 
 constexpr const char* PATH = "/sleep.log";
@@ -38,7 +39,7 @@ struct Entry {
   const char* event = "";   // boot | sleep | resleep | cut
   uint32_t uptimeS = 0;     // seconds since this boot
   int resetReason = 0;      // esp_reset_reason(); 5 = deep-sleep wake
-  int wakeCause = 0;        // esp_sleep_get_wakeup_cause(); 7 = EXT1 button, 4 = timer
+  int wakeCause = 0;        // the boot's wake cause; 3 = EXT1 button, 4 = timer, 0 = none
   int extra = 0;            // per-event, see above
   unsigned socPercent = 0;  // gauge SoC, 1 % resolution
   unsigned millivolts = 0;  // gauge VCELL, ~0.3 mV resolution; 0 on I2C failure

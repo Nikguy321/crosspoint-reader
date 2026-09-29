@@ -1,5 +1,6 @@
 #include <HalDisplay.h>
 #include <HalGPIO.h>
+#include <HalPowerManager.h>
 
 // Global HalDisplay instance
 HalDisplay display;
@@ -19,6 +20,11 @@ void HalDisplay::begin(bool seamless) {
   }
 
   einkDisplay.begin();
+  // 80 MHz through a long refresh wait (never while a radio is up). The render
+  // task holds a Lock across the wait, so these bypass it on purpose.
+  if (BoardConfig::isX4Pro()) {
+    einkDisplay.setBusyWaitHooks(&HalPowerManager::refreshWaitBegin, &HalPowerManager::refreshWaitEnd);
+  }
 
   if (seamless) {
     // Defuse the SDK's X3 _x3InitialFullSyncsRemaining counter (no-op on X4)

@@ -39,6 +39,7 @@
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
 #include "fontIds.h"
+#include "network/RadioPower.h"
 
 namespace fui = freeink::ui;
 
@@ -393,7 +394,7 @@ void SettingsActivity::toggleCurrentSetting() {
           // these rows only save credentials, so nothing here would ever
           // release the driver's heap. The scan alone brings it up, so tear
           // down whether or not the user joined a network.
-          if (WiFi.getMode() == WIFI_MODE_NULL) return;
+          if (WiFi.getMode() == WIFI_MODE_NULL && !RadioPower::ranThisBoot()) return;
           WiFi.disconnect(false);
           delay(30);
           // Unlike the onExit() teardowns, this runs from the loop task with

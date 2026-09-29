@@ -6,7 +6,6 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <WiFi.h>
-#include <esp_wifi.h>
 
 #include <algorithm>
 #include <cassert>
@@ -24,6 +23,7 @@
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"  // list icons for the compare rows
 #include "fontIds.h"
+#include "network/RadioPower.h"
 #include "util/BookSyncHooks.h"
 
 namespace fui = freeink::ui;
@@ -406,7 +406,7 @@ void KOReaderSyncActivity::performUpload() {
   }
 
   // Drop the radio while user reads the result; full teardown happens at silent reboot.
-  esp_wifi_stop();
+  RadioPower::stop();
 
   if (result != KOReaderSyncClient::OK) {
     {
