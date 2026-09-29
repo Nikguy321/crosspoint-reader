@@ -40,10 +40,21 @@ class HalPowerManager {
 
   // Setup wake up GPIO and enter deep sleep
   // Should be called inside main loop() to handle the currentLockMode
-  void startDeepSleep(HalGPIO& gpio) const;
+  // powerOffAfterUs > 0 also arms a timer wake beside the button; setup() turns
+  // that wake into cutRailAndSleep() (stock-style auto power-off).
+  void startDeepSleep(HalGPIO& gpio, uint64_t powerOffAfterUs = 0) const;
+
+  // Stock "cutLdo": drop power.latch0 (the X4 Pro's peripheral rail on GPIO1),
+  // hold it LOW, and sleep on the power button only. On battery the board dies
+  // here and the button cold-boots it; on USB power the SoC survives and sleeps.
+  [[noreturn]] void cutRailAndSleep() const;
 
   // Get battery percentage (range 0-100)
   uint16_t getBatteryPercentage() const;
+
+  // Cell voltage, uncached: the gauge's VCELL (CW2017: ~0.3 mV/LSB) or the ADC
+  // divider reading; 0 on an I2C failure.
+  uint16_t getBatteryMillivolts() const;
 
   // RAII helper class to manage power saving locks
   // Usage: create an instance of Lock in a scope to disable power saving, for example when running a task that needs

@@ -282,4 +282,24 @@ uint32_t clampHoldMs(const uint32_t ms) {
   return ms;
 }
 
+bool parseCatArgs(char* args, uint32_t& tailBytes, char*& path) {
+  tailBytes = CAT_TAIL_DEFAULT;
+  if (args == nullptr) return false;
+  char* p = args;
+  while (*p >= '0' && *p <= '9') ++p;
+  if (p != args && *p == ' ') {
+    *p = '\0';
+    uint32_t n = 0;
+    if (!parseU32(args, n)) return false;
+    tailBytes = n < 1 ? 1 : (n > CAT_TAIL_MAX ? CAT_TAIL_MAX : n);
+    ++p;
+    while (*p == ' ') ++p;
+  } else {
+    p = args;
+  }
+  if (*p == '\0') return false;
+  path = p;
+  return true;
+}
+
 }  // namespace bench

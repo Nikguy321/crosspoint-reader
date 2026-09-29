@@ -34,6 +34,10 @@ class HalClock {
   // Returns false if RTC is not available.
   bool localTime(struct tm& out) const;
 
+  // Current time as a UTC Unix epoch (same cached read as localTime()).
+  // Returns false if RTC is not available.
+  bool utcEpoch(time_t& out) const;
+
   // Get current local hour (0-23) and minute (0-59).
   // Returns false if RTC is not available.
   bool getTime(uint8_t& hour, uint8_t& minute) const;

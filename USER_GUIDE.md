@@ -329,6 +329,8 @@ The Settings screen allows you to configure the device's behavior. There are a f
 
 - **Time to Sleep**: Set the duration of inactivity before the device automatically goes to sleep; options are 1, 3, 5, 10 (default), 15 or 30 minutes.
 
+- **Auto Power Off** (X4 Pro only): How long the device stays in its instant-wake sleep before it powers off completely, like the stock firmware; options are 5, 10, 20, 30 (default) or 60 minutes, or Never. Waking after a power-off is a cold boot (splash screen, a few seconds), and the frontlight stays off. Never keeps today's instant-wake sleep indefinitely. The X4 Pro also appends one short line per sleep, power-off and boot to `/sleep.log` at the card root, a diagnostic record you can delete at any time.
+
 - **Wi-Fi Networks**: Connect to Wi-Fi networks for file transfers and firmware updates.
 
 - **KOReader Sync**: Options for setting up KOReader for syncing book progress. **Smart sync** is the default for new configurations and auto-resolves simple push/pull decisions. Existing credential files retain **Ask every time** when migrated; you can switch Sync Behavior at any time if you prefer manual confirmation.

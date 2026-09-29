@@ -4,6 +4,7 @@
 #include <Logging.h>
 #include <PowerManager.h>
 #include <WiFi.h>
+#include <driver/gpio.h>
 #include <esp_sleep.h>
 #include <soc/soc_caps.h>
 
@@ -66,7 +67,7 @@ void HalPowerManager::setPowerSaving(bool enabled) {
   // Otherwise, no change needed
 }
 
-void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
+void HalPowerManager::startDeepSleep(HalGPIO& gpio, const uint64_t powerOffAfterUs) const {
 #ifdef ENABLE_SERIAL_LOG
   // Tear down HWCDC so the host sees a clean disconnect and the peripheral
   // doesn't hold power domains that interfere with USB-powered GPIO wake.
@@ -110,6 +111,24 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
     gpio_hold_en(g);
   }
 
+  // The frontlight driver IC hangs off the rail held HIGH above (X4 Pro GPIO1).
+  // deepSleep() isolates the LEDC pads (GPIO8 cool / GPIO9 warm), leaving a
+  // powered driver with floating inputs. Hand the pads back from LEDC, drive
+  // them to the OFF level and hold them; HalFrontlight::begin() releases the
+  // hold at boot.
+  {
+    const auto& fl = BoardConfig::ACTIVE.frontlight;
+    for (const int8_t pin : {fl.gpio, fl.gpioWarm}) {
+      if (pin < 0) continue;
+      const auto g = static_cast<gpio_num_t>(pin);
+      ledcDetach(pin);
+      gpio_hold_dis(g);  // a held pad silently ignores the drive below
+      pinMode(pin, OUTPUT);
+      digitalWrite(pin, fl.activeHigh ? LOW : HIGH);
+      gpio_hold_en(g);
+    }
+  }
+
   // Cut the gated peripheral rails (touch/SD/EPD on boards like the Sticky) and
   // hold the enables off through deep sleep — otherwise the GT911 and SD card
   // stay powered all through "off" and drain the battery. No-op on boards with
@@ -128,13 +147,60 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   }
 #endif
 
+  // Auto power-off: the timer wake lands at the top of setup(), which cuts the
+  // rail (cutRailAndSleep) instead of booting.
+  if (powerOffAfterUs > 0) esp_sleep_enable_timer_wakeup(powerOffAfterUs);
+
   // Waits for the power button to be physically released (so holding it doesn't
   // immediately wake the device again), then arms the wake source and sleeps.
   freeink::PowerManager::deepSleepUntilPowerButton();
 }
 
-uint16_t HalPowerManager::getBatteryPercentage() const {
+void HalPowerManager::cutRailAndSleep() const {
+  const auto& b = BoardConfig::ACTIVE;
+  // The sleep that armed the timer held the rail-fed enables at their OFF
+  // levels and the EPD reset HIGH (the SDK keeps it HIGH while the panel rail
+  // is powered). Once the rail is gone every one of those is a 3.3 V output
+  // into an unpowered chip: back-power through its protection diode, the
+  // milliamp-level drain the SDK's powerDownRailsForSleep() describes. Reset
+  // goes LOW (the SDK's rule for a switched-off rail); the enables float
+  // (INPUT now, isolated by deepSleep()).
+  if (b.display.rst >= 0) {
+    const auto g = static_cast<gpio_num_t>(b.display.rst);
+    gpio_hold_dis(g);
+    pinMode(b.display.rst, OUTPUT);
+    digitalWrite(b.display.rst, LOW);
+    gpio_hold_en(g);
+  }
+  for (const int8_t pin : {b.touch.powerEnable, b.sd.powerEnable, b.mic.enable}) {
+    if (pin < 0) continue;
+    gpio_hold_dis(static_cast<gpio_num_t>(pin));
+    pinMode(pin, INPUT);
+  }
+
+  const int8_t latch = b.power.latch0;
+  if (latch >= 0) {
+    const auto g = static_cast<gpio_num_t>(latch);
+    gpio_hold_dis(g);  // held HIGH through the sleep that armed the timer
+    pinMode(latch, OUTPUT);
+    digitalWrite(latch, LOW);
+    gpio_hold_en(g);
+    delay(200);  // a battery-latched board dies here; USB power falls through
+  }
+  freeink::PowerManager::deepSleepUntilPowerButton();
+}
+
+namespace {
+const BatteryMonitor& batteryMonitor() {
   static const BatteryMonitor battery;
+  return battery;
+}
+}  // namespace
+
+uint16_t HalPowerManager::getBatteryMillivolts() const { return batteryMonitor().readMillivolts(); }
+
+uint16_t HalPowerManager::getBatteryPercentage() const {
+  const BatteryMonitor& battery = batteryMonitor();
   if (BoardConfig::ACTIVE.batteryGauge.gaugeAddr != 0) {
     const unsigned long now = millis();
     if (_batteryLastPollMs != 0 && (now - _batteryLastPollMs) < BATTERY_POLL_MS) {

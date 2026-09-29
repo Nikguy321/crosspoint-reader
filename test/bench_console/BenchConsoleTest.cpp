@@ -155,6 +155,42 @@ TEST(BenchPath, PartSuffixAndSlashes) {
   EXPECT_STREQ(root, "/");
 }
 
+TEST(BenchCat, ArgsAreAnOptionalWindowThenThePath) {
+  uint32_t tail = 0;
+  char* path = nullptr;
+  char plain[] = "/sleep.log";
+  ASSERT_TRUE(parseCatArgs(plain, tail, path));
+  EXPECT_EQ(tail, CAT_TAIL_DEFAULT);
+  EXPECT_STREQ(path, "/sleep.log");
+
+  char windowed[] = "512  /Books/My Book.txt";
+  ASSERT_TRUE(parseCatArgs(windowed, tail, path));
+  EXPECT_EQ(tail, 512u);
+  EXPECT_STREQ(path, "/Books/My Book.txt");
+
+  char clampedHigh[] = "999999 /a.txt";
+  ASSERT_TRUE(parseCatArgs(clampedHigh, tail, path));
+  EXPECT_EQ(tail, CAT_TAIL_MAX);
+  char clampedLow[] = "0 /a.txt";
+  ASSERT_TRUE(parseCatArgs(clampedLow, tail, path));
+  EXPECT_EQ(tail, 1u);
+
+  // Digits alone are a path candidate (isValidPath then rejects them: no
+  // leading '/'), never a window without a path.
+  char digitsOnly[] = "4096";
+  ASSERT_TRUE(parseCatArgs(digitsOnly, tail, path));
+  EXPECT_EQ(tail, CAT_TAIL_DEFAULT);
+  EXPECT_STREQ(path, "4096");
+  EXPECT_FALSE(isValidPath(path, false));
+  char empty[] = "";
+  EXPECT_FALSE(parseCatArgs(empty, tail, path));
+  EXPECT_FALSE(parseCatArgs(nullptr, tail, path));
+  char numericName[] = "123abc";  // digits not followed by a space: the whole thing is the path
+  ASSERT_TRUE(parseCatArgs(numericName, tail, path));
+  EXPECT_EQ(tail, CAT_TAIL_DEFAULT);
+  EXPECT_STREQ(path, "123abc");
+}
+
 TEST(BenchChunkHeader, Parses) {
   uint32_t len = 0;
   uint32_t crc = 0;

@@ -49,6 +49,10 @@ Verbs
                               D <base64> lines, OK SHOT. The black/white plane
                               only (grayscale anti-aliasing is not captured).
   LS <dir> | MD5 <path> | DF | MKDIR <path> | AWAKE
+  CAT [<tailBytes>] <path>  the last tailBytes (default 4096, max 16384) of a
+                           text file, one "L <line>" per line (a partial first
+                           line is dropped), then OK CAT lines= bytes= size=.
+                           For /sleep.log and other small logs.
   OPEN <path>              the reader opens it (epub xtc txt md bmp png); OK
                            once the reader is up, ERR OPEN failed if the book
                            did not load.
@@ -625,6 +629,9 @@ def build_parser() -> argparse.ArgumentParser:
         s = sub.add_parser(name)
         s.add_argument("path", nargs="?" if name == "ls" else None, default="/")
     sub.add_parser("df")
+    s = sub.add_parser("cat", help="print the tail of a text file (e.g. /sleep.log)")
+    s.add_argument("path")
+    s.add_argument("--tail", type=int, help="bytes from the end of the file (default 4096, max 16384)")
     s = sub.add_parser("put")
     s.add_argument("local")
     s.add_argument("remote")
@@ -689,6 +696,12 @@ def run(args, link: Link, out=sys.stdout) -> int:
     elif op == "df":
         rest, _ = link.command("DF", t or 30)
         print(rest, file=out)
+    elif op == "cat":
+        window = f"{args.tail} " if args.tail else ""
+        rest, body = link.command(f"CAT {window}{args.path}", t or 30)
+        for line in body:
+            print(line[2:] if line.startswith("L ") else line, file=out)
+        print(f"# {args.path}: {rest}", file=sys.stderr)
     elif op == "mkdir":
         rest, _ = link.command(f"MKDIR {args.path}", t or 10)
         print(rest, file=out)

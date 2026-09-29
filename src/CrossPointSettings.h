@@ -6,6 +6,7 @@
 
 #include <cstdint>
 
+#include "util/AutoPowerOff.h"
 #include "util/HomeButtonInput.h"
 
 class CrossPointSettings : public PersistableStore<CrossPointSettings> {
@@ -133,6 +134,22 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     SLEEP_30_MIN = 4,
     SLEEP_TIMEOUT_COUNT
   };
+
+  // Stock-style auto power-off after sleep (X4 Pro). Persisted by index, so
+  // append only; the minutes live in util/AutoPowerOff.h.
+  enum AUTO_POWER_OFF {
+    AUTO_OFF_5_MIN = 0,
+    AUTO_OFF_10_MIN = 1,
+    AUTO_OFF_20_MIN = 2,
+    AUTO_OFF_30_MIN = 3,
+    AUTO_OFF_60_MIN = 4,
+    AUTO_OFF_NEVER = 5,
+    AUTO_POWER_OFF_COUNT
+  };
+  static_assert(AUTO_POWER_OFF_COUNT == auto_power_off::OPTION_COUNT, "auto power-off table out of step");
+  static_assert(auto_power_off::minutesForIndex(AUTO_OFF_30_MIN) == 30 &&
+                    auto_power_off::minutesForIndex(AUTO_OFF_NEVER) == 0,
+                "auto power-off table out of step");
 
   // E-ink refresh frequency (pages between full refreshes).
   enum REFRESH_FREQUENCY {
@@ -294,6 +311,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t paragraphAlignment = JUSTIFIED;
   // Auto-sleep timeout setting (default 10 minutes). Legacy sleepTimeout enum values are migration-only.
   uint8_t sleepTimeoutMinutes = 10;
+  // Minutes asleep before the peripheral rail is cut (AUTO_POWER_OFF index). X4 Pro only.
+  uint8_t autoPowerOff = AUTO_OFF_30_MIN;
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
   uint8_t hyphenationEnabled = 0;

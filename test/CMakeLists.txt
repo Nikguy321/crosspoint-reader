@@ -68,6 +68,8 @@ add_subdirectory(chapter_position)
 add_subdirectory(home_button)
 add_subdirectory(button_press_navigation)
 add_subdirectory(bench_console)
+add_subdirectory(auto_power_off)
+add_subdirectory(sleep_ledger)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)

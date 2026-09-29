@@ -59,6 +59,17 @@ void trimTrailingSlashes(char* path);
 // Parses a PUT chunk header "<len> <crc32hex>". len must be 1..maxLen.
 bool parseChunkHeader(const char* line, uint32_t maxLen, uint32_t& len, uint32_t& crc);
 
+// CAT [<tailBytes>] <path>: the last tailBytes of a text file, one "L <line>"
+// reply per line (a partial first line is dropped when the window starts
+// mid-file), then "OK CAT lines= bytes= size=". Parses the arguments in place:
+// a leading integer followed by a space is the window (clamped to 1..CAT_TAIL_MAX,
+// CAT_TAIL_DEFAULT when absent); everything after it is the path, which the
+// caller still validates. Returns false when no path remains.
+constexpr uint32_t CAT_TAIL_DEFAULT = 4096;
+constexpr uint32_t CAT_TAIL_MAX = 16384;
+constexpr size_t CAT_LINE_CAP = 200;  // longer lines are truncated on the wire
+bool parseCatArgs(char* args, uint32_t& tailBytes, char*& path);
+
 // Bookkeeping for one PUT receive: which bytes to read next, when to ACK, NAK
 // or abort. The firmware does the serial and card I/O around it.
 class PutSession {

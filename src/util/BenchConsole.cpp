@@ -316,9 +316,11 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
   // computer is attached" signal. Free space is DF's job: it can scan the FAT.
   const bool sdReady = !storageBusy(exclusive) && Storage.ready();
   const long long sdTotal = sdReady ? static_cast<long long>(Storage.sdTotalBytes()) : -1;
-  reply("STATE bat=%u usb=%d host=%d sd=%d sdtotal=%lld pwrshort=%u dblclick=%u", powerManager.getBatteryPercentage(),
-        gpio.isUsbConnected() ? 1 : 0, host.present() ? 1 : 0, sdReady ? 1 : 0, sdTotal,
-        static_cast<unsigned>(SETTINGS.shortPwrBtn), static_cast<unsigned>(SETTINGS.doubleClickPwrLight));
+  // mv= is the gauge's VCELL (~0.3 mV/LSB); 0 on I2C failure
+  reply("STATE bat=%u mv=%u usb=%d host=%d sd=%d sdtotal=%lld pwrshort=%u dblclick=%u",
+        powerManager.getBatteryPercentage(), powerManager.getBatteryMillivolts(), gpio.isUsbConnected() ? 1 : 0,
+        host.present() ? 1 : 0, sdReady ? 1 : 0, sdTotal, static_cast<unsigned>(SETTINGS.shortPwrBtn),
+        static_cast<unsigned>(SETTINGS.doubleClickPwrLight));
 
   const unsigned long timeoutMs = SETTINGS.getSleepTimeoutMs();
   long left = -1;
@@ -589,6 +591,86 @@ void cmdMd5(const char* path, const bool exclusive) {
   reply("OK MD5 %s %llu", hex, static_cast<unsigned long long>(size));
 }
 
+// CAT [<tailBytes>] <path>: the tail of a text file as "L <line>" replies (the
+// sleep ledger, a log). Control characters become '?' so a line can never be
+// taken for console framing; lines past CAT_LINE_CAP are cut on the wire.
+void cmdCat(char* args, const bool exclusive) {
+  uint32_t tail = 0;
+  char* path = nullptr;
+  if (!bench::parseCatArgs(args, tail, path) || !bench::isValidPath(path, false)) {
+    reply("ERR CAT badpath");
+    return;
+  }
+  if (!fileVerbAllowed("CAT", exclusive)) return;
+  if (!Storage.exists(path)) {
+    reply("ERR CAT notfound");
+    return;
+  }
+  if (isDirectory(path)) {
+    reply("ERR CAT isdir");
+    return;
+  }
+  HalFile file;
+  if (!Storage.openFileForRead("BENCH", path, file)) {
+    reply("ERR CAT read");
+    return;
+  }
+  const size_t size = file.size();
+  const size_t start = size > tail ? size - tail : 0;
+  if (start > 0 && !file.seek(start)) {
+    reply("ERR CAT read");
+    return;
+  }
+  constexpr size_t LINE_REPLY_CAP = bench::CAT_LINE_CAP + 16;
+  ScratchBuffer scratch(tail + bench::CAT_LINE_CAP + 1 + LINE_REPLY_CAP);
+  if (!scratch.data) {
+    LOG_ERR("BENCH", "OOM: CAT buffers");
+    reply("ERR CAT oom");
+    return;
+  }
+  char* buf = reinterpret_cast<char*>(scratch.data);  // the file window
+  char* line = buf + tail;                            // one sanitized line
+  char* out = line + bench::CAT_LINE_CAP + 1;         // its "@B L ..." reply
+  const int got = file.read(buf, tail);
+  if (got < 0) {
+    reply("ERR CAT read");
+    return;
+  }
+  const size_t n = static_cast<size_t>(got);
+  size_t pos = 0;
+  if (start > 0) {  // the window opened mid-line: drop that fragment
+    while (pos < n && buf[pos] != '\n') ++pos;
+    if (pos < n) ++pos;
+  }
+  unsigned lines = 0;
+  size_t bytes = 0;
+  while (pos < n) {
+    size_t end = pos;
+    while (end < n && buf[end] != '\n') ++end;
+    size_t len = end - pos;
+    if (len > 0 && buf[pos + len - 1] == '\r') --len;
+    const size_t shown = std::min(len, bench::CAT_LINE_CAP);
+    for (size_t i = 0; i < shown; ++i) {
+      const char c = buf[pos + i];
+      line[i] = ((c >= 0 && c < 0x20 && c != '\t') || c == 0x7f) ? '?' : c;
+    }
+    line[shown] = '\0';
+    if (!replyInto(out, LINE_REPLY_CAP, "L %s", line)) {
+      LOG_ERR("BENCH", "CAT abandoned: host not reading");
+      return;
+    }
+    ++lines;
+    bytes += (end < n ? end + 1 : end) - pos;
+    pos = end + 1;
+    if (lines % 32 == 0) {
+      yield();
+      resetTaskWatchdogIfSubscribed();
+    }
+  }
+  reply("OK CAT lines=%u bytes=%lu size=%lu", lines, static_cast<unsigned long>(bytes),
+        static_cast<unsigned long>(size));
+}
+
 // Free space may scan the whole FAT (SdFat keeps no free-cluster count here)
 // and is cached by the SDK for 20 s, so it can lag a PUT by that long.
 void cmdDf(const bool exclusive) {
@@ -830,6 +912,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdLs(args, exclusive);
   } else if (strcmp(verb, "MD5") == 0) {
     cmdMd5(args, exclusive);
+  } else if (strcmp(verb, "CAT") == 0) {
+    cmdCat(args, exclusive);
   } else if (strcmp(verb, "DF") == 0) {
     cmdDf(exclusive);
   } else if (strcmp(verb, "MKDIR") == 0) {

@@ -127,6 +127,25 @@ class FakeDevice(threading.Thread):
                 self.emit("ERR MD5 isdir")
             else:
                 self.emit("ERR MD5 notfound")
+        elif verb == "CAT":
+            tail = 4096
+            first, _, more = rest.partition(" ")
+            if first.isdigit() and more:
+                tail, rest = max(1, min(int(first), 16384)), more.lstrip(" ")
+            key = self.lookup(rest)
+            if key is None:
+                self.emit("ERR CAT notfound")
+                return
+            data = self.files[key]
+            window = data[-tail:]
+            if len(data) > tail and b"\n" in window:
+                window = window.split(b"\n", 1)[1]
+            lines = window.split(b"\n")
+            if lines and lines[-1] == b"":
+                lines.pop()
+            for line in lines:
+                self.emit("L " + line.decode("utf-8", "surrogateescape"))
+            self.emit(f"OK CAT lines={len(lines)} bytes={len(window)} size={len(data)}")
         elif verb == "MKDIR":
             self.dirs.add(rest)
             self.emit(f"OK MKDIR created {rest}")
@@ -268,6 +287,19 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(ctx.exception.reason, "unknown")
         self.ser.close()
         code, _ = self.cli("md5", "/missing.epub")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_cat_prints_the_tail_lines(self):
+        self.dev.files["/sleep.log"] = b"1 boot up=3\n2 sleep up=9\n3 cut up=1\n"
+        self.ser.close()
+        code, out = self.cli("cat", "/sleep.log")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out, "1 boot up=3\n2 sleep up=9\n3 cut up=1\n")
+        # A window that opens mid-line drops the fragment before its first newline.
+        code, out = self.cli("cat", "--tail", "12", "/sleep.log")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out, "3 cut up=1\n")
+        code, _ = self.cli("cat", "/missing.log")
         self.assertEqual(code, x4bench.EXIT_ERR)
 
     def test_no_port_exit_code(self):

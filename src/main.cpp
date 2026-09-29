@@ -16,11 +16,14 @@
 #include <HalTiltSensor.h>
 #include <I18n.h>
 #include <Logging.h>
+#include <PowerManager.h>
 #include <SPI.h>
 #include <VectorFontSupport.h>
 #include <WiFi.h>
 #include <XteinkDetect.h>
 #include <builtinFonts/all.h>
+#include <esp_sleep.h>
+#include <esp_system.h>
 
 #include <cstring>
 
@@ -37,11 +40,13 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "platform/UsbSerialJtagHandoff.h"
+#include "util/AutoPowerOff.h"
 #include "util/BenchConsole.h"
 #include "util/BookSyncHooks.h"
 #include "util/ButtonNavigator.h"
 #include "util/PowerButtonTiming.h"
 #include "util/ScreenshotUtil.h"
+#include "util/SleepLedger.h"
 #include "util/Timezones.h"
 
 #if CROSSPOINT_VECTOR_FONTS
@@ -257,6 +262,77 @@ static bool loadSleepFrameBuffer() {
   return true;
 }
 
+// Timer wake to arm beside the power button: the auto power-off timeout, or 0
+// (Never, or a board whose rail cannot be cut).
+static uint64_t autoPowerOffMicros() {
+  return auto_power_off::timerMicros(
+      SETTINGS.autoPowerOff, auto_power_off::canCutRail(BoardConfig::isX4Pro(), BoardConfig::ACTIVE.power.latch0));
+}
+
+#if FREEINK_DEVICE_X4PRO
+// Set by powerOffAfterTimer() so the wake after a rail cut knows the panel was
+// power-cycled: RTC memory survives the button-only sleep (USB power kept the
+// SoC up) and is garbage on the cold boot a battery cut ends in, which takes
+// the splash path anyway.
+RTC_NOINIT_ATTR uint32_t railCutMagic;
+constexpr uint32_t RAIL_CUT_MAGIC = 0x52414943;  // 'RAIC'
+
+// Append one line to the sleep ledger on the card (format: util/SleepLedger.h).
+// Best effort: a card that is not mounted or refuses the write costs nothing,
+// and it must never keep the device awake.
+static void sleepLedger(const char* event, const int extra) {
+  if (!Storage.ready()) return;
+  sleep_ledger::Entry e;
+  time_t now = 0;
+  if (halClock.utcEpoch(now)) e.unixTime = static_cast<uint32_t>(now);
+  e.event = event;
+  e.uptimeS = static_cast<uint32_t>(millis() / 1000UL);
+  e.resetReason = static_cast<int>(esp_reset_reason());
+  e.wakeCause = static_cast<int>(esp_sleep_get_wakeup_cause());
+  e.extra = extra;
+  e.socPercent = powerManager.getBatteryPercentage();
+  e.millivolts = powerManager.getBatteryMillivolts();
+  char line[sleep_ledger::LINE_CAP];
+  const size_t len = sleep_ledger::formatLine(line, sizeof line, e);
+  if (len == 0) return;
+  HalFile f = Storage.open(sleep_ledger::PATH, O_WRONLY | O_CREAT | O_APPEND);
+  if (f) f.write(line, len);
+}
+
+// Boot only (the sleep and cut paths stay tiny): roll the ledger over once it
+// passes its cap, keeping one previous file.
+static void rotateSleepLedger() {
+  if (!Storage.ready()) return;
+  size_t bytes = 0;
+  {
+    HalFile f = Storage.open(sleep_ledger::PATH);
+    if (!f) return;
+    bytes = f.size();
+  }
+  if (!sleep_ledger::shouldRotate(bytes)) return;
+  Storage.remove(sleep_ledger::ROTATED_PATH);
+  Storage.rename(sleep_ledger::PATH, sleep_ledger::ROTATED_PATH);
+}
+
+// Second half of auto power-off: the timer armed by the last sleep has expired.
+// The rail is still held up from that sleep, so the card can take the ledger
+// line first (the RTC and gauge share the I2C bus halClock.begin() starts).
+// Then the rail drops and the device sleeps on the power button alone.
+[[noreturn]] static void powerOffAfterTimer() {
+  halClock.begin();
+  if (Storage.begin()) {
+    sleepLedger("cut", 0);
+    Storage.prepareForDeepSleep();
+  }
+  railCutMagic = RAIL_CUT_MAGIC;
+  powerManager.cutRailAndSleep();
+}
+#else
+// The ledger is an X4 Pro diagnostic; no other board writes it.
+static void sleepLedger(const char*, int) {}
+static void rotateSleepLedger() {}
+#endif
+
 // Enter deep sleep mode
 void enterDeepSleep(bool fromTimeout = false) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
@@ -293,10 +369,11 @@ void enterDeepSleep(bool fromTimeout = false) {
 
   halTiltSensor.deepSleep();
   display.deepSleep();
+  sleepLedger("sleep", fromTimeout ? 1 : 0);
   Storage.prepareForDeepSleep();
   LOG_DBG("MAIN", "Entering deep sleep");
 
-  powerManager.startDeepSleep(gpio);
+  powerManager.startDeepSleep(gpio, autoPowerOffMicros());
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -346,6 +423,26 @@ void setupDisplayAndFonts(bool seamless = false) {
 }
 
 void setup() {
+#if FREEINK_DEVICE_X4PRO
+  // Auto power-off: a timer wake can only come from startDeepSleep(gpio,
+  // powerOffAfterUs). Decided before holdPowerRails() re-asserts the rail
+  // this is about to cut. The bitmap form sees a button press that landed in
+  // the timer's instant (the single-cause call reports the timer first).
+  {
+    const uint32_t causes = esp_sleep_get_wakeup_causes();
+    const bool timerWake = (causes & (1u << ESP_SLEEP_WAKEUP_TIMER)) != 0;
+    const bool buttonWake = (causes & ((1u << ESP_SLEEP_WAKEUP_EXT1) | (1u << ESP_SLEEP_WAKEUP_GPIO))) != 0;
+    if (auto_power_off::shouldCutRailOnWake(
+            timerWake, buttonWake,
+            auto_power_off::canCutRail(BoardConfig::isX4Pro(), BoardConfig::ACTIVE.power.latch0))) {
+      powerOffAfterTimer();
+    }
+  }
+  const bool railWasCut = railCutMagic == RAIL_CUT_MAGIC;
+  railCutMagic = 0;
+#else
+  constexpr bool railWasCut = false;
+#endif
   BoardConfig::holdPowerRails();
 
 #ifdef ENABLE_SERIAL_LOG
@@ -417,9 +514,22 @@ void setup() {
 
   HalSystem::checkPanic();
 
+  {
+    // The SDK's record of an esp_deep_sleep_start() that returned: that
+    // "sleep" never happened (boot line x bit 1).
+    const auto aborted = freeink::PowerManager::takeAbortedSleepInfo();
+    if (aborted.aborted) {
+      LOG_ERR("PWR", "Previous sleep entry aborted: cause=%d powerPin=%d", aborted.wakeupCause, aborted.wakePinLevel);
+    }
+    rotateSleepLedger();
+    sleepLedger("boot", (aborted.aborted ? 1 : 0) | (railWasCut ? 2 : 0));
+  }
+
   APP_STATE.loadFromFile();
   const bool isSleepWake = wakeupReason == HalGPIO::WakeupReason::PowerButton;
-  const bool isPersistedSleepWake = isSleepWake && !APP_STATE.showBootScreen;
+  // A rail cut power-cycled the panel, so its retained frame is gone: that wake
+  // takes the splash path (full clear + resync) like the cold boot it mimics.
+  const bool isPersistedSleepWake = isSleepWake && !APP_STATE.showBootScreen && !railWasCut;
 
   if (recoveryFirmwareMode) {
     LOG_INF("MAIN", "Recovery firmware mode (%s + POWER held at boot)",
@@ -459,8 +569,10 @@ void setup() {
       // device; otherwise the button must still be held (ghost-wake debounce).
       if (!wakeHoldVerified && SETTINGS.shortPwrBtn != CrossPointSettings::SHORT_PWRBTN::SLEEP) {
         LOG_DBG("MAIN", "Power-button wake not held through verification, sleeping");
+        sleepLedger("resleep", 1);
         Storage.prepareForDeepSleep();
-        powerManager.startDeepSleep(gpio);
+        // Re-armed from scratch: a ghost wake must not cancel the auto power-off.
+        powerManager.startDeepSleep(gpio, autoPowerOffMicros());
       }
       wakePowerReleasePending = true;
       break;
@@ -482,6 +594,8 @@ void setup() {
 #endif
     case HalGPIO::WakeupReason::AfterFlash:
       // After flashing, just proceed to boot
+    case HalGPIO::WakeupReason::Timer:
+      // Only armed where setup() already cut the rail above; boot otherwise.
     case HalGPIO::WakeupReason::Other:
     default:
       break;

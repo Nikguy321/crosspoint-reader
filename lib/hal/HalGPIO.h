@@ -136,7 +136,9 @@ class HalGPIO {
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;
 
-  enum class WakeupReason { PowerButton, AfterFlash, AfterUSBPower, Other };
+  // Timer: the auto power-off timer armed by HalPowerManager::startDeepSleep();
+  // setup() normally cuts the rail before this is ever asked.
+  enum class WakeupReason { PowerButton, AfterFlash, AfterUSBPower, Timer, Other };
 
   WakeupReason getWakeupReason() const;
 
