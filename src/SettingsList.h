@@ -494,6 +494,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
              StrId::STR_QUOTE_SOURCE_BUILT_IN_BOOKMARKS, StrId::STR_QUOTE_SOURCE_BUILT_IN, StrId::STR_QUOTE_SOURCE_MINE,
              StrId::STR_QUOTE_SOURCE_BOOKMARKS},
             "quoteSources", StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_DARK_CARDS, &CrossPointSettings::darkCards, "darkCards", StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_NOW_READING, &CrossPointSettings::shuffleNowReading, "shuffleNowReading",
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_DAY, &CrossPointSettings::shuffleDay, "shuffleDay",
@@ -508,6 +509,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_PICTURES, &CrossPointSettings::shufflePictures, "shufflePictures",
                             StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_CARD_CYCLE_CHARGING, &CrossPointSettings::cardCycleWhenCharging,
+                            "cardCycleWhenCharging", StrId::STR_SLEEP_CARDS),
+        // In live_sleep::INTERVAL_MINUTES order.
+        SettingInfo::Enum(
+            StrId::STR_CHARGING_UPDATES, &CrossPointSettings::chargingUpdateInterval,
+            {StrId::STR_CHARGING_EVERY_1_MIN, StrId::STR_CHARGING_EVERY_2_MIN, StrId::STR_CHARGING_EVERY_5_MIN,
+             StrId::STR_CHARGING_EVERY_10_MIN, StrId::STR_CHARGING_EVERY_15_MIN},
+            "chargingUpdateInterval", StrId::STR_SLEEP_CARDS),
         // --- Status Bar Settings (web-only, uses StatusBarSettingsActivity) ---
         SettingInfo::Toggle(StrId::STR_CHAPTER_PAGE_COUNT, &CrossPointSettings::statusBarChapterPageCount,
                             "statusBarChapterPageCount", StrId::STR_CUSTOMISE_STATUS_BAR),

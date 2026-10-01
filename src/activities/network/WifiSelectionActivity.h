@@ -23,6 +23,9 @@ struct WifiNetworkInfo {
   bool isEncrypted;
   bool hasSavedPassword;             // Whether we have saved credentials for this network
   bool isHiddenPlaceholder = false;  // Synthetic "Add hidden network..." list entry
+  // The strongest access point the scan saw for this SSID: an auto-connect joins it directly.
+  int32_t channel = 0;
+  uint8_t bssid[6] = {};
 };
 
 // WiFi selection states
@@ -96,6 +99,18 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   // Saved SSIDs already attempted during the current auto-connect session.
   std::vector<std::string> autoAttemptedSsids;
 
+  // The last scan saw a network that hides its name (a hidden last network may be it).
+  bool scanSawHidden = false;
+  // The blind attempt at a hidden last network was made (once per session).
+  bool hiddenLastTried = false;
+  // The session's first auto-connect scan has been looked at; it owes one more scan when it showed
+  // nothing to join (reset per session, in onEnter).
+  bool firstScanHandled = false;
+  bool rescanOwed = false;
+  // The access point the next join names (from the scan); channel 0 = let the driver find it.
+  int32_t joinChannel = 0;
+  uint8_t joinBssid[6] = {};
+
   // Save/forget prompt selection (0 = Yes, 1 = No)
   int savePromptSelection = 0;
   int forgetPromptSelection = 0;
@@ -140,7 +155,11 @@ class WifiSelectionActivity final : public Activity, private UiAppHost {
   void promptPasswordEntry();
   void attemptConnection();
   void checkConnectionStatus();
-  bool tryAutoConnectCredential(const WifiCredential& cred);
+  bool tryAutoConnectCredential(const WifiCredential& cred, const WifiNetworkInfo* seen = nullptr);
+  // The BookSync peer's network is in the last scan (patientWait joins it directly).
+  bool peerInScan() const;
+  // Use up the owed rescan: true once, when one is owed.
+  bool takeRescanOwed();
   bool tryNextSavedNetworkFromScan();
   void handleAutoConnectFailure();
   void showNetworkListFromAutoConnect();

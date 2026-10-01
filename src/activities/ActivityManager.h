@@ -95,7 +95,9 @@ class ActivityManager {
   void goToLibrary();
   void goToBrowser();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
-  void goToSleep(bool fromTimeout = false);
+  // live: the live sleep screen (charging, X4 Pro), which stays up and is redrawn; popup = show
+  // "Entering sleep" first (not at a boot straight into the live screen).
+  void goToSleep(bool fromTimeout = false, bool live = false, bool popup = true);
   void goToBoot();
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();

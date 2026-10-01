@@ -248,6 +248,36 @@ void PutSession::committed() {
   naks = 0;
 }
 
+bool parseSleepArgs(const char* args, SleepKind& out) {
+  if (args == nullptr) args = "";
+  while (isSpace(*args)) ++args;
+  size_t n = strlen(args);
+  while (n > 0 && isSpace(args[n - 1])) --n;
+  if (n == 0) {
+    out = SleepKind::Default;
+    return true;
+  }
+  static constexpr char DEEP[] = "deep";
+  if (n != sizeof(DEEP) - 1) return false;
+  for (size_t i = 0; i < n; ++i) {
+    char c = args[i];
+    if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    if (c != DEEP[i]) return false;
+  }
+  out = SleepKind::Deep;
+  return true;
+}
+
+bool isValidSsid(const char* ssid) {
+  if (ssid == nullptr || *ssid == '\0') return false;
+  size_t n = 0;
+  for (; ssid[n] != '\0'; ++n) {
+    const auto c = static_cast<unsigned char>(ssid[n]);
+    if (c < 0x20 || c == 0x7F || n >= SSID_MAX_BYTES) return false;
+  }
+  return true;
+}
+
 bool isValidNonce(const char* s) {
   if (s == nullptr || *s == '\0') return false;
   size_t n = 0;

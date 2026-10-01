@@ -1,14 +1,21 @@
 // The pure pieces the sleep cards share: dates and DST-aware day boundaries, clock strings,
 // location parsing, the hunting-season calendar (across New Year too), the moon's lit shape,
 // and the registry.
+#include <GfxRenderer.h>
+#include <HalDisplay.h>
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string>
 
+#include "CardPreview.h"
+#include "src/fontIds.h"
 #include "src/sleepcards/CardDraw.h"
 #include "src/sleepcards/CardTime.h"
+#include "src/sleepcards/FooterText.h"
 #include "src/sleepcards/SleepCard.h"
 #include "src/sleepcards/SleepCardSettings.h"
 
@@ -255,4 +262,144 @@ TEST(SleepCardRegistry, ModesNamesAndIds) {
   EXPECT_EQ(cardInfo(CardId::Pictures)->render, nullptr);
   EXPECT_EQ(cardInfo(CardId::Shuffle)->render, nullptr);
   EXPECT_NE(cardInfo(CardId::Day)->render, nullptr);
+}
+
+// ---- footer ----------------------------------------------------------------------------------------
+
+namespace {
+LocalDate wallTime(const int month, const int day, const int weekday, const int hour, const int minute) {
+  LocalDate d;
+  d.year = 2026;
+  d.month = month;
+  d.day = day;
+  d.weekday = weekday;
+  d.hour = hour;
+  d.minute = minute;
+  return d;
+}
+
+std::string updated(const LocalDate& d, const bool clock12h, const footer::Form form) {
+  char buf[96];
+  footer::formatUpdated(d, clock12h, form, buf, sizeof(buf));
+  return buf;
+}
+
+int uiWidth(void* user, const char* text) { return static_cast<GfxRenderer*>(user)->getTextWidth(UI_10_FONT_ID, text); }
+
+// Logical (portrait) pixel of the framebuffer, as writeFramePng reads it.
+bool inkAt(const int x, const int y) {
+  const uint8_t* fb = display.getFrameBuffer();
+  const int px = y;
+  const int py = HalDisplay::DISPLAY_HEIGHT - 1 - x;
+  return ((fb[py * HalDisplay::DISPLAY_WIDTH_BYTES + px / 8] >> (7 - (px & 7))) & 1) == 0;
+}
+}  // namespace
+
+TEST(SleepCardFooter, EveryFormIn12And24Hours) {
+  const LocalDate oct1 = wallTime(10, 1, 3, 14, 17);  // Wed Oct 1, 14:17
+  EXPECT_EQ(updated(oct1, true, footer::Form::Full), "Screen updated 2:17 PM, Wed Oct 1");
+  EXPECT_EQ(updated(oct1, true, footer::Form::NoWeekday), "Screen updated 2:17 PM, Oct 1");
+  EXPECT_EQ(updated(oct1, true, footer::Form::Short), "Updated 2:17 PM, Oct 1");
+  EXPECT_EQ(updated(oct1, true, footer::Form::TimeOnly), "Updated 2:17 PM");
+  EXPECT_EQ(updated(oct1, false, footer::Form::Full), "Screen updated 14:17, Wed Oct 1");
+  EXPECT_EQ(updated(oct1, false, footer::Form::TimeOnly), "Updated 14:17");
+  const LocalDate late = wallTime(5, 30, 3, 0, 59);
+  EXPECT_EQ(updated(late, true, footer::Form::Full), "Screen updated 12:59 AM, Wed May 30");
+  EXPECT_EQ(updated(late, false, footer::Form::Full), "Screen updated 00:59, Wed May 30");
+}
+
+TEST(SleepCardFooter, PlaceholdersMayBeReordered) {
+  const footer::Field fields[] = {{"time", "14:17"}, {"date", "1 Oct"}};
+  char buf[64];
+  EXPECT_EQ(footer::expand("{date}, {time} aktualisiert", fields, 2, buf, sizeof(buf)), 25u);
+  EXPECT_STREQ(buf, "1 Oct, 14:17 aktualisiert");
+  // An unknown or unclosed placeholder stays as written; a short buffer is cut, terminated.
+  footer::expand("{when} {time} {", fields, 2, buf, sizeof(buf));
+  EXPECT_STREQ(buf, "{when} 14:17 {");
+  char small[6];
+  EXPECT_EQ(footer::expand("at {time}", fields, 2, small, sizeof(small)), 5u);
+  EXPECT_STREQ(small, "at 14");
+}
+
+TEST(SleepCardFooter, FallsBackLongestFirst) {
+  const LocalDate oct1 = wallTime(10, 1, 3, 14, 17);
+  // A pretend font: 10 px a byte.
+  const auto width = [](void*, const char* text) { return static_cast<int>(std::strlen(text)) * 10; };
+  char buf[96];
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 1000, width, nullptr, buf, sizeof(buf)), footer::Form::Full);
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 330, width, nullptr, buf, sizeof(buf)), footer::Form::Full);
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 329, width, nullptr, buf, sizeof(buf)), footer::Form::NoWeekday);
+  EXPECT_STREQ(buf, "Screen updated 2:17 PM, Oct 1");
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 250, width, nullptr, buf, sizeof(buf)), footer::Form::Short);
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 200, width, nullptr, buf, sizeof(buf)), footer::Form::TimeOnly);
+  EXPECT_EQ(footer::fitUpdated(oct1, true, 10, width, nullptr, buf, sizeof(buf)), footer::Form::TimeOnly);
+  EXPECT_STREQ(buf, "Updated 2:17 PM");
+}
+
+// The real footer with the real font: the widest times and dates, at 100 % (the widest battery),
+// stay between the margins, and still name the day whenever the full line fits.
+TEST(SleepCardFooter, WidestCaseStaysBetweenTheMargins) {
+  GfxRenderer& r = preview::renderer();
+  const int w = r.getScreenWidth();
+  const int h = r.getScreenHeight();
+  for (const bool clock12h : {true, false}) {
+    for (const bool charging : {false, true}) {
+      CardContext ctx = preview::sampleContext();
+      ctx.localNow = wallTime(5, 30, 3, 12, 59);  // "12:59 PM, Wed May 30"
+      ctx.clock12h = clock12h;
+      ctx.batteryPercent = 100;
+      ctx.charging = charging;
+      r.clearScreen();
+      draw::drawSleepFooter(ctx, r);
+      for (int y = h - FOOTER_HEIGHT + 2; y < h; y++) {
+        for (int x = 0; x < SCREEN_MARGIN; x++) {
+          ASSERT_FALSE(inkAt(x, y)) << "left margin at " << x << "," << y << " 12h=" << clock12h;
+          ASSERT_FALSE(inkAt(w - 1 - x, y)) << "right margin at " << w - 1 - x << "," << y << " 12h=" << clock12h;
+        }
+      }
+      char buf[96];
+      const int room = w - 2 * SCREEN_MARGIN - (20 + 5 + r.getTextWidth(UI_10_FONT_ID, "100%")) - 16;
+      const footer::Form form = footer::fitUpdated(ctx.localNow, clock12h, room, &uiWidth, &r, buf, sizeof(buf));
+      EXPECT_LT(static_cast<int>(form), static_cast<int>(footer::Form::TimeOnly)) << buf;
+      std::printf("footer %s: \"%s\" (form %d)\n", clock12h ? "12h" : "24h", buf, static_cast<int>(form));
+    }
+  }
+  // The usual case shows everything.
+  CardContext ctx = preview::sampleContext();
+  ctx.localNow = wallTime(10, 1, 3, 14, 17);
+  ctx.clock12h = true;
+  ctx.batteryPercent = 73;
+  char buf[96];
+  const int room = w - 2 * SCREEN_MARGIN - (20 + 5 + r.getTextWidth(UI_10_FONT_ID, "73%")) - 16;
+  EXPECT_EQ(footer::fitUpdated(ctx.localNow, true, room, &uiWidth, &r, buf, sizeof(buf)), footer::Form::Full)
+      << buf << " in " << room << " px: " << uiWidth(&r, "Screen updated 2:17 PM, Wed Oct 1");
+  ctx.charging = true;
+  r.clearScreen();
+  draw::drawSleepFooter(ctx, r);
+  ASSERT_TRUE(preview::writeFramePng(preview::outputDir() + "/_footer.png"));
+}
+
+TEST(SleepCardFooter, ChargingBoltIsWhiteInsideTheFill) {
+  GfxRenderer& r = preview::renderer();
+  for (const int percent : {0, 5, 50, 100}) {
+    r.clearScreen();
+    draw::drawBatteryIcon(r, 100, 100, 20, 10, percent, true);
+    // The fill reaches past the bolt, and the bolt's middle rows are white inside it.
+    EXPECT_TRUE(inkAt(102, 105)) << percent;
+    int white = 0;
+    for (int x = 103; x < 110; x++) {
+      for (int y = 102; y < 108; y++) white += inkAt(x, y) ? 0 : 1;
+    }
+    EXPECT_GT(white, 6) << percent;
+    // Both tips sit inside the fill's rows (y + 2 .. y + 7), never on the white gap: the top
+    // tip's right pixel and the bottom tip's left pixel are white with ink beside them.
+    EXPECT_FALSE(inkAt(108, 102)) << percent;
+    EXPECT_TRUE(inkAt(109, 102)) << percent;
+    EXPECT_FALSE(inkAt(104, 107)) << percent;
+    EXPECT_TRUE(inkAt(103, 107)) << percent;
+    // Not charging: an empty battery has no fill at all.
+    r.clearScreen();
+    draw::drawBatteryIcon(r, 100, 100, 20, 10, percent, false);
+    if (percent == 0) EXPECT_FALSE(inkAt(104, 105));
+  }
 }

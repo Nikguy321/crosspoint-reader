@@ -805,3 +805,29 @@ TEST(BenchInputWaiter, StuckNeedsPassesAndTime) {
   now += InputWaiter::STUCK_MS;
   EXPECT_EQ(w.poll(now, false, false), InputWaiter::Verdict::ErrTimeout);
 }
+
+TEST(BenchSleep, PlainOrDeep) {
+  SleepKind kind = SleepKind::Deep;
+  EXPECT_TRUE(parseSleepArgs("", kind));
+  EXPECT_EQ(kind, SleepKind::Default);
+  EXPECT_TRUE(parseSleepArgs(nullptr, kind));
+  EXPECT_EQ(kind, SleepKind::Default);
+  EXPECT_TRUE(parseSleepArgs("deep", kind));
+  EXPECT_EQ(kind, SleepKind::Deep);
+  EXPECT_TRUE(parseSleepArgs(" DEEP ", kind));
+  EXPECT_EQ(kind, SleepKind::Deep);
+  EXPECT_FALSE(parseSleepArgs("deeper", kind));
+  EXPECT_FALSE(parseSleepArgs("live", kind));
+  EXPECT_FALSE(parseSleepArgs("dee", kind));
+}
+
+TEST(BenchWifiLast, SsidIsTheRestOfTheLine) {
+  EXPECT_TRUE(isValidSsid("Home"));
+  EXPECT_TRUE(isValidSsid("Cafe Guest 5G"));
+  EXPECT_TRUE(isValidSsid("12345678901234567890123456789012"));    // 32 bytes
+  EXPECT_FALSE(isValidSsid("123456789012345678901234567890123"));  // 33
+  EXPECT_FALSE(isValidSsid(""));
+  EXPECT_FALSE(isValidSsid(nullptr));
+  EXPECT_FALSE(isValidSsid("tab\there"));
+  EXPECT_FALSE(isValidSsid("del\x7f"));
+}

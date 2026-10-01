@@ -146,20 +146,27 @@ uint8_t categoriesWithEntries(uint8_t enabled, const Pools& pools);
 Pick chooseCategory(uint8_t enabled, const Pools& pools, uint32_t& rng);
 
 // Uniform choice in one pass (reservoir sampling) that avoids lastHash while any other candidate
-// exists. value is the caller's payload (an offset, an index ...).
+// exists. value is the caller's payload (an offset, an index ...). After keepLast() it answers
+// with the lastHash entry instead, when one was offered (a redraw of the same quote).
 class FreshPicker {
  public:
   FreshPicker(uint32_t lastHash, uint32_t& rng) : lastHash_(lastHash), rng_(rng) {}
   void offer(uint32_t hash, uint32_t value, uint32_t value2 = 0);
   PoolStats stats() const { return {count_, fresh_}; }
   bool has() const { return count_ > 0; }
-  uint32_t value() const { return fresh_ > 0 ? freshValue_ : staleValue_; }
-  uint32_t value2() const { return fresh_ > 0 ? freshValue2_ : staleValue2_; }
-  uint32_t hash() const { return fresh_ > 0 ? freshHash_ : lastHash_; }
+  // The lastHash entry was offered.
+  bool hasLast() const { return count_ > fresh_; }
+  void keepLast() { keepLast_ = true; }
+  uint32_t value() const { return useFresh() ? freshValue_ : staleValue_; }
+  uint32_t value2() const { return useFresh() ? freshValue2_ : staleValue2_; }
+  uint32_t hash() const { return useFresh() ? freshHash_ : lastHash_; }
 
  private:
+  bool useFresh() const { return fresh_ > 0 && !(keepLast_ && hasLast()); }
+
   uint32_t lastHash_;
   uint32_t& rng_;
+  bool keepLast_ = false;
   uint32_t count_ = 0;
   uint32_t fresh_ = 0;
   uint32_t freshValue_ = 0, freshValue2_ = 0, freshHash_ = 0;

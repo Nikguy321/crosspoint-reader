@@ -31,21 +31,25 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "KOReaderCredentialStore.h"
+#include "LiveSleep.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/boot_sleep/SleepActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/RadioPower.h"
+#include "network/StationKeeper.h"
 #include "platform/UsbSerialJtagHandoff.h"
 #include "util/AutoPowerOff.h"
 #include "util/BenchConsole.h"
 #include "util/BookSyncHooks.h"
 #include "util/ButtonNavigator.h"
+#include "util/LiveSleepPolicy.h"
 #include "util/PowerButtonTiming.h"
 #include "util/PowerLedger.h"
 #include "util/ScreenshotUtil.h"
@@ -151,6 +155,8 @@ constexpr uint32_t SILENT_REBOOT_TARGET_SETTINGS = 2;
 constexpr uint32_t SILENT_REBOOT_TARGET_SLEEP_CARDS = 3;
 constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_SLEEP_CARDS;
 constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
+// A key on the live sleep screen: the reopen is a wake, so Pull on Open runs as after deep sleep.
+constexpr uint32_t SILENT_REBOOT_LIVE_WAKE = 1U << 1;
 
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
@@ -159,6 +165,7 @@ enum class BootResume : uint8_t {
   Splash,          // cold boot, flash, panic, or plain reboot
   Silent,          // heap-defrag ESP.restart() (RTC flag; lost on power loss)
   SplashlessWake,  // wake from deep sleep with the splash suppressed by the SD flag
+  LiveSleep,       // auto power-off timer wake on the charger: the live sleep screen
 };
 
 // Latched true once enterDeepSleep() commits to sleeping, before it tears down
@@ -175,17 +182,19 @@ static bool deepSleepInProgress = false;
 // off leaves the light off while the saved "was on" preference is kept), so
 // carry the live state across the reboot instead of re-deriving it from
 // settings. Cleared with the magic in setup().
-static void armSilentReboot(const uint32_t target) {
+static void armSilentReboot(const uint32_t target, const bool lightOn, const bool liveWake = false) {
   silentRebootTarget = target;
-  silentRebootPayload = Frontlight.isOn() ? SILENT_REBOOT_LIGHT_ON : 0;
+  silentRebootPayload = (lightOn ? SILENT_REBOOT_LIGHT_ON : 0) | (liveWake ? SILENT_REBOOT_LIVE_WAKE : 0);
   silentRebootMagic = SILENT_REBOOT_MAGIC;
 }
 
 // Returns instead of rebooting when sleep supersedes the reboot; callers keep
-// running in that case.
-static void silentRestartTo(const uint32_t target, const char* targetName) {
+// running in that case. lightOn: the frontlight the restarted reader shows.
+// liveWake: the restart is the live sleep screen's wake (SILENT_REBOOT_LIVE_WAKE).
+static void silentRestartWithLight(const uint32_t target, const char* targetName, const bool lightOn,
+                                   const bool liveWake = false) {
   if (deepSleepInProgress) return;  // sleeping supersedes the heap-defrag reboot
-  armSilentReboot(target);
+  armSilentReboot(target, lightOn, liveWake);
   LOG_DBG("MAIN", "Silent restart (target=%s)", targetName);
   // E-ink retains the previous frame until the target's first paint lands
   // (~2-3s). Without an overlay, users don't see the reboot and fire input
@@ -195,6 +204,10 @@ static void silentRestartTo(const uint32_t target, const char* targetName) {
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
   ESP.restart();
+}
+
+static void silentRestartTo(const uint32_t target, const char* targetName) {
+  silentRestartWithLight(target, targetName, Frontlight.isOn());
 }
 
 void silentRestart() { silentRestartTo(SILENT_REBOOT_TARGET_HOME, "home"); }
@@ -209,7 +222,7 @@ void silentRestartToSleepCards() { silentRestartTo(SILENT_REBOOT_TARGET_SLEEP_CA
 
 void restartToHomeAfterStorageHandoff() {
   if (deepSleepInProgress) return;  // sleeping supersedes the storage handoff reboot
-  armSilentReboot(SILENT_REBOOT_TARGET_HOME);
+  armSilentReboot(SILENT_REBOOT_TARGET_HOME, Frontlight.isOn());
   LOG_DBG("MAIN", "Restart after storage handoff (target=home)");
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
   delay(50);
@@ -246,6 +259,50 @@ bool handleX4ProFrontlightDoubleClick() {
   toggleFrontlight();
   return true;
 }
+
+static_assert(live_sleep::FIRST_CARD_MODE == CrossPointSettings::NOW_READING &&
+                  live_sleep::LAST_CARD_MODE + 1 == CrossPointSettings::SLEEP_SCREEN_MODE_COUNT,
+              "live_sleep's card modes must match CrossPointSettings::SLEEP_SCREEN_MODE");
+
+// The live sleep screen (LiveSleep.h): one session from the sleep gesture (or a timer wake on the
+// charger) to a key or the unplug.
+struct LiveSession {
+  bool active = false;
+  bool lightWasOn = false;   // the frontlight before the screen went live, for the wake
+  bool wakePending = false;  // a key went down: the wake waits until every key is up again
+  uint32_t wakePressAt = 0;  // when that key went down (live_sleep::wakeNow)
+  uint32_t rotatedAt = 0;    // the last /sleep.log rotation check (the pwr lines go on for days)
+  live_sleep::UnplugDebounce unplug;
+};
+static LiveSession liveSession;
+
+// /sleep.log "live" x=: what put it to sleep. "sleep" x= of a live session's end.
+constexpr int LIVE_FROM_BUTTON = 0;
+constexpr int LIVE_FROM_TIMEOUT = 1;
+constexpr int LIVE_FROM_TIMER_BOOT = 2;
+constexpr int SLEEP_AFTER_UNPLUG = 2;
+constexpr int SLEEP_AFTER_BENCH = 3;
+constexpr unsigned long LIVE_LOOP_DELAY_MS = 20;
+constexpr uint32_t LIVE_ROTATE_EVERY_MS = 60UL * 60UL * 1000UL;
+
+bool liveSleepActive() { return liveSession.active; }
+
+// A computer on the USB cable (SOF frames), sampled once per loop pass. The
+// bench console tracks it in dev builds; release builds read the same monitor.
+static bool usbHostAttached() {
+#if CROSSPOINT_BENCH_CONSOLE
+  return BenchConsole::hostPresent();
+#elif ARDUINO_USB_MODE && SOC_USB_SERIAL_JTAG_SUPPORTED
+  static power_policy::HostSeen seen;
+  const uint32_t now = millis();
+  seen.update(now, HWCDC::isPlugged());
+  return seen.present(now);
+#else
+  return false;
+#endif
+}
+
+bool externalPowerPresent() { return live_sleep::externalPower(gpio.isUsbConnected(), usbHostAttached()); }
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
@@ -322,7 +379,7 @@ static void powerLedgerTick(const bool usbHost) {
   static uint64_t sleptUsAtStart = 0;
   static power_ledger::WindowLatch latch;
   latch.note((Frontlight.present() && Frontlight.isOn()) ? Frontlight.brightness() : 0, powerManager.radioActive(),
-             gpio.usbConnectedAtUpdate(), usbHost);
+             gpio.usbConnectedAtUpdate(), usbHost, liveSession.active);
   const uint32_t now = millis();
   const uint32_t windowMs = now - windowStartMs;
   if (windowMs < power_ledger::WINDOW_MS) return;
@@ -340,6 +397,9 @@ static void powerLedgerTick(const bool usbHost) {
   w.lightSleepPermille = power_ledger::permille(powerManager.lightSleepMicros() - sleptUsAtStart,
                                                 static_cast<uint64_t>(windowMs) * 1000ULL);
   w.lightSleepEnabled = powerManager.lightSleepEnabled();
+  const auto heap = HalMemory::getInternalHeap();
+  w.heapFree = static_cast<uint32_t>(heap.freeBytes);
+  w.heapLargest = static_cast<uint32_t>(heap.largestBlockBytes);
   char line[power_ledger::LINE_CAP];
   appendLedgerLine(line, power_ledger::formatLine(line, sizeof line, w));
 
@@ -350,8 +410,8 @@ static void powerLedgerTick(const bool usbHost) {
   sleptUsAtStart = powerManager.lightSleepMicros();
 }
 
-// Boot only (the sleep and cut paths stay tiny): roll the ledger over once it
-// passes its cap, keeping one previous file.
+// At boot, at live sleep entry and hourly while live (the sleep and cut paths
+// stay tiny): roll the ledger over once it passes its cap, keeping one previous file.
 static void rotateSleepLedger() {
   if (!Storage.ready()) return;
   size_t bytes = 0;
@@ -369,14 +429,25 @@ static void rotateSleepLedger() {
 // The rail is still held up from that sleep, so the card can take the ledger
 // line first (the RTC and gauge share the I2C bus halClock.begin() starts).
 // Then the rail drops and the device sleeps on the power button alone.
-[[noreturn]] static void powerOffAfterTimer() {
-  halClock.begin();
-  if (Storage.begin()) {
+// storageReady: setup() already mounted the card (a charging timer wake whose
+// sleep screen turned out not to be live-capable).
+[[noreturn]] static void powerOffAfterTimer(const bool storageReady = false) {
+  if (!storageReady) halClock.begin();
+  if (storageReady || Storage.begin()) {
     sleepLedger("cut", 0);
     Storage.prepareForDeepSleep();
   }
   railCutMagic = RAIL_CUT_MAGIC;
   powerManager.cutRailAndSleep();
+}
+
+// The charger STAT line at the top of setup(), before BatteryMonitor configures
+// it: input with no pull, like BatteryMonitor (STAT is push-pull).
+static bool chargerStatAtBoot() {
+  const int8_t pin = BoardConfig::ACTIVE.batteryChargeStatus;
+  if (pin < 0) return false;
+  pinMode(pin, INPUT);
+  return digitalRead(pin) == (BoardConfig::ACTIVE.batteryChargeStatusActiveHigh ? HIGH : LOW);
 }
 #else
 // The ledger is an X4 Pro diagnostic; no other board writes it.
@@ -385,26 +456,11 @@ static void rotateSleepLedger() {}
 static void powerLedgerTick(bool) {}
 #endif
 
-// Enter deep sleep mode
-void enterDeepSleep(bool fromTimeout = false) {
+// The second half of a sleep: the sleep screen is on the panel; tear down and
+// deep sleep (the auto power-off timer armed). ledgerExtra: the "sleep" line's x.
+static void commitDeepSleep(const bool isQuickResumeSleep, const int ledgerExtra) {
   HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
-  APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
-
-  const bool isQuickResumeSleep =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
-  // Every sleep mode leaves a complete retained frame on the e-ink panel. Keep
-  // it visible until the first useful reader or home paint replaces it.
-  APP_STATE.showBootScreen = false;
-
-  APP_STATE.saveToFile();
-
-  // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
-  // a WiFi activity would otherwise silentRestart() here and reboot instead.
   deepSleepInProgress = true;
-  activityManager.goToSleep(fromTimeout);
-
   if (isQuickResumeSleep) {
     saveSleepFrameBuffer();
   } else if (Storage.exists(SLEEP_FRAME_FILE)) {
@@ -418,11 +474,150 @@ void enterDeepSleep(bool fromTimeout = false) {
 
   halTiltSensor.deepSleep();
   display.deepSleep();
-  sleepLedger("sleep", fromTimeout ? 1 : 0);
+  sleepLedger("sleep", ledgerExtra);
   Storage.prepareForDeepSleep();
   LOG_DBG("MAIN", "Entering deep sleep");
 
   powerManager.startDeepSleep(gpio, autoPowerOffMicros());
+}
+
+// The live sleep screen instead of deep sleep (LiveSleep.h). The light goes off
+// without touching the saved setting; the wake brings it back. Silent restarts
+// stay possible afterwards (the wake is one), so the deep-sleep latch is held
+// only while goToSleep() runs the outgoing activity's onExit().
+static void enterLiveSleep(const int ledgerExtra, const bool fromTimeout, const bool popup) {
+  liveSession = LiveSession{};
+  liveSession.active = true;
+  liveSession.unplug.start(millis());
+  liveSession.rotatedAt = millis();
+  liveSession.lightWasOn = Frontlight.present() && Frontlight.isOn();
+  if (Frontlight.present()) Frontlight.setOn(false);
+  rotateSleepLedger();
+  sleepLedger("live", ledgerExtra);
+  LOG_INF("SLP", "Live sleep: on external power, the sleep screen stays up");
+  deepSleepInProgress = true;
+  activityManager.goToSleep(fromTimeout, /*live=*/true, popup);
+  deepSleepInProgress = false;
+  // A radio the outgoing activity left up (or only stopped: RadioPower::stop() cannot be started
+  // again) goes off, so the station keeper starts the driver afresh. The keeper starts only now:
+  // its first scan would otherwise be torn down here (goToSleep() already ran one loop pass).
+  RadioPower::off();
+  StationKeeper::start();
+}
+
+// A key on the live screen: back to where the reader was, like a deep-sleep
+// wake (a restart, which also clears the heap the Wi-Fi session fragmented).
+static void wakeFromLiveSleep() {
+  HalPowerManager::Lock powerLock;
+  LOG_INF("SLP", "Live sleep: woken by a key");
+  sleepLedger("livewake", 0);
+  StationKeeper::stop();
+  RadioPower::off();
+  liveSession.active = false;
+  // Restore Light on Wake, of the light as it was before the screen went live.
+  const bool lightOn = liveSession.lightWasOn && SETTINGS.frontlightRestoreOnWake != 0;
+  if (APP_STATE.lastSleepFromReader && !APP_STATE.openEpubPath.empty()) {
+    silentRestartWithLight(SILENT_REBOOT_TARGET_READER, "reader", lightOn, /*liveWake=*/true);
+  }
+  silentRestartWithLight(SILENT_REBOOT_TARGET_HOME, "home", lightOn, /*liveWake=*/true);
+}
+
+// The live screen ends in today's deep sleep (unplugged, or the bench's SLEEP
+// deep): one last redraw so the card's time and battery are those of this
+// moment, then the unchanged commit. Auto Power Off counts from here.
+static void endLiveSleep(const int ledgerExtra, const char* why) {
+  HalPowerManager::Lock powerLock;
+  LOG_INF("SLP", "Live sleep ends (%s): deep sleep", why);
+  SleepActivity::finalLiveRedraw();
+  StationKeeper::stop();
+  liveSession.active = false;
+  commitDeepSleep(false, ledgerExtra);
+}
+
+static bool anyKeyDown() {
+  for (uint8_t button = HalGPIO::BTN_BACK; button <= HalGPIO::BTN_POWER; button++) {
+    if (gpio.isPressed(button)) return true;
+  }
+  return false;
+}
+
+// One main-loop pass while the live screen is up: no inactivity or power-hold
+// sleep, no naps (the charger and the radio block them anyway). SleepActivity's
+// loop() redraws and ticks the station keeper.
+static void liveSleepLoop() {
+  const uint32_t now = millis();
+#if CROSSPOINT_BENCH_CONSOLE
+  const uint8_t bench = BenchConsole::poll(/*exclusiveStorage=*/false, now);
+  if (bench & BenchConsole::REQUEST_DEEP_SLEEP) {
+    endLiveSleep(SLEEP_AFTER_BENCH, "bench");
+    return;
+  }
+  if (bench & (BenchConsole::REQUEST_SLEEP | BenchConsole::REQUEST_REDRAW)) SleepActivity::requestLiveRedraw();
+#endif
+  // The unplug first, on every pass: nothing (not even a key held down) keeps the screen live
+  // on the battery.
+  const bool usbHost = usbHostAttached();
+  liveSession.unplug.note(live_sleep::externalPower(gpio.usbConnectedAtUpdate(), usbHost), now);
+  if (liveSession.unplug.unplugged(now)) {
+    LOG_INF("SLP", "Live sleep: no external power for %lu s (charger line low, no USB host)",
+            static_cast<unsigned long>(live_sleep::UNPLUG_DEBOUNCE_MS / 1000));
+    endLiveSleep(SLEEP_AFTER_UNPLUG, "unplugged");
+    return;
+  }
+
+  // Any physical key wakes it (not touch). The wake waits until every key is up
+  // so the press cannot also act on what comes back (page turns fire on release),
+  // but not for a key that stays down (live_sleep::wakeNow).
+  if (!liveSession.wakePending && gpio.wasAnyPressed()) {
+    liveSession.wakePending = true;
+    liveSession.wakePressAt = now;
+  }
+  if (liveSession.wakePending) {
+    if (live_sleep::wakeNow(anyKeyDown(), now - liveSession.wakePressAt)) wakeFromLiveSleep();
+    delay(10);
+    return;
+  }
+
+  if (now - liveSession.rotatedAt >= LIVE_ROTATE_EVERY_MS) {
+    liveSession.rotatedAt = now;
+    rotateSleepLedger();
+  }
+  powerLedgerTick(usbHost);
+
+  activityManager.loop();
+  powerManager.setPowerSaving(true);  // refused while a radio is up
+  delay(LIVE_LOOP_DELAY_MS);
+}
+
+// Show the sleep screen and deep sleep, or keep it live on external power
+// (LiveSleep.h). forceDeep: the bench's SLEEP deep.
+void enterDeepSleep(bool fromTimeout = false, bool forceDeep = false) {
+  HalPowerManager::Lock powerLock;  // Ensure we are at normal CPU frequency for sleep preparation
+  const bool live = !forceDeep && live_sleep::liveEligible(BoardConfig::isX4Pro(), externalPowerPresent(),
+                                                           SETTINGS.sleepScreen, SETTINGS.cardCycleWhenCharging != 0);
+  APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
+
+  // Live wins over Quick Resume after timeout: its screen is redrawn.
+  const bool isQuickResumeSleep =
+      !live && (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
+                (fromTimeout && SETTINGS.quickResumeSleepScreen ==
+                                    CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT));
+  // Every sleep mode leaves a complete retained frame on the e-ink panel. Keep
+  // it visible until the first useful reader or home paint replaces it.
+  APP_STATE.showBootScreen = false;
+
+  APP_STATE.saveToFile();
+
+  if (live) {
+    enterLiveSleep(fromTimeout ? LIVE_FROM_TIMEOUT : LIVE_FROM_BUTTON, fromTimeout, /*popup=*/true);
+    return;
+  }
+
+  // Commit to sleeping before goToSleep() runs the outgoing activity's onExit():
+  // a WiFi activity would otherwise silentRestart() here and reboot instead.
+  deepSleepInProgress = true;
+  activityManager.goToSleep(fromTimeout);
+  commitDeepSleep(isQuickResumeSleep, fromTimeout ? 1 : 0);
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -476,16 +671,20 @@ void setup() {
   // Auto power-off: a timer wake can only come from startDeepSleep(gpio,
   // powerOffAfterUs). Decided before holdPowerRails() re-asserts the rail
   // this is about to cut. The bitmap form sees a button press that landed in
-  // the timer's instant (the single-cause call reports the timer first).
+  // the timer's instant (the single-cause call reports the timer first). A
+  // reader plugged in while it slept is not cut: it boots into the live sleep
+  // screen below (once the settings say its sleep screen can be live).
+  bool chargingTimerWake = false;
   {
     const uint32_t causes = esp_sleep_get_wakeup_causes();
     const bool timerWake = (causes & (1u << ESP_SLEEP_WAKEUP_TIMER)) != 0;
     const bool buttonWake = (causes & ((1u << ESP_SLEEP_WAKEUP_EXT1) | (1u << ESP_SLEEP_WAKEUP_GPIO))) != 0;
-    if (auto_power_off::shouldCutRailOnWake(
-            timerWake, buttonWake,
-            auto_power_off::canCutRail(BoardConfig::isX4Pro(), BoardConfig::ACTIVE.power.latch0))) {
+    const bool railCuttable = auto_power_off::canCutRail(BoardConfig::isX4Pro(), BoardConfig::ACTIVE.power.latch0);
+    const bool charging = timerWake && chargerStatAtBoot();
+    if (auto_power_off::shouldCutRailOnWake(timerWake, buttonWake, railCuttable, charging)) {
       powerOffAfterTimer();
     }
+    chargingTimerWake = timerWake && !buttonWake && railCuttable && charging;
   }
   const bool railWasCut = railCutMagic == RAIL_CUT_MAGIC;
   railCutMagic = 0;
@@ -521,10 +720,13 @@ void setup() {
   const uint32_t snapshotTarget =
       (isSilentReboot && silentRebootTarget <= SILENT_REBOOT_TARGET_MAX) ? silentRebootTarget : 0;
   const bool silentRebootLightOn = isSilentReboot && (silentRebootPayload & SILENT_REBOOT_LIGHT_ON) != 0;
+  const bool silentRebootLiveWake = isSilentReboot && (silentRebootPayload & SILENT_REBOOT_LIVE_WAKE) != 0;
   silentRebootMagic = 0;
   silentRebootTarget = 0;
   silentRebootPayload = 0;
-  BookSyncHooks::onBoot(isSilentReboot, snapshotTarget == SILENT_REBOOT_TARGET_READER);
+  // The live sleep screen's wake reopens the book like a deep-sleep wake: a fresh open (Pull on
+  // Open runs), not a sync's continuation.
+  BookSyncHooks::onBoot(isSilentReboot, snapshotTarget == SILENT_REBOOT_TARGET_READER && !silentRebootLiveWake);
 
   gpio.begin();
   powerManager.begin();
@@ -606,12 +808,24 @@ void setup() {
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
+  // The auto power-off timer fired on the charger: straight back into the live
+  // sleep screen, or the cut it was armed for when the screen cannot be live.
+  bool liveBoot = false;
+#if FREEINK_DEVICE_X4PRO
+  if (chargingTimerWake) {
+    liveBoot = live_sleep::liveEligible(BoardConfig::isX4Pro(), externalPowerPresent(), SETTINGS.sleepScreen,
+                                        SETTINGS.cardCycleWhenCharging != 0);
+    if (!liveBoot) powerOffAfterTimer(/*storageReady=*/true);
+  }
+#endif
+
   // Brightness and warmth are always restored. A normal wake starts with the
   // light off unless Restore Light on Wake is enabled; silent maintenance
   // reboots replay the live state captured at restart, so they neither go dark
   // nor light up against the user's wake preference.
   const bool restoreLightOn =
-      isSilentReboot ? silentRebootLightOn : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0);
+      !liveBoot &&
+      (isSilentReboot ? silentRebootLightOn : (SETTINGS.frontlightOn != 0 && SETTINGS.frontlightRestoreOnWake != 0));
   Frontlight.begin(SETTINGS.frontlightBrightness, SETTINGS.frontlightWarmth, restoreLightOn);
 
   switch (wakeupReason) {
@@ -662,6 +876,7 @@ void setup() {
   // Otherwise a stale flag could suppress the splash on a cold boot.
   const BootResume resume = isSilentReboot         ? BootResume::Silent
                             : isPersistedSleepWake ? BootResume::SplashlessWake
+                            : liveBoot             ? BootResume::LiveSleep
                                                    : BootResume::Splash;
   bool allowFastInitialReaderRefresh = false;
   bool needsWakeRefresh = false;
@@ -694,6 +909,9 @@ void setup() {
     case BootResume::Splash:
       activityManager.goToBoot();
       break;
+    case BootResume::LiveSleep:
+      // The panel keeps the card it slept with until the live screen's first draw.
+      break;
   }
 
   // Output polarity is resolved per render by ActivityManager (night mode
@@ -706,6 +924,10 @@ void setup() {
   } else if (rebootedFromPanic) {
     // If we rebooted from a panic, go to crash report screen to show the panic info
     activityManager.goToCrashReport();
+  } else if (resume == BootResume::LiveSleep) {
+    // As it went to sleep: lastSleepFromReader and the open book are as saved then.
+    enterLiveSleep(LIVE_FROM_TIMER_BOOT, /*fromTimeout=*/false, /*popup=*/false);
+    liveSession.lightWasOn = SETTINGS.frontlightOn != 0;
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_READER &&
              !APP_STATE.openEpubPath.empty()) {
     activityManager.goToReader(APP_STATE.openEpubPath);
@@ -757,21 +979,6 @@ void setup() {
   allowSleepAt = millis() + 2000;
 }
 
-// A computer on the USB cable (SOF frames), sampled once per loop pass. The
-// bench console tracks it in dev builds; release builds read the same monitor.
-static bool usbHostAttached() {
-#if CROSSPOINT_BENCH_CONSOLE
-  return BenchConsole::hostPresent();
-#elif ARDUINO_USB_MODE && SOC_USB_SERIAL_JTAG_SUPPORTED
-  static power_policy::HostSeen seen;
-  const uint32_t now = millis();
-  seen.update(now, HWCDC::isPlugged());
-  return seen.present(now);
-#else
-  return false;
-#endif
-}
-
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
@@ -818,12 +1025,18 @@ void loop() {
     lastMemPrint = millis();
   }
 
+  if (liveSession.active) {
+    liveSleepLoop();
+    return;
+  }
+
 #if CROSSPOINT_BENCH_CONSOLE
   // The bench console owns the serial input (it also serves CMD:SCREENSHOT).
   static unsigned long lastActivityTime = millis();
   const uint8_t benchResult = BenchConsole::poll(/*exclusiveStorage=*/false, lastActivityTime);
   if (benchResult & BenchConsole::REQUEST_SLEEP) {
-    enterDeepSleep(true);  // the auto-sleep path
+    // The auto-sleep path; SLEEP deep skips the live screen.
+    enterDeepSleep(true, (benchResult & BenchConsole::REQUEST_DEEP_SLEEP) != 0);
     return;
   }
   const bool benchActivity = (benchResult & BenchConsole::USER_ACTIVITY) != 0;

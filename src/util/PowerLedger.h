@@ -9,7 +9,8 @@
 // boot/sleep/cut lines. Pure formatting so a host test can pin the layout.
 //
 //   <unix> pwr up=<s> soc=<%> mv=<mV> mhz=<n> fl=<n> wifi=<0|1> usb=<0|1>
-//          host=<0|1> rnd=<n> ls=<permille> lsn=<n> lse=<0|1>
+//          host=<0|1> rnd=<n> ls=<permille> lsn=<n> lse=<0|1> live=<0|1>
+//          heap=<bytes> blk=<bytes>
 //   mhz   CPU clock at the instant the line was written (a snapshot, and
 //         nearly always 80: the write follows an idle pass)
 //   fl    the highest frontlight brightness % seen in the window, 0 = dark all
@@ -19,12 +20,15 @@
 //         on USB (SOF frames) at any time in the window
 //   rnd   renders in the window;  ls = per-mille of the window in light sleep
 //   lsn   light sleeps in the window;  lse = light sleep enabled (bench LS on|off)
+//   live  the live sleep screen (charging, util/LiveSleepPolicy.h) was up at any
+//         time in the window;  heap / blk = free internal heap and its largest
+//         block when the line was written (fragmentation over a long live session)
 // Reading current off the gauge: over windows with fl=0 wifi=0 usb=0 within one
 // boot, mA ~= 11 x (sum of soc drops) / (sum of hours); the mv slope agrees.
 namespace power_ledger {
 
 constexpr uint32_t WINDOW_MS = 5UL * 60UL * 1000UL;
-constexpr size_t LINE_CAP = 160;
+constexpr size_t LINE_CAP = 200;
 
 struct Window {
   uint32_t unixTime = 0;  // 0 while the RTC is unset
@@ -40,6 +44,9 @@ struct Window {
   unsigned lightSleepPermille = 0;
   uint32_t lightSleeps = 0;
   bool lightSleepEnabled = false;
+  bool live = false;
+  uint32_t heapFree = 0;
+  uint32_t heapLargest = 0;
 };
 
 // The window's conditions, noted on every loop pass: a window counts as dark,
@@ -49,18 +56,22 @@ struct WindowLatch {
   bool wifi = false;
   bool usb = false;
   bool host = false;
+  bool live = false;
 
-  void note(const unsigned frontlight, const bool wifiOn, const bool usbOn, const bool hostOn) {
+  void note(const unsigned frontlight, const bool wifiOn, const bool usbOn, const bool hostOn,
+            const bool liveOn = false) {
     if (frontlight > frontlightMax) frontlightMax = frontlight;
     wifi = wifi || wifiOn;
     usb = usb || usbOn;
     host = host || hostOn;
+    live = live || liveOn;
   }
   void applyTo(Window& w) const {
     w.frontlight = frontlightMax;
     w.wifi = wifi;
     w.usb = usb;
     w.host = host;
+    w.live = live;
   }
 };
 
@@ -75,11 +86,12 @@ constexpr unsigned permille(const uint64_t sleptUs, const uint64_t windowUs) {
 inline size_t formatLine(char* buf, const size_t cap, const Window& w) {
   const int n = snprintf(buf, cap,
                          "%lu pwr up=%lu soc=%u mv=%u mhz=%u fl=%u wifi=%d usb=%d host=%d rnd=%lu ls=%u lsn=%lu "
-                         "lse=%d\n",
+                         "lse=%d live=%d heap=%lu blk=%lu\n",
                          static_cast<unsigned long>(w.unixTime), static_cast<unsigned long>(w.uptimeS), w.socPercent,
                          w.millivolts, w.cpuMhz, w.frontlight, w.wifi ? 1 : 0, w.usb ? 1 : 0, w.host ? 1 : 0,
                          static_cast<unsigned long>(w.renders), w.lightSleepPermille,
-                         static_cast<unsigned long>(w.lightSleeps), w.lightSleepEnabled ? 1 : 0);
+                         static_cast<unsigned long>(w.lightSleeps), w.lightSleepEnabled ? 1 : 0, w.live ? 1 : 0,
+                         static_cast<unsigned long>(w.heapFree), static_cast<unsigned long>(w.heapLargest));
   if (n <= 0 || static_cast<size_t>(n) >= cap) return 0;
   return static_cast<size_t>(n);
 }

@@ -58,7 +58,7 @@ void SleepCardPreviewActivity::draw() {
   }
   if (strcmp(last.outcome, "drawn") != 0) {
     // What the sleep screen falls back to: the logo, dark for the classic Dark screen and, for a
-    // card, under the Inverted filter (like the card itself).
+    // card, with Dark Cards on (like the card itself).
     sleepcards::drawX4ProLogoScreen(renderer, tr(STR_SLEEPING));
     invert = card == sleepcards::CardId::None ? SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::DARK
                                               : sleepcards::cardsDark();

@@ -17,14 +17,18 @@ namespace RadioPower {
 // releases the lock.
 bool mode(wifi_mode_t mode);
 
-// WiFi.begin(): joins as a station (starting STA mode if needed).
-wl_status_t begin(const char* ssid, const char* passphrase = nullptr);
+// WiFi.begin(): joins as a station (starting STA mode if needed). A channel and BSSID from a
+// scan name that access point; the caller's WIFI_FAST_SCAN then makes the driver's connect scan
+// start on that channel and stop at it (channel 0: it searches by name).
+wl_status_t begin(const char* ssid, const char* passphrase = nullptr, int32_t channel = 0,
+                  const uint8_t* bssid = nullptr);
 
 // WiFi.softAP(): starts the access point (AP mode if needed).
 bool softAP(const char* ssid, const char* passphrase, int channel, bool hidden, int maxConnections);
 
-// WiFi.scanNetworks(): scans as a station (STA mode if needed).
-int16_t scanNetworks(bool async);
+// WiFi.scanNetworks(): scans as a station (STA mode if needed). showHidden: networks that hide
+// their name are listed too (with an empty SSID), so a join can tell one is in range.
+int16_t scanNetworks(bool async, bool showHidden = false);
 
 // esp_wifi_stop(): RF off while a result screen is read. The driver stays
 // initialised and the radio lock stays held (full clock, no light sleep) until

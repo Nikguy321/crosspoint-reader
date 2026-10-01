@@ -959,7 +959,22 @@ bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer) {
   w.name[0] = w.work[0] = w.note[0] = '\0';
   uint32_t shownHash = 0;
   bool ready = false;
-  switch (chooseCategory(enabled, pools, rng)) {
+  Pick pick = Pick::None;
+  if (ctx.repeatLast && lastHash != 0) {
+    // The quote already on screen, from whichever category holds it.
+    if (minePick.hasLast()) {
+      pick = Pick::Mine;
+    } else if (bookmarkPick.hasLast()) {
+      pick = Pick::Bookmarks;
+    } else if (builtInPick.hasLast()) {
+      pick = Pick::BuiltIn;
+    }
+    minePick.keepLast();
+    bookmarkPick.keepLast();
+    builtInPick.keepLast();
+  }
+  if (pick == Pick::None) pick = chooseCategory(enabled, pools, rng);
+  switch (pick) {
     case Pick::Mine: {
       const uint32_t offset = minePick.value();
       const uint32_t length = std::min<uint32_t>(minePick.value2(), ENTRY_CAP);

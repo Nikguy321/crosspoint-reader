@@ -19,12 +19,14 @@ Pro. CrossPoint's own README follows further down.
   - Shuffle: a different card each sleep.
 
   An X4 Pro logo replaces the CrossPoint one, and the cards can be white on black.
+- **A live sleep screen on the charger:** the card is redrawn on the minute (every 2 minutes by default) and can deal
+  a new Shuffle card each time (Card Cycle When Charging); unplugged, the reader sleeps as usual.
 - **Locate Me** sets the cards' location from nearby Wi-Fi (beaconDB), or from your internet address as a fallback.
   Nothing is sent until you press Locate. It can also refresh the location once a day during a sync.
 - **Battery behaviour like the stock firmware:**
   - Auto Power Off turns the reader fully off after a set time asleep.
   - The awake reader naps between key presses, with the light on too.
-  - Wi-Fi is on only while a job needs it.
+  - Wi-Fi is on only while a job needs it, or while the sleep screen is live on the charger.
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.

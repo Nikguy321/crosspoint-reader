@@ -207,6 +207,17 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
     needsResave = true;
   }
 
+  // Dark cards used to be the Sleep Screen Cover Filter's "Inverted", which also turned pictures and
+  // covers into negatives. They have their own setting now: a reader that had Inverted keeps its dark
+  // cards and gets its pictures back. Only with a card as the sleep screen: anywhere else Inverted was
+  // chosen for pictures or covers and stays.
+  if (BoardConfig::isX4Pro() && doc["darkCards"].isNull() && isSleepCardMode(sleepScreen) &&
+      sleepScreenCoverFilter == SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE) {
+    darkCards = 1;
+    sleepScreenCoverFilter = SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
+    needsResave = true;
+  }
+
   if (doc["sleepTimeoutMinutes"].isNull() && !doc["sleepTimeout"].isNull()) {
     const uint8_t legacyValue =
         clamp(doc["sleepTimeout"] | (uint8_t)SLEEP_10_MIN, SLEEP_TIMEOUT_COUNT, (uint8_t)SLEEP_10_MIN);

@@ -70,6 +70,17 @@ constexpr uint32_t CAT_TAIL_MAX = 16384;
 constexpr size_t CAT_LINE_CAP = 200;  // longer lines are truncated on the wire
 bool parseCatArgs(char* args, uint32_t& tailBytes, char*& path);
 
+// SLEEP [deep]. Default: the sleep a power press gives (on external power, the live sleep screen
+// when it can be live; on that screen, a redraw). Deep: deep sleep even on external power, and
+// from the live screen its commit to deep sleep. False for anything else.
+enum class SleepKind : uint8_t { Default, Deep };
+bool parseSleepArgs(const char* args, SleepKind& out);
+
+// WIFILAST <ssid>: the rest of the line is the SSID, as the Wi-Fi list stores it: 1..32 bytes,
+// no control characters (spaces are part of an SSID).
+constexpr size_t SSID_MAX_BYTES = 32;
+bool isValidSsid(const char* ssid);
+
 // Bookkeeping for one PUT receive: which bytes to read next, when to ACK, NAK
 // or abort. The firmware does the serial and card I/O around it.
 class PutSession {

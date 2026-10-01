@@ -8,15 +8,16 @@
  * Display > Sleep Screen Cards (X4 Pro): the place the Day, Calendar and Sky
  * cards compute the sun and moon for (typed, or found by Locate Me, and optionally refreshed from
  * nearby Wi-Fi while a sync has Wi-Fi up), the hunting season and its legal-light
- * rule, the Owner card's lines, where the Quote card reads from, and which
- * cards Shuffle may pick. Everything lives in CrossPointSettings and is saved
+ * rule, the Owner card's lines, where the Quote card reads from, Dark Cards, which
+ * cards Shuffle may pick, and the live sleep screen on the charger (Card Cycle
+ * When Charging, Charging Updates). Everything lives in CrossPointSettings and is saved
  * on each change; typed entries are validated and a bad one is not saved.
  */
 class SleepCardSettingsActivity final : public UiListActivity {
  public:
   explicit SleepCardSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-  static constexpr int MENU_ITEMS = 18;
+  static constexpr int MENU_ITEMS = 21;
 
  private:
   int listCount() const override;

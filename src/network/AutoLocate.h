@@ -4,9 +4,9 @@
 
 // "Update location when syncing" (Display > Sleep Screen Cards, X4 Pro; off by default): while a
 // job that needed Wi-Fi for its own work still has it up (KOReaderSyncActivity, ClockSyncActivity
-// "Sync clock now"), refresh a sleep-card location that was not saved today from nearby Wi-Fi
-// networks. Typed-in locations are refreshed too; a stored Wi-Fi fix at least as tight as the new
-// answer and agreeing with it is kept (re-dated) instead.
+// "Sync clock now", the live sleep screen's clock sync on the charger: network/StationKeeper),
+// refresh a sleep-card location that was not saved today from nearby Wi-Fi networks. Typed-in locations are refreshed
+// too; a stored Wi-Fi fix at least as tight as the new answer and agreeing with it is kept (re-dated) instead.
 //
 // Never starts the radio: it runs only on a station already connected, and its scan goes through
 // RadioPower like every other. Asks beaconDB only (the MLS geolocate API, up to 20 access points,
@@ -34,5 +34,9 @@ bool due(bool jobOnline);
 
 // The lookup, after due() said so. Blocks the calling (loop) task for up to about BUDGET_MS.
 void run();
+
+// Lets due() answer once more this boot: live sleep's station keeper asks after each clock sync of
+// a charging session that may last days (the once-a-day rule still holds).
+void rearm();
 
 }  // namespace AutoLocate

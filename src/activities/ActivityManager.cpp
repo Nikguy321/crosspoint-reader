@@ -129,7 +129,9 @@ void ActivityManager::loop() {
       // The header back button shares this band; its taps stay Back.
       statusBarTap = mappedInput.wasScreenTapped(tx, ty) && ty < 44 && !HeaderBackTapTarget::contains(tx, ty);
     }
-    if (currentActivity->name != "FrontlightPanel" && (statusBarTap || mappedInput.wasLightPanelGesture())) {
+    // Never over the sleep screen: a live one (charging) is left only by a key.
+    if (currentActivity->name != "FrontlightPanel" && currentActivity->name != "Sleep" &&
+        (statusBarTap || mappedInput.wasLightPanelGesture())) {
       pushActivity(std::make_unique<FrontlightPanelActivity>(renderer, mappedInput));
       return;
     }
@@ -328,8 +330,8 @@ void ActivityManager::goToReader(std::string path, const bool allowFastInitialRe
   }
 }
 
-void ActivityManager::goToSleep(bool fromTimeout) {
-  replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput, fromTimeout));
+void ActivityManager::goToSleep(bool fromTimeout, bool live, bool popup) {
+  replaceActivity(std::make_unique<SleepActivity>(renderer, mappedInput, fromTimeout, live, popup));
   loop();  // Important: sleep screen must be rendered immediately, the caller will go to sleep right after this returns
 }
 

@@ -17,7 +17,10 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py open "/Books/My Book.epub"
   scripts/x4bench.py card day --shot /tmp/day.png   # sleep card preview
   scripts/x4bench.py lightsleep off       # A/B power run (RAM, until the next boot)
-  scripts/x4bench.py sleep                # end of a bench session
+  scripts/x4bench.py sleep                # on this cable: the live sleep screen (charging)
+  scripts/x4bench.py redraw               # the live sleep screen redraws now
+  scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
+  scripts/x4bench.py sleep deep           # end of a bench session (deep sleep)
 
 Protocol (proto=1)
   host -> device   "CMD:<VERB> <args>\\n" (the host sends "\\n" first so a
@@ -52,7 +55,13 @@ Verbs
                               survives light sleep; lsblk=light only when not)
                               xtal (light-sleep crystal requests: 1 while lit,
                               else 0) flrun=ran/checked (dev: lit naps of 45 ms
-                              or more whose PWM was measured running)
+                              or more whose PWM was measured running),
+                              live (1: the live sleep screen is up, held=live)
+                              power (external power now: charger line or a
+                              computer) next_s (seconds to the next redraw, -1
+                              none) card screen (card|picture|logo) redraws
+                              wifi (station keeper: off none scan join up wait)
+                              cycle (Card Cycle When Charging) every (minutes)
   LS on|off                idle light sleep on or off until the next boot (a
                            deep-sleep wake is a boot: it comes back on);
                            OK LS lightsleep=on|off. For A/B power runs: the
@@ -88,8 +97,24 @@ Verbs
                            shown=<card> outcome=drawn|pictures|declined|logo
                            ms=<compute + draw> once it is on the panel; the
                            next key or tap returns to the screen below.
-  SLEEP                    deep sleep through the auto-sleep path (refused
-                           while an upload/sync/OTA holds the reader awake)
+  SLEEP [deep]             sleep through the auto-sleep path (refused while an
+                           upload/sync/OTA holds the reader awake). OK SLEEP
+                           live: on external power with a card (or Card Cycle
+                           When Charging) the live sleep screen comes up and
+                           this console stays; OK SLEEP deep: deep sleep, the
+                           port drops. "deep" forces deep sleep on power too.
+                           On the live screen: SLEEP redraws it (OK SLEEP live
+                           redraw), SLEEP deep commits to deep sleep.
+  REDRAW                   the live sleep screen redraws now (the cycle deals
+                           its next card): OK REDRAW redraws=<count so far>;
+                           ERR REDRAW notlive otherwise. The draw lands on a
+                           later loop pass: "x4bench.py redraw" waits for
+                           STATE redraws= to pass that count.
+  WIFILAST <ssid>          dev only: the Wi-Fi list's last-connected network
+                           (the rest of the line), so the fallback to the
+                           next-best saved network can be tested where the
+                           last one is out of range. OK WIFILAST saved=0|1
+                           networks=<n>. Never shows a password.
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).
@@ -110,7 +135,10 @@ X4 Pro key names
 
 Staying awake: while a computer is on the USB cable (STATE host=1) the reader
 never auto-sleeps; Power still sleeps it by hand. It cannot be woken over USB
-once asleep: press Power on it. End a session with "x4bench.py sleep".
+once asleep: press Power on it. On this cable a sleep is the live sleep screen
+(a computer is external power): the console stays, "key down" wakes it (the
+reader restarts, so the port drops briefly). End a session with
+"x4bench.py sleep deep".
 
 There is no overwrite, delete or rename verb: push never replaces a file, and
 reports stale "*.bench-part" files an interrupted upload left behind.
@@ -408,6 +436,29 @@ def parse_kv(text: str) -> dict:
     return out
 
 
+def state_fields(link: Link, timeout: float = 10.0) -> dict:
+    """Every k=v of one STATE reply."""
+    _, body = link.command("STATE", timeout)
+    fields = {}
+    for line in body:
+        if line.startswith("STATE "):
+            fields.update(parse_kv(line[6:]))
+    return fields
+
+
+def wait_live_redraw(link: Link, before: int, timeout: float = 30.0) -> dict:
+    """The live sleep screen draws on a later loop pass than the reply: wait for its count to
+    pass `before` (the count the REDRAW reply gave)."""
+    deadline = time.monotonic() + timeout
+    while True:
+        fields = state_fields(link)
+        if int(fields.get("redraws", "0")) > before:
+            return fields
+        if time.monotonic() > deadline:
+            raise BenchTimeout(f"REDRAW: the redraw did not land within {timeout:.0f} s")
+        time.sleep(0.3)
+
+
 def put_file(link: Link, data: bytes, remote: str, ack_timeout: float = 15.0,
              progress=None) -> str:
     """Upload bytes to a new file; returns the verified MD5."""
@@ -679,7 +730,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("state", choices=("on", "off"))
     s = sub.add_parser("lsforce", help="nap N seconds (1-45) with the cable attached; the port drops meanwhile")
     s.add_argument("seconds", type=int)
-    sub.add_parser("sleep")
+    s = sub.add_parser("sleep", help="sleep: the live sleep screen on power; 'deep' forces deep sleep")
+    s.add_argument("kind", nargs="?", choices=("deep",))
+    sub.add_parser("redraw", help="the live sleep screen redraws now")
+    s = sub.add_parser("wifilast", help="dev: set the Wi-Fi list's last-connected network (fallback tests)")
+    s.add_argument("ssid")
     s = sub.add_parser("cmd", help="raw passthrough: prints every console line")
     s.add_argument("text", nargs=argparse.REMAINDER)
     return p
@@ -765,8 +820,24 @@ def run(args, link: Link, out=sys.stdout) -> int:
         rest, _ = link.command(f"LSFORCE {args.seconds}", t or 5)
         print(rest, file=out)
     elif op == "sleep":
-        link.command("SLEEP", t or 5)
-        print("sleeping (press Power to wake)", file=out)
+        rest, _ = link.command("SLEEP deep" if args.kind == "deep" else "SLEEP", t or 5)
+        if rest == "live":
+            print("live sleep screen (on external power): a key wakes it", file=out)
+        elif rest == "live redraw":
+            print("live sleep screen: redraw requested", file=out)
+        else:
+            print("sleeping (press Power to wake)", file=out)
+    elif op == "redraw":
+        rest, _ = link.command("REDRAW", t or 30)
+        # "redraws=N": the count when the request landed, so a scheduled redraw that was already
+        # due cannot pass for this one.
+        before = int(dict(f.split("=", 1) for f in rest.split() if "=" in f).get("redraws", "0"))
+        fields = wait_live_redraw(link, before, t or 30)
+        print(f"redrawn card={fields.get('card', '?')} screen={fields.get('screen', '?')} "
+              f"next_s={fields.get('next_s', '?')}", file=out)
+    elif op == "wifilast":
+        rest, _ = link.command(f"WIFILAST {check_arg(args.ssid)}", t or 10)
+        print(rest, file=out)
     elif op == "put":
         data = read_local(args.local)
 

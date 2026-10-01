@@ -7,8 +7,10 @@
 #include <FontCacheManager.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalClock.h>
 #include <HalDisplay.h>
 #include <HalGPIO.h>
+#include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Memory.h>
@@ -20,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <limits>
 #include <string>
 
@@ -30,9 +33,12 @@
 #include "fontIds.h"
 #include "images/Logo120.h"
 #include "images/MoonIcon.h"
+#include "network/StationKeeper.h"
 #include "sleepcards/BrandScreen.h"
+#include "sleepcards/CardTime.h"
 #include "sleepcards/DeviceCards.h"
 #include "sleepcards/NowReadingPace.h"
+#include "util/LiveSleepPolicy.h"
 
 namespace {
 
@@ -503,7 +509,15 @@ void releaseSdFontCachesForDecode(const GfxRenderer& renderer) {
   }
 }
 
+// The live sleep screen up now (one at a time: the sleep screen is the only activity).
+SleepActivity* liveInstance = nullptr;
+bool liveRedrawRequested = false;
+
 }  // namespace
+
+SleepActivity::~SleepActivity() {
+  if (liveInstance == this) liveInstance = nullptr;
+}
 
 void SleepActivity::onEnter() {
   Activity::onEnter();
@@ -512,10 +526,11 @@ void SleepActivity::onEnter() {
   // sleep shows (a few bytes, only when the reader measured something since the last save).
   if (BoardConfig::isX4Pro()) sleepcards::pace::flushReaderPace();
 
+  // A live screen is redrawn, so it never keeps the page under the moon.
   const bool renderQuickResume =
-      SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
-      (fromTimeout &&
-       SETTINGS.quickResumeSleepScreen == CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT);
+      !live && (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::QUICK_RESUME ||
+                (fromTimeout && SETTINGS.quickResumeSleepScreen ==
+                                    CrossPointSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT));
 
   if (renderQuickResume) {
     // Quick Resume keeps the current frame as-is, so the driver's inversion
@@ -532,7 +547,7 @@ void SleepActivity::onEnter() {
   // night-mode reader render.
   display.setInverted(false);
 
-  if (SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM) {
+  if (!live && SETTINGS.sleepScreen == CrossPointSettings::SLEEP_SCREEN_MODE::TRANSPARENT_CUSTOM) {
     // Transparent mode retains the current framebuffer. Materialize any
     // output-level inversion first so the retained content keeps its visible
     // polarity after the display driver returns to normal.
@@ -549,12 +564,21 @@ void SleepActivity::onEnter() {
   }
 
   // Show popup with reader orientation only when going to sleep from reader
-  if (APP_STATE.lastSleepFromReader) {
+  if (!popup) {
+    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+  } else if (APP_STATE.lastSleepFromReader) {
     ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
     renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   } else {
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
+  }
+
+  if (live) {
+    liveInstance = this;  // main.cpp starts the station keeper once the old screen's radio is off
+    drawLive(/*entry=*/true, /*final=*/false);
+    scheduleNextRedraw();
+    return;
   }
 
   switch (SETTINGS.sleepScreen) {
@@ -593,23 +617,26 @@ void SleepActivity::renderCardSleepScreen() const {
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
-  // Look for sleep.bmp on the root of the sd card to determine if we should
-  // render a custom sleep screen instead of the default.
-  // This takes priority over the /sleep folder.
-  HalFile file;
-  if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
-    Bitmap bitmap(file, true,
-                  renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
-                      display.getController() == HalDisplay::Controller::SSD1677 &&
-                      SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
-    if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-      LOG_DBG("SLP", "Loading: /sleep.bmp");
-      renderBitmapSleepScreen(bitmap);
-      file.close();
-      return;
-    }
-    file.close();
-  }
+  if (!renderPictureFrame(false)) renderDefaultSleepScreen();
+}
+
+bool SleepActivity::renderPictureFrame(const bool cycling) const {
+  const bool originalThresholds =
+      renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
+      display.getController() == HalDisplay::Controller::SSD1677 &&
+      SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
+  // sleep.bmp on the root of the sd card takes priority over the /sleep folder. The live cycle
+  // shows the folders' pictures in turn instead, and sleep.bmp only when they have none.
+  const auto renderRootPicture = [&]() {
+    HalFile file;
+    if (!Storage.openFileForRead("SLP", "/sleep.bmp", file)) return false;
+    Bitmap bitmap(file, true, originalThresholds);
+    if (bitmap.parseHeaders() != BmpReaderError::Ok) return false;
+    LOG_DBG("SLP", "Loading: /sleep.bmp");
+    renderBitmapSleepScreen(bitmap);
+    return true;
+  };
+  if (!cycling && renderRootPicture()) return true;
 
   std::string selectedPath;
   if (!selectRandomSleepFile("/.sleep", SleepRecentKind::Standard, selectedPath)) {
@@ -621,27 +648,168 @@ void SleepActivity::renderCustomSleepScreen() const {
     if (Storage.openFileForRead("SLP", selectedPath, randFile)) {
       LOG_DBG("SLP", "Randomly loading: %s", selectedPath.c_str());
       delay(100);
-      Bitmap bitmap(randFile, true,
-                    renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
-                        display.getController() == HalDisplay::Controller::SSD1677 &&
-                        SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
+      Bitmap bitmap(randFile, true, originalThresholds);
       if (bitmap.parseHeaders() == BmpReaderError::Ok) {
         renderBitmapSleepScreen(bitmap);
-        randFile.close();
-        return;
+        return true;
       }
-      randFile.close();
     }
   }
 
-  renderDefaultSleepScreen();
+  return cycling && renderRootPicture();
+}
+
+// ---- live sleep ----------------------------------------------------------------------------------
+
+bool SleepActivity::liveRedrawWanted() const {
+  // Without the cycle a picture stays: nothing on it changes with time.
+  return SETTINGS.cardCycleWhenCharging != 0 || lastScreen != LiveScreen::Picture;
+}
+
+void SleepActivity::scheduleNextRedraw() {
+  halClock.invalidate();  // the minute boundary from a fresh RTC read, not a cached one
+  time_t utc = 0;
+  struct tm wall{};  // never `local`: zlib #defines it
+  const bool clockValid = halClock.isAvailable() && halClock.utcEpoch(utc) &&
+                          sleepcards::plausibleTime(static_cast<int64_t>(utc)) && halClock.localTime(wall);
+  const uint32_t secondsOfDay =
+      clockValid ? static_cast<uint32_t>(wall.tm_hour * 3600 + wall.tm_min * 60 + wall.tm_sec) : 0;
+  nextRedrawAt = millis() + live_sleep::nextRedrawDelayMs(clockValid, secondsOfDay,
+                                                          live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval));
+}
+
+void SleepActivity::loop() {
+  if (!live) return;
+  if (liveRedrawRequested || (liveRedrawWanted() && static_cast<int32_t>(millis() - nextRedrawAt) >= 0)) {
+    liveRedrawRequested = false;
+    drawLive(/*entry=*/false, /*final=*/false);
+    scheduleNextRedraw();
+    return;  // the station keeper takes the next pass: keys are read between the steps
+  }
+  StationKeeper::tick();
+}
+
+void SleepActivity::drawLive(const bool entry, const bool final) {
+  using sleepcards::CardId;
+  // The final redraw refreshes a card's time and battery; a picture or the logo shows neither.
+  if (final && lastScreen != LiveScreen::Card) return;
+  const bool cycling = SETTINGS.cardCycleWhenCharging != 0 && !final;
+
+  HalPowerManager::Lock powerLock;
+  RenderLock lock;
+  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+  // Fresh content in normal polarity (a render-task pass may have set Night mode's since).
+  display.setInverted(false);
+  const unsigned long start = millis();
+
+  sleepcards::CardDrawOptions options;
+  // Once the picture frame found nothing, Shuffle never deals Pictures again this session: a
+  // dealt-but-empty Pictures would take the deck's "last" and "dealt" from the card shown.
+  if (picturesEmpty) options.excluded = sleepcards::cardBit(CardId::Pictures);
+  CardId requested = lastShown;
+  if (cycling) {
+    requested = CardId::Shuffle;
+  } else if (entry || lastScreen == LiveScreen::Logo) {
+    // The logo stays only while nothing is drawable: a Shuffle whose picks all declined (an
+    // unset clock, say) is asked again, so a card shows once NTP has set the clock.
+    requested = sleepcards::cardForSleepMode(SETTINGS.sleepScreen);
+  } else {
+    options.repeatLast = true;  // the same card (never Shuffle again: that would deal the next one)
+  }
+
+  LiveScreen screen = LiveScreen::Logo;
+  CardId shown = requested;
+  uint16_t baseExcluded = options.excluded;
+  for (uint8_t attempt = 0; attempt < 3 && requested != CardId::None; attempt++) {
+    const auto outcome = sleepcards::drawDeviceCard(renderer, requested, &shown, options);
+    if (outcome == sleepcards::CardOutcome::Drawn) {
+      screen = LiveScreen::Card;
+      break;
+    }
+    if (outcome != sleepcards::CardOutcome::Pictures) {
+      // Nothing but the card on screen was left to deal: that one, rather than the logo.
+      if (options.excluded == baseExcluded) break;
+      options.excluded = baseExcluded;
+      shown = CardId::None;
+      continue;
+    }
+    if (!picturesEmpty) {
+      releaseSdFontCachesForDecode(renderer);
+      if (renderPictureFrame(cycling)) {
+        screen = LiveScreen::Picture;
+        break;
+      }
+      LOG_INF("SLP", "live: no picture to show");
+      picturesEmpty = true;
+    }
+    // No picture on the card: the cycle deals the next card instead of the logo, never the
+    // card already on screen (the empty deal took its place as the deck's last card).
+    if (requested != CardId::Shuffle) break;
+    options.excluded |= sleepcards::cardBit(CardId::Pictures);
+    baseExcluded |= sleepcards::cardBit(CardId::Pictures);
+    if (lastScreen == LiveScreen::Card) options.excluded |= sleepcards::cardBit(lastShown);
+    shown = CardId::None;
+  }
+
+  const bool afterPicture = lastScreen == LiveScreen::Picture;
+  const bool changed = entry || screen != lastScreen || shown != lastShown;
+  bool half = true;
+  if (screen != LiveScreen::Picture) {
+    half = entry || live_sleep::halfRefresh(changed, afterPicture, fastSinceHalf, final);
+    if (screen == LiveScreen::Card) {
+      renderer.displayBuffer(half ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
+    } else {
+      renderLogoScreen(half, /*cardStyle=*/true);
+    }
+  }
+  fastSinceHalf = half ? 0 : static_cast<uint8_t>(fastSinceHalf + 1);
+  lastScreen = screen;
+  lastShown = screen == LiveScreen::Picture ? CardId::Pictures : shown;
+  redraws++;
+  LOG_INF("SLP", "live %s: %s (%s), %s, %lu ms",
+          entry   ? "entry"
+          : final ? "final"
+                  : "redraw",
+          sleepcards::cardName(lastShown),
+          screen == LiveScreen::Card      ? "card"
+          : screen == LiveScreen::Picture ? "picture"
+                                          : "logo",
+          half ? "half" : "fast", millis() - start);
+}
+
+SleepActivity::LiveStatus SleepActivity::liveStatus() {
+  LiveStatus status;
+  const SleepActivity* a = liveInstance;
+  if (a == nullptr) return status;
+  status.active = true;
+  if (a->liveRedrawWanted()) {
+    const auto left = static_cast<int32_t>(a->nextRedrawAt - millis());
+    status.nextRedrawInMs = left > 0 ? static_cast<uint32_t>(left) : 0;
+  }
+  status.card = sleepcards::cardName(a->lastShown);
+  status.screen = a->lastScreen == LiveScreen::Card      ? "card"
+                  : a->lastScreen == LiveScreen::Picture ? "picture"
+                  : a->lastScreen == LiveScreen::Logo    ? "logo"
+                                                         : "none";
+  status.redraws = a->redraws;
+  return status;
+}
+
+void SleepActivity::requestLiveRedraw() {
+  if (liveInstance != nullptr) liveRedrawRequested = true;
+}
+
+void SleepActivity::finalLiveRedraw() {
+  if (liveInstance != nullptr) liveInstance->drawLive(/*entry=*/false, /*final=*/true);
 }
 
 // Sleep screens paint with a single HALF refresh (stock parity): the OEM X4
 // firmware's only clean refresh in normal operation is the single-pass 0xD7
 // sequence, used once for the sleep image. It never runs the multi-flash GC
 // waveform (0xF7) that FULL_REFRESH selects (#2471's blinking complaint).
-void SleepActivity::renderDefaultSleepScreen() const {
+void SleepActivity::renderDefaultSleepScreen() const { renderLogoScreen(true, false); }
+
+void SleepActivity::renderLogoScreen(const bool halfRefresh, const bool cardStyle) const {
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
 
@@ -655,13 +823,14 @@ void SleepActivity::renderDefaultSleepScreen() const {
   }
 
   // Make sleep screen dark unless light is selected in settings. A card's
-  // fallback matches the cards: light, or dark under the Inverted filter.
-  const bool dark = CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)
+  // fallback matches the cards: light, or dark with Dark Cards on (the
+  // live screen's always does: the cycle deals cards whatever the mode).
+  const bool dark = cardStyle || CrossPointSettings::isSleepCardMode(SETTINGS.sleepScreen)
                         ? BoardConfig::isX4Pro() && sleepcards::cardsDark()
                         : SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT;
   if (dark) renderer.invertScreen();
 
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  renderer.displayBuffer(halfRefresh ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
 }
 
 void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap, const bool preserveBackground) const {

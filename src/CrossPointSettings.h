@@ -439,6 +439,14 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t shuffleOwner = 0;
   uint8_t shuffleSky = 1;
   uint8_t shufflePictures = 0;
+  // Sleep cards drawn white on black (sleepcards::cardsDark). Pictures and covers follow the Sleep
+  // Screen Cover Filter instead; a reader that had that filter on Inverted is migrated in fromJson.
+  uint8_t darkCards = 0;
+  // Live sleep on external power (util/LiveSleepPolicy.h): a new Shuffle card at each update,
+  // whatever the sleep screen. Off unless turned on.
+  uint8_t cardCycleWhenCharging = 0;
+  // How often the live sleep screen redraws: a live_sleep::INTERVAL_MINUTES index (1 = 2 min).
+  uint8_t chargingUpdateInterval = 1;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;

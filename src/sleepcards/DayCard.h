@@ -9,7 +9,7 @@
 
 // DAY: big date + weekday, sunrise/sunset and day length for the saved location, the moon's
 // phase drawing + illumination % + next full moon; with Hunting Season on, the legal light
-// window (today's, or tomorrow's once today's has ended). "Asleep since" and the battery are in
+// window (today's, or tomorrow's once today's has ended). "Screen updated" and the battery are in
 // the shared footer. Entry point: sleepcards::renderDayCard() (declared in SleepCard.h).
 //
 // The facts are computed by computeDayFacts(), pure and host-tested; the renderer only lays

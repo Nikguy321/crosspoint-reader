@@ -9,8 +9,12 @@ and every card's fallback show the X4 Pro mark. Other boards keep the CrossPoint
 and do not list the cards.
 
 The e-ink keeps the last picture with no power, also after Auto Power Off cuts the rail,
-so a card shows the moment the reader fell asleep ("Asleep since 21:04"), never a clock
-that pretends to be live.
+so a card's footer says when it was drawn ("Screen updated 2:17 PM, Wed Oct 1", the 24-hour
+form with the Clock setting's), never a clock that pretends to be live. The footer measures
+the line beside the battery and shortens it until it fits between the margins: "Screen updated
+2:17 PM, Oct 1", then "Updated 2:17 PM, Oct 1", then "Updated 2:17 PM". On external power the
+battery carries a lightning bolt. On the charger the sleep screen stays live and is redrawn
+(below), so the time and battery stay current.
 
 ## Settings
 
@@ -25,17 +29,22 @@ that pretends to be live.
 | Legal Light | `legalLightRule` | sunrise - 30 min .. sunset + 30 min, or civil twilight; always rounded inward to the minute |
 | Owner Name, Owner Contact 1/2 | `ownerName` `ownerContact1` `ownerContact2` | typed on the reader; nothing is preset |
 | Quote Source | `quoteSources` | which categories feed the Quote card: All (default), Built-in + My Quotes, My Quotes + Bookmarks, Built-in + Bookmarks, Built-in Only, My Quotes Only, Bookmarks Only (stored by that index). Replaces the old `quoteSource` key, migrated once on load: quotes file -> My Quotes Only, bookmarks -> Bookmarks Only, both -> All |
+| Dark Cards | `darkCards` | Off by default. The cards and the logo a card falls back to, white on black; pictures and covers follow the Sleep Screen Cover Filter instead. See "White on black" below |
 | Shuffle: ... | `shuffleNowReading` ... `shufflePictures` | default on: Now Reading, Day, Calendar, Quote, Sky |
+| Card Cycle When Charging | `cardCycleWhenCharging` | Off by default. On the charger the live sleep screen deals a new Shuffle card at each update, whatever the Sleep Screen setting; see Live sleep on the charger |
+| Charging Updates | `chargingUpdateInterval` | how often the live sleep screen redraws: Every 1 / 2 (default) / 5 / 10 / 15 min (stored by that index) |
 
 All of them are ordinary `settings.json` keys and, apart from `sleepCardLocationFix`, appear
 on the web settings page under "Sleep Screen Cards".
 
-**White on black.** Settings > Display > Sleep Screen Cover Filter = **Inverted**
-(`sleepScreenCoverFilter` 2) also turns every card, and the logo screen a card falls back to,
-white on black. The moon and the Now Reading cover keep their real tones: the lit part of the
-moon stays white inside a white ring (a new moon is a dark disc, never the white disc of a full
-moon), and the cover is never a negative. **Contrast** changes nothing on the cards (they are
-black and white already); it still applies to the picture frame.
+**White on black.** **Dark Cards** (`darkCards`) turns every card, and the logo screen a card
+falls back to, white on black. The moon and the Now Reading cover keep their real tones: the lit
+part of the moon stays white inside a white ring (a new moon is a dark disc, never the white disc
+of a full moon), and the cover is never a negative. Pictures and book covers follow the Sleep
+Screen Cover Filter instead, so they are never negatives because the cards are dark. (Dark cards
+were the filter's **Inverted** until 2026-10-01; a reader with a card as its Sleep Screen and the
+filter on Inverted is moved over once, to Dark Cards on and the filter back to None. Anywhere else
+Inverted was chosen for pictures or covers, and it stays.)
 
 ### Locate Me
 
@@ -44,8 +53,9 @@ reader restarts afterwards, before anything leaves the reader; nothing is sent w
 Locate tap, and nothing runs in the background (the one opt-in exception is Update Location
 When Syncing, below, which rides a sync's own Wi-Fi).
 
-1. **Join** a saved Wi-Fi network through `WifiSelectionActivity`'s auto-connect (the last
-   network, then any saved one in range; the network list only when none is). Every radio start
+1. **Join** a saved Wi-Fi network through `WifiSelectionActivity`'s auto-connect (a scan first,
+   then the last network when it is in view, else the strongest other saved one in view:
+   `network/WifiJoinOrder.h`; the network list only when none is). Every radio start
    goes through `RadioPower` (full clock, no light sleep while it is up).
 2. **Scan** (a blocking station scan on the joined radio) and send up to 20 access points, the
    strongest first, to [beaconDB](https://beacondb.net) (`POST https://api.beacondb.net/v1/geolocate`,
@@ -95,7 +105,8 @@ two about a minute; the buttons wait meanwhile, and the screen says it can take 
 Off unless turned on (Sleep Screen Cards, under Locate Me; the row's second line says what it
 sends). It never starts the radio and adds no network job of its own: `network/AutoLocate`
 runs only while a job that needed Wi-Fi for its own work still has it up, just before that job
-takes the radio down, with the job's result already on screen:
+takes the radio down, with the job's result already on screen, or right after the live sleep
+screen's own clock sync on the charger:
 
 - `KOReaderSyncActivity::performUpload()` after the upload, once its result is drawn and before
   `RadioPower::stop()` (an upload, including the smart sync's and the sync on close);
@@ -106,7 +117,11 @@ takes the radio down, with the job's result already on screen:
   the reboot;
 - `ClockSyncActivity::loop()` after a successful Settings > Clock > Sync clock now, with the
   result on screen. The automatic clock sync on a Wi-Fi join (`WifiSelectionActivity`) does not
-  run it.
+  run it;
+- `network/StationKeeper` after each successful clock sync while the live sleep screen is up on
+  the charger (the first join, then every 6 hours), treated like Sync clock now. `due()` answers
+  once per boot, so the keeper re-arms it before asking; the once-a-day rule below still holds
+  over a charging session that lasts days.
 
 It then runs only when all of these hold (`sleepcards/AutoLocatePolicy`, host-tested in
 `test/sleep_card_location`): the setting is on; the job's own request got an answer from its
@@ -142,6 +157,60 @@ gets one line per sync and nothing about the place: `autolocate: saved`, `autolo
 `sleeping`, `too-few-aps`) or `autolocate: failed <reason>` (`no-memory`, `dns`, `unreachable`,
 `no-fix`, `too-vague`, `timeout`, `save`). ESP-IDF's own error lines (esp-tls, HTTP_CLIENT) can
 add a line on a connect failure; they name the host, never a place or a network.
+
+## Live sleep on the charger
+
+On external power the sleep screen does not deep-sleep: it stays up and is redrawn, so the
+footer's time and battery (and the sky, the day, the calendar) stay current, and Wi-Fi stays
+joined. `src/util/LiveSleepPolicy.h` holds the decisions (host-tested in `test/live_sleep`),
+`main.cpp` the session, `SleepActivity` the drawing and `network/StationKeeper` the Wi-Fi.
+
+- **When.** Every sleep (Power, Time to Sleep, the bench's SLEEP) goes through
+  `enterDeepSleep()`, which takes the live branch on the X4 Pro when external power is present
+  and the sleep screen is a card, or for any sleep screen when Card Cycle When Charging is on.
+  External power is the charger STAT line (charging) or a computer's USB SOF frames; the board
+  has no VBUS sense. Live wins over Quick Resume after timeout; Quick Resume as the sleep screen
+  goes live only with the cycle. Unplugged, nothing changes: the same screen, then deep sleep.
+- **Redraws.** On the minute: 2 s past each wall-clock minute that is a multiple of Charging
+  Updates (every 2 min by default), so the footer's minute is true; a plain interval when the
+  clock is not set. With the cycle each redraw deals the next Shuffle card (the Shuffle deck, so
+  every ticked card comes round before one repeats). Pictures picked: a fresh random picture
+  from `/.sleep` or `/sleep` (no repeat among the recent ones; `/sleep.bmp` only when the
+  folders have none). Pictures picked with no pictures on the card: the next card instead (never
+  the one on screen), and Shuffle leaves Pictures out for the rest of the session.
+  Without the cycle the card on screen is redrawn (the Quote card keeps its quote:
+  `CardContext::repeatLast`); a picture is not redrawn; a logo (every pick declined, say with no
+  clock yet) asks for the Sleep Screen card again, so it shows once NTP has set the clock. The
+  logo always takes the cards' polarity. Refresh: HALF on a card change, after a picture, every
+  5th redraw and for the final frame at the unplug; FAST for a same-card redraw in between.
+- **Wake.** Any physical key (not touch, not Home) wakes it once every key is up again, so the
+  press never also turns a page (a key still down 1.5 s after the press wakes it anyway, and the
+  unplug is watched all the while): the radio goes off and the reader restarts to the book or
+  Home, as a deep-sleep wake would, the light as Restore Light on Wake says. The restart is
+  marked as a wake (`SILENT_REBOOT_LIVE_WAKE`), so Pull on Open runs on the reopened book as it
+  does after deep sleep.
+- **Unplug.** External power absent for 20 s without a break counts as unplugged: one last
+  redraw (fresh time and battery), then today's deep sleep, and Auto Power Off counts from
+  there. At charge termination the STAT line may drop with the cable still in; on a wall
+  charger that reads as an unplug and ends in deep sleep, which is safe. A computer on the cable
+  keeps it live at 100 % (its SOF frames prove the power).
+- **Plugged in while asleep.** Nothing wakes a deep-sleeping reader when a cable goes in, but
+  when the Auto Power Off timer fires on the charger the rail is not cut: the reader boots
+  straight into the live screen (or cuts it after all when the sleep screen cannot be live).
+- **Wi-Fi.** `StationKeeper` scans, joins the last network if it is in view, else the next-best
+  saved one (`network/WifiJoinOrder.h`; never the book-sync peer's or hub's hotspot), syncs the
+  clock from NTP on the first join and every 6 h, then runs Update Location When Syncing when
+  that is on. A lost link waits 2 min and scans again; three failed rounds in a row, 10 min.
+  Its scans list hidden networks too, so a hidden last network is tried by name when one is in
+  range; a join names the scanned access point (fast scan on its channel). Between attempts the
+  driver stays initialised (`WiFi.disconnect(false, true)`): the session has no restart to
+  clear the heap, so only `RadioPower::off()` at the wake or the unplug tears it down.
+  Every start goes through `RadioPower`; it holds the radio lock (full clock, no naps), which on
+  the charger costs nothing that matters.
+- **Ledger.** `/sleep.log` gets `live` (x: 0 button, 1 timeout, 2 timer boot on the charger),
+  `livewake`, and `sleep` with x=2 (unplugged) or 3 (the bench's SLEEP deep) when it ends; the
+  5-minute `pwr` lines carry `live=` and the free heap / largest block. The ledger's rotation is
+  checked at entry and hourly while live, so it keeps its 64 KB cap on a charger for days.
 
 ## How a card is built
 

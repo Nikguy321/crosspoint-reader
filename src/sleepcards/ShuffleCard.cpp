@@ -157,11 +157,12 @@ CardId pickShuffleCardExcluding(const CardContext& ctx, const uint16_t excluded)
 
 CardId pickShuffleCard(const CardContext& ctx) { return pickShuffleCardExcluding(ctx, 0); }
 
-bool renderCardOrShuffle(CardId requested, const CardContext& ctx, GfxRenderer& renderer, CardId& shown) {
+bool renderCardOrShuffle(CardId requested, const CardContext& ctx, GfxRenderer& renderer, CardId& shown,
+                         const uint16_t excluded) {
   const bool shuffling = requested == CardId::Shuffle;
-  if (shuffling) requested = pickShuffleCard(ctx);
+  if (shuffling) requested = pickShuffleCardExcluding(ctx, excluded);
   bool drawn = false;
-  uint16_t declined = 0;
+  uint16_t declined = excluded;
   for (uint8_t attempt = 0; attempt < static_cast<uint8_t>(CardId::Count); attempt++) {
     if (requested == CardId::None || requested == CardId::Pictures) break;
     drawn = renderCard(requested, ctx, renderer);

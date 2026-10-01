@@ -13,7 +13,9 @@ class GfxRenderer;
 // framebuffer from a CardContext; SleepActivity shows it with the sleep
 // screen's single HALF refresh and the device sleeps. The e-ink keeps the
 // picture with no power, also after Auto Power Off cuts the rail, so a card
-// shows the moment it fell asleep ("Asleep since 21:04"), never a live clock.
+// says when it was drawn ("Screen updated 9:04 PM, Mon Nov 2"), never a live
+// clock. On external power the sleep stays live and redraws the card on the
+// minute (util/LiveSleepPolicy.h).
 //
 // Rules for every card:
 //  - render() returns false when it has nothing true to show (no time, no
@@ -97,7 +99,7 @@ struct CardContext {
   // Time. When timeValid is false (no RTC, or an RTC that was never set), cards that need a
   // date return false and the footer leaves the time out.
   bool timeValid = false;
-  int64_t utcNow = 0;      // UNIX seconds: the moment the device fell asleep
+  int64_t utcNow = 0;      // UNIX seconds: the moment the card is drawn
   LocalDate localNow;      // local wall time at utcNow (never name anything `local`: zlib #defines it)
   int32_t utcOffsetS = 0;  // local - UTC at utcNow, seconds
   UtcOffsetFn utcOffsetAt = &libcUtcOffset;  // DST-aware offset at any instant; never null
@@ -105,6 +107,7 @@ struct CardContext {
 
   // Device.
   int batteryPercent = -1;    // 0..100; -1 unknown
+  bool charging = false;      // on external power: the footer's battery carries a bolt
   uint32_t awakeSeconds = 0;  // how long it was awake before this sleep (since the last boot/wake)
 
   // Place: Settings > Display > Sleep Screen Cards > Location. Sun/moon times need it; the
@@ -118,8 +121,11 @@ struct CardContext {
   bool fromReader = false;  // it went to sleep from inside the reader
 
   uint32_t seed = 0;  // fresh randomness for this sleep (fixed on the host)
+  // A redraw of the card already on screen (live sleep without the cycle): a card that picks
+  // something (Quote) shows its last pick again instead of a new one.
+  bool repeatLast = false;
 
-  // White on black (Sleep Screen Cover Filter = Inverted): renderCard inverts the finished card,
+  // White on black (Dark Cards, sleepcards::cardsDark): renderCard inverts the finished card,
   // pictures excepted (draw::invertKeepingTones). Cards draw the same either way.
   bool dark = false;
 
@@ -166,8 +172,10 @@ CardId pickShuffleCard(const CardContext& ctx);
 
 // renderCard() with Shuffle resolved: when the pick declines, the next usable card is tried
 // (each card at most once). shown = the card drawn, Pictures (nothing drawn: the caller shows the
-// picture frame) or the last card that declined. True when the frame holds a card.
-bool renderCardOrShuffle(CardId requested, const CardContext& ctx, GfxRenderer& renderer, CardId& shown);
+// picture frame) or the last card that declined. True when the frame holds a card. Shuffle never
+// picks a card in `excluded` (cardBit()s), e.g. Pictures once the picture frame found no picture.
+bool renderCardOrShuffle(CardId requested, const CardContext& ctx, GfxRenderer& renderer, CardId& shown,
+                         uint16_t excluded = 0);
 
 // The card files' entry points (one per card, see the registry in SleepCardRegistry.cpp).
 bool renderNowReadingCard(const CardContext& ctx, GfxRenderer& renderer);

@@ -46,7 +46,7 @@ python3 scripts/x4bench.py key down
 python3 scripts/x4bench.py tap 240 400
 python3 scripts/x4bench.py shot /tmp/screen.png
 python3 scripts/x4bench.py push ~/books /Books
-python3 scripts/x4bench.py sleep
+python3 scripts/x4bench.py sleep deep
 ```
 
 - Uploads are add-only: there is no overwrite, delete or rename verb.
@@ -54,6 +54,10 @@ python3 scripts/x4bench.py sleep
   inactivity auto-sleep waits. The power button still sleeps the reader, and a
   sleeping reader cannot be woken over USB.
 - `KEY power` refuses a press that would sleep the reader unless `force` is given.
+- On the cable (external power), `sleep` and the power button open the live sleep screen
+  when the sleep screen is a card or Card Cycle When Charging is on: the console stays up,
+  `state` shows `live=1`, `redraw` redraws it now, and `key down` wakes it (a restart).
+  `sleep deep` always deep-sleeps, which ends the session.
 - Close any other serial monitor first: the tool opens the port exclusively.
 - `python3 scripts/x4bench.py --help` lists every verb and key name. Self-test:
   `python3 scripts/x4bench_selftest.py`.

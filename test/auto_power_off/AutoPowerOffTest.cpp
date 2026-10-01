@@ -41,15 +41,25 @@ TEST(AutoPowerOff, OnlyTheX4ProWithALatchCanCut) {
 }
 
 TEST(AutoPowerOff, CutsOnlyOnATimerWake) {
-  EXPECT_TRUE(shouldCutRailOnWake(true, false, true));
-  EXPECT_FALSE(shouldCutRailOnWake(false, false, true));  // cold boot / USB
-  EXPECT_FALSE(shouldCutRailOnWake(false, true, true));   // button
-  EXPECT_FALSE(shouldCutRailOnWake(true, false, false));  // never armed there, and never cut
-  EXPECT_FALSE(shouldCutRailOnWake(false, false, false));
+  EXPECT_TRUE(shouldCutRailOnWake(true, false, true, false));
+  EXPECT_FALSE(shouldCutRailOnWake(false, false, true, false));  // cold boot / USB
+  EXPECT_FALSE(shouldCutRailOnWake(false, true, true, false));   // button
+  EXPECT_FALSE(shouldCutRailOnWake(true, false, false, false));  // never armed there, and never cut
+  EXPECT_FALSE(shouldCutRailOnWake(false, false, false, false));
 }
 
 TEST(AutoPowerOff, AButtonPressInTheTimersInstantWins) {
   // Both sources fired: the user is holding the button, so boot instead of
   // powering off under their thumb.
-  EXPECT_FALSE(shouldCutRailOnWake(true, true, true));
+  EXPECT_FALSE(shouldCutRailOnWake(true, true, true, false));
+}
+
+TEST(AutoPowerOff, AChargingReaderIsNeverCut) {
+  // Plugged in while it slept: the timer wake boots into the live sleep screen.
+  EXPECT_FALSE(shouldCutRailOnWake(true, false, true, true));
+  EXPECT_FALSE(shouldCutRailOnWake(true, true, true, true));
+  // Charging changes nothing about the other wakes.
+  EXPECT_FALSE(shouldCutRailOnWake(false, false, true, true));
+  EXPECT_FALSE(shouldCutRailOnWake(false, true, true, true));
+  EXPECT_FALSE(shouldCutRailOnWake(true, false, false, true));
 }

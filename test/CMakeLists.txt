@@ -73,6 +73,8 @@ add_subdirectory(sleep_ledger)
 add_subdirectory(power_policy)
 add_subdirectory(frontlight_pwm)
 add_subdirectory(power_ledger)
+add_subdirectory(live_sleep)
+add_subdirectory(wifi_join_order)
 # Nick's radio/clock rule is a source check, not a unit: run it with the suite.
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)

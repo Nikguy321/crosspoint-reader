@@ -23,7 +23,8 @@ TEST(PowerLedger, FormatsOneWindow) {
   char buf[LINE_CAP];
   const size_t n = formatLine(buf, sizeof buf, w);
   EXPECT_EQ(std::string(buf),
-            "1759100000 pwr up=1800 soc=83 mv=3987 mhz=80 fl=0 wifi=0 usb=0 host=0 rnd=7 ls=912 lsn=5470 lse=1\n");
+            "1759100000 pwr up=1800 soc=83 mv=3987 mhz=80 fl=0 wifi=0 usb=0 host=0 rnd=7 ls=912 lsn=5470 lse=1 live=0 "
+            "heap=0 blk=0\n");
   EXPECT_EQ(n, strlen(buf));
 }
 
@@ -34,9 +35,14 @@ TEST(PowerLedger, FlagsAndLight) {
   w.wifi = true;
   w.usb = true;
   w.host = true;
+  w.live = true;
+  w.heapFree = 61234;
+  w.heapLargest = 40960;
   char buf[LINE_CAP];
   ASSERT_GT(formatLine(buf, sizeof buf, w), 0u);
-  EXPECT_EQ(std::string(buf), "0 pwr up=0 soc=0 mv=0 mhz=240 fl=35 wifi=1 usb=1 host=1 rnd=0 ls=0 lsn=0 lse=0\n");
+  EXPECT_EQ(std::string(buf),
+            "0 pwr up=0 soc=0 mv=0 mhz=240 fl=35 wifi=1 usb=1 host=1 rnd=0 ls=0 lsn=0 lse=0 live=1 heap=61234 "
+            "blk=40960\n");
 }
 
 TEST(PowerLedger, WidestLineFitsBothCaps) {
@@ -47,7 +53,9 @@ TEST(PowerLedger, WidestLineFitsBothCaps) {
   w.millivolts = 65535;
   w.cpuMhz = 240;
   w.frontlight = 100;
-  w.wifi = w.usb = w.host = w.lightSleepEnabled = true;
+  w.wifi = w.usb = w.host = w.lightSleepEnabled = w.live = true;
+  w.heapFree = 4294967295u;
+  w.heapLargest = 4294967295u;
   w.renders = 4294967295u;
   w.lightSleepPermille = 1000;
   w.lightSleeps = 4294967295u;
@@ -110,4 +118,20 @@ TEST(PowerLedger, FreshLatchIsAQuietWindow) {
   latch = WindowLatch{};  // the next window starts clean
   latch.applyTo(w);
   EXPECT_EQ(w.frontlight, 0u);
+}
+
+TEST(PowerLedger, LatchHoldsLiveForTheWholeWindow) {
+  WindowLatch latch;
+  latch.note(0, false, true, false);
+  latch.note(0, true, true, false, true);
+  latch.note(0, false, false, false, false);
+  Window w;
+  latch.applyTo(w);
+  EXPECT_TRUE(w.live);
+  EXPECT_TRUE(w.wifi);
+  EXPECT_TRUE(w.usb);
+  WindowLatch quiet;
+  quiet.note(0, false, false, false);
+  quiet.applyTo(w);
+  EXPECT_FALSE(w.live);
 }

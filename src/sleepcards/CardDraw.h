@@ -90,11 +90,13 @@ int drawWrapped(GfxRenderer& r, int fontId, int x, int y, int width, const char*
                 Align align = Align::Left, EpdFontFamily::Style style = EpdFontFamily::REGULAR, int lineHeight = 0);
 
 // ---- the shared frame ---------------------------------------------------------------------------
-// A battery outline w x h px (a nub on the right) filled to percent (0..100), top-left at (x, y).
-void drawBatteryIcon(GfxRenderer& r, int x, int y, int w, int h, int percent);
+// A battery outline w x h px (a nub on the right) filled to percent (0..100), top-left at (x, y);
+// charging adds the theme's lightning bolt (white on a fill of at least its width).
+void drawBatteryIcon(GfxRenderer& r, int x, int y, int w, int h, int percent, bool charging = false);
 
-// The footer every card gets (renderCard() draws it): "Asleep since 21:04 . [battery] 88%"
-// centred in the bottom FOOTER_HEIGHT px over a hairline; parts that are unknown are left out.
+// The footer every card gets (renderCard() draws it): "Screen updated 9:04 PM, Mon Nov 2 . [battery]
+// 88%" centred in the bottom FOOTER_HEIGHT px over a hairline, the "when" shortened until it fits
+// between the margins (footer::fitUpdated); parts that are unknown are left out.
 void drawSleepFooter(const CardContext& ctx, GfxRenderer& r);
 
 }  // namespace sleepcards::draw

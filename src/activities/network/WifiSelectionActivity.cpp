@@ -1,5 +1,6 @@
 #include "WifiSelectionActivity.h"
 
+#include <BookSyncStore.h>
 #include <GfxRenderer.h>
 #include <HalClock.h>
 #include <I18n.h>
@@ -8,6 +9,8 @@
 #include <esp_mac.h>
 
 #include <algorithm>
+#include <cstring>
+#include <iterator>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
@@ -16,6 +19,7 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "network/RadioPower.h"
+#include "network/WifiJoinOrder.h"
 
 namespace fui = freeink::ui;
 
@@ -113,6 +117,9 @@ void WifiSelectionActivity::onEnter() {
   autoConnecting = false;
   manualNetworkListRequested = false;
   autoAttemptedSsids.clear();
+  hiddenLastTried = false;
+  firstScanHandled = false;
+  rescanOwed = false;
   const size_t savedCredentialCount = WIFI_STORE.getCredentialCount();
   autoAttemptedSsids.reserve(savedCredentialCount);
 
@@ -141,18 +148,11 @@ void WifiSelectionActivity::onEnter() {
   // Trigger first update to show scanning message
   requestUpdate();
 
-  // Attempt to auto-connect to known networks. Try the last successful
-  // network first for speed, then scan and try any visible saved networks by
-  // signal strength. The user can interrupt this and show the scan result.
+  // Attempt to auto-connect to known networks: scan first, then join the last
+  // successful network if it is in view, else the next-best saved network in
+  // view (network/WifiJoinOrder.h). The user can interrupt this and show the
+  // scan result.
   if (allowAutoConnect && savedCredentialCount != 0) {
-    const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
-    if (!lastSsid.empty()) {
-      const auto cred = WIFI_STORE.findCredential(lastSsid);
-      if (cred && tryAutoConnectCredential(*cred)) {
-        return;
-      }
-    }
-
     startWifiScan(true);
     return;
   }
@@ -194,8 +194,8 @@ void WifiSelectionActivity::startWifiScan(const bool autoScan) {
   WiFi.disconnect();
   delay(100);
 
-  // Start async scan
-  RadioPower::scanNetworks(true);  // true = async scan
+  // Start async scan, hidden networks included (an auto-connect may try a hidden last network)
+  RadioPower::scanNetworks(true, /*showHidden=*/true);
 }
 
 void WifiSelectionActivity::processWifiScanResults() {
@@ -222,6 +222,7 @@ void WifiSelectionActivity::processWifiScanResults() {
   // Scan complete, process results — deduplicate in-place, keeping strongest signal
   networks.clear();
   networks.reserve(scanResult);
+  scanSawHidden = false;
 
   for (int i = 0; i < scanResult; i++) {
     char ssid[33];
@@ -230,6 +231,7 @@ void WifiSelectionActivity::processWifiScanResults() {
 
     // Skip hidden networks (empty SSID)
     if (ssid[0] == '\0') {
+      scanSawHidden = true;
       continue;
     }
 
@@ -241,10 +243,14 @@ void WifiSelectionActivity::processWifiScanResults() {
       network.rssi = rssi;
       network.isEncrypted = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
       network.hasSavedPassword = WIFI_STORE.hasSavedCredential(network.ssid);
+      network.channel = WiFi.channel(i);
+      if (const uint8_t* bssid = WiFi.BSSID(i)) memcpy(network.bssid, bssid, sizeof(network.bssid));
       networks.push_back(std::move(network));
     } else if (rssi > it->rssi) {
       it->rssi = rssi;
       it->isEncrypted = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+      it->channel = WiFi.channel(i);
+      if (const uint8_t* bssid = WiFi.BSSID(i)) memcpy(it->bssid, bssid, sizeof(it->bssid));
     }
   }
 
@@ -262,7 +268,25 @@ void WifiSelectionActivity::processWifiScanResults() {
 
   WiFi.scanDelete();
 
+  const auto savedSeen = static_cast<int>(std::count_if(networks.begin(), networks.end(), [](const WifiNetworkInfo& n) {
+    return !n.isHiddenPlaceholder && n.hasSavedPassword;
+  }));
+  LOG_INF("WIFI", "Scan: %d networks, %d saved", static_cast<int>(realNetworkCount), savedSeen);
+
+  // One scan can miss a network that is there (a phone hotspot between beacons, a busy channel).
+  // When the session's first scan shows nothing to join - no saved network, and no BookSync peer
+  // the patient wait would join directly - one more scan is owed before the patient wait or the
+  // network list. The patient wait's own rescans never earn one.
+  if (autoConnecting && !manualNetworkListRequested && !firstScanHandled) {
+    firstScanHandled = true;
+    rescanOwed = savedSeen == 0 && !(patience.armed() && peerInScan());
+  }
+
   if (autoConnecting && !manualNetworkListRequested && tryNextSavedNetworkFromScan()) {
+    return;
+  }
+  if (autoConnecting && !manualNetworkListRequested && takeRescanOwed()) {
+    startWifiScan(true);
     return;
   }
   if (autoConnecting && !manualNetworkListRequested && patientWait()) return;
@@ -324,6 +348,7 @@ void WifiSelectionActivity::selectNetwork(const int index) {
   usedSavedPassword = false;
   enteredPassword.clear();
   autoConnecting = false;
+  joinChannel = 0;
 
   // Check if we have saved credentials for this network
   const auto savedCred = WIFI_STORE.findCredential(selectedSSID);
@@ -368,6 +393,7 @@ void WifiSelectionActivity::promptHiddenSsid() {
   usedSavedPassword = false;
   enteredPassword.clear();
   autoConnecting = false;
+  joinChannel = 0;
 
   // Suppress rendering during the activity transition (see render()).
   state = WifiSelectionState::HIDDEN_SSID_ENTRY;
@@ -392,13 +418,15 @@ bool WifiSelectionActivity::hasAttemptedAutoSsid(const std::string& ssid) const 
   return std::find(autoAttemptedSsids.begin(), autoAttemptedSsids.end(), ssid) != autoAttemptedSsids.end();
 }
 
-bool WifiSelectionActivity::tryAutoConnectCredential(const WifiCredential& cred) {
+bool WifiSelectionActivity::tryAutoConnectCredential(const WifiCredential& cred, const WifiNetworkInfo* seen) {
   if (hasAttemptedAutoSsid(cred.ssid)) {
     return false;
   }
 
-  LOG_DBG("WIFI", "Attempting saved network: %s", cred.ssid.c_str());
+  LOG_DBG("WIFI", "Attempting saved network: %s%s", cred.ssid.c_str(), seen ? "" : " (not in the scan)");
   autoAttemptedSsids.push_back(cred.ssid);
+  joinChannel = seen ? seen->channel : 0;
+  if (seen) memcpy(joinBssid, seen->bssid, sizeof(joinBssid));
   selectedSSID = cred.ssid;
   enteredPassword = cred.password;
   selectedRequiresPassword = !cred.password.empty();
@@ -411,17 +439,47 @@ bool WifiSelectionActivity::tryAutoConnectCredential(const WifiCredential& cred)
 }
 
 bool WifiSelectionActivity::tryNextSavedNetworkFromScan() {
-  for (const auto& network : networks) {
-    if (!network.hasSavedPassword || hasAttemptedAutoSsid(network.ssid)) {
-      continue;
-    }
-
+  const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
+  std::vector<wifi_join::Seen> seen;
+  seen.reserve(realNetworkCount);
+  bool lastSeen = false;
+  for (size_t i = 0; i < realNetworkCount && i < networks.size(); i++) {
+    seen.push_back({networks[i].ssid, networks[i].rssi, networks[i].hasSavedPassword});
+    lastSeen = lastSeen || networks[i].ssid == lastSsid;
+  }
+  uint16_t order[wifi_join::MAX_CANDIDATES];
+  const size_t count = wifi_join::order(seen.data(), seen.size(), lastSsid, nullptr, 0, order, std::size(order));
+  for (size_t k = 0; k < count; k++) {
+    const WifiNetworkInfo& network = networks[order[k]];
+    if (hasAttemptedAutoSsid(network.ssid)) continue;
     const auto cred = WIFI_STORE.findCredential(network.ssid);
-    if (cred && tryAutoConnectCredential(*cred)) {
+    if (cred && tryAutoConnectCredential(*cred, &network)) {
       return true;
     }
   }
+  // Once a session: the patient wait's rescans clear autoAttemptedSsids, and a blind 7 s attempt
+  // every rescan would hide the countdown whenever any hidden network is in range.
+  if (!hiddenLastTried &&
+      wifi_join::tryHiddenLast(!lastSsid.empty() && WIFI_STORE.hasSavedCredential(lastSsid), lastSeen, scanSawHidden)) {
+    hiddenLastTried = true;
+    const auto cred = WIFI_STORE.findCredential(lastSsid);
+    if (cred && tryAutoConnectCredential(*cred)) return true;
+  }
   return false;
+}
+
+bool WifiSelectionActivity::peerInScan() const {
+  const std::string peer = BOOKSYNC_STORE.getConfig().peerSsid;
+  return !peer.empty() && std::any_of(networks.begin(), networks.end(), [&peer](const WifiNetworkInfo& n) {
+    return !n.isHiddenPlaceholder && n.ssid == peer;
+  });
+}
+
+bool WifiSelectionActivity::takeRescanOwed() {
+  if (!rescanOwed) return false;
+  rescanOwed = false;
+  LOG_INF("WIFI", "Nothing to join in the scan; scanning once more");
+  return true;
 }
 
 void WifiSelectionActivity::handleAutoConnectFailure() {
@@ -430,6 +488,11 @@ void WifiSelectionActivity::handleAutoConnectFailure() {
 
   if (!networks.empty()) {
     if (tryNextSavedNetworkFromScan()) {
+      return;
+    }
+    // The blind attempt at a hidden last network failed: the scan still owes its second look.
+    if (takeRescanOwed()) {
+      startWifiScan(true);
       return;
     }
     if (patientWait()) return;
@@ -472,9 +535,12 @@ void WifiSelectionActivity::attemptConnection() {
   WiFi.disconnect(true, true);  // Abort any in-progress SDK auto-connect and clear NVS-saved SSID
   delay(100);
 
-  // Scan all channels so networks with multiple APs use the strongest matching
-  // BSSID instead of the first match found by the framework's default fast scan.
-  WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+  // A join by name scans all channels so networks with multiple APs use the
+  // strongest matching BSSID instead of the first match found by the framework's
+  // default fast scan. An auto-connect already chose the strongest from its own
+  // scan and names it (channel + BSSID): the fast scan starts on that channel
+  // and stops at that access point.
+  WiFi.setScanMethod(joinChannel > 0 ? WIFI_FAST_SCAN : WIFI_ALL_CHANNEL_SCAN);
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
   // Set hostname so routers show "CrossPoint-Reader-AABBCCDDEEFF" instead of "esp32-XXXXXXXXXXXX"
@@ -489,11 +555,9 @@ void WifiSelectionActivity::attemptConnection() {
     LOG_ERR("WIFI", "Failed to read station MAC for hostname (err=%d)", static_cast<int>(macResult));
   }
 
-  if (selectedRequiresPassword && !enteredPassword.empty()) {
-    RadioPower::begin(selectedSSID.c_str(), enteredPassword.c_str());
-  } else {
-    RadioPower::begin(selectedSSID.c_str());
-  }
+  // An auto-connect names the access point its scan saw, so the join needs no scan of its own.
+  const char* passphrase = selectedRequiresPassword && !enteredPassword.empty() ? enteredPassword.c_str() : nullptr;
+  RadioPower::begin(selectedSSID.c_str(), passphrase, joinChannel, joinChannel > 0 ? joinBssid : nullptr);
 }
 
 void WifiSelectionActivity::checkConnectionStatus() {

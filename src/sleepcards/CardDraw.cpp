@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "FooterText.h"
 #include "fontIds.h"
 #include "images/CardDigits.h"
 
@@ -380,17 +381,35 @@ int drawWrapped(GfxRenderer& r, const int fontId, const int x, const int y, cons
 
 // ---- footer -------------------------------------------------------------------------------------
 
-void drawBatteryIcon(GfxRenderer& r, const int x, const int y, const int w, const int h, int percent) {
+void drawBatteryIcon(GfxRenderer& r, const int x, const int y, const int w, const int h, int percent,
+                     const bool charging) {
   constexpr int NUB_W = 2;
+  // The theme's bolt (BaseTheme::drawBatteryLightningBolt) cut to the fill's 6 rows (from y + 2):
+  // a stroke down to the left, the bar, and a stroke on down to the left, both tips kept.
+  constexpr int BOLT_W = 6;
+  constexpr int BOLT_H = 6;
+  constexpr int BOLT_ROWS[BOLT_H][2] = {{4, 5}, {3, 4}, {2, 5}, {3, 4}, {2, 3}, {1, 2}};
   const int bodyW = w - NUB_W;
   if (bodyW <= 4 || h <= 4) return;
   percent = std::clamp(percent, 0, 100);
   r.drawRect(x, y, bodyW, h, true);
   r.fillRect(x + bodyW, y + h / 4, NUB_W, h - 2 * (h / 4), true);
   const int inner = bodyW - 4;
-  const int filled = (inner * percent + 50) / 100;
+  int filled = (inner * percent + 50) / 100;
+  const bool bolt = charging && inner >= BOLT_W + 2;
+  if (bolt) filled = std::max(filled, BOLT_W + 2);
   if (filled > 0) r.fillRect(x + 2, y + 2, filled, h - 4, true);
+  if (!bolt) return;
+  for (int row = 0; row < BOLT_H && row < h - 4; row++) {
+    r.drawLine(x + 3 + BOLT_ROWS[row][0], y + 2 + row, x + 3 + BOLT_ROWS[row][1], y + 2 + row, false);
+  }
 }
+
+namespace {
+int footerTextWidth(void* user, const char* text) {
+  return static_cast<GfxRenderer*>(user)->getTextWidth(UI_10_FONT_ID, text);
+}
+}  // namespace
 
 void drawSleepFooter(const CardContext& ctx, GfxRenderer& r) {
   const int w = r.getScreenWidth();
@@ -398,30 +417,31 @@ void drawSleepFooter(const CardContext& ctx, GfxRenderer& r) {
   const int top = h - FOOTER_HEIGHT;
   r.fillRect(SCREEN_MARGIN, top, w - 2 * SCREEN_MARGIN, 1, true);
 
-  char since[48] = "";
-  if (ctx.timeValid) {
-    char clock[16];
-    formatHourMinute(ctx.localNow.hour, ctx.localNow.minute, ctx.clock12h, clock, sizeof(clock));
-    std::snprintf(since, sizeof(since), tr(STR_ASLEEP_SINCE), clock);
-  }
   char battery[8] = "";
   if (ctx.batteryPercent >= 0) std::snprintf(battery, sizeof(battery), "%d%%", ctx.batteryPercent);
 
   const int font = UI_10_FONT_ID;
   const int textY = top + (FOOTER_HEIGHT - r.getLineHeight(font)) / 2 + 1;
-  const int dotGap = 10;  // each side of the separator dot
+  const int dotGap = 8;  // each side of the separator dot
   // The battery reads as a battery, never as another percentage on the card.
   constexpr int ICON_W = 20;
   constexpr int ICON_H = 10;
   constexpr int ICON_GAP = 5;
-  const int sinceW = since[0] ? r.getTextWidth(font, since) : 0;
   const int batteryW = battery[0] ? ICON_W + ICON_GAP + r.getTextWidth(font, battery) : 0;
-  const bool both = sinceW > 0 && batteryW > 0;
-  const int total = sinceW + batteryW + (both ? 2 * dotGap + 4 : 0);
+
+  // The "when", in the longest form that fits between the margins beside the battery.
+  char when[96] = "";
+  if (ctx.timeValid) {
+    const int room = w - 2 * SCREEN_MARGIN - (batteryW > 0 ? batteryW + 2 * dotGap + 4 : 0);
+    footer::fitUpdated(ctx.localNow, ctx.clock12h, room, &footerTextWidth, &r, when, sizeof(when));
+  }
+  const int whenW = when[0] ? r.getTextWidth(font, when) : 0;
+  const bool both = whenW > 0 && batteryW > 0;
+  const int total = whenW + batteryW + (both ? 2 * dotGap + 4 : 0);
   int x = (w - total) / 2;
-  if (sinceW > 0) {
-    r.drawText(font, x, textY, since, true);
-    x += sinceW;
+  if (whenW > 0) {
+    r.drawText(font, x, textY, when, true);
+    x += whenW;
   }
   if (both) {
     fillCircle(r, x + dotGap + 2, textY + r.getFontAscenderSize(font) / 2 + 1, 2, true);
@@ -430,7 +450,7 @@ void drawSleepFooter(const CardContext& ctx, GfxRenderer& r) {
   if (batteryW > 0) {
     const int asc = r.getFontAscenderSize(font);
     // Centred on the figures (lining digits stand ~0.72 of the ascender).
-    drawBatteryIcon(r, x, textY + asc - asc * 36 / 100 - ICON_H / 2, ICON_W, ICON_H, ctx.batteryPercent);
+    drawBatteryIcon(r, x, textY + asc - asc * 36 / 100 - ICON_H / 2, ICON_W, ICON_H, ctx.batteryPercent, ctx.charging);
     r.drawText(font, x + ICON_W + ICON_GAP, textY, battery, true);
   }
 }

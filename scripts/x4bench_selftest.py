@@ -51,6 +51,12 @@ class FakeDevice(threading.Thread):
         self.cards = []
         self.lightsleep = "on"
         self.lsforce = []
+        self.on_power = True  # STATE power=1: a SLEEP keeps the live sleep screen up
+        self.live = False
+        self.redraws = 0
+        self.redraw_lands = True  # False: REDRAW is accepted but the draw never comes
+        self.sleeps = []
+        self.wifi_last = None
         self.fb = b""
         self.shot = {}
         self.stop = False
@@ -197,6 +203,42 @@ class FakeDevice(threading.Thread):
             shown = "none" if rest == "default" else rest
             self.emit(f"OK CARD {rest} shown={shown} outcome={'logo' if rest == 'default' else 'drawn'} ms=42",
                       noise=True)
+        elif verb == "SLEEP":
+            if rest not in ("", "deep"):
+                self.emit("ERR SLEEP usage")
+                return
+            self.sleeps.append(rest or "default")
+            if self.live:
+                if rest == "deep":
+                    self.emit("OK SLEEP deep")
+                    raise ConnectionError  # deep sleep: USB goes down
+                self.redraws += 1
+                self.emit("OK SLEEP live redraw")
+            elif rest != "deep" and self.on_power:
+                self.live = True
+                self.emit("OK SLEEP live")
+            else:
+                self.emit("OK SLEEP deep")
+                raise ConnectionError
+        elif verb == "REDRAW":
+            if not self.live:
+                self.emit("ERR REDRAW notlive")
+                return
+            self.emit(f"OK REDRAW redraws={self.redraws}")
+            if self.redraw_lands:
+                self.redraws += 1
+        elif verb == "WIFILAST":
+            if not rest or len(rest.encode()) > 32:
+                self.emit("ERR WIFILAST usage")
+                return
+            self.wifi_last = rest
+            self.emit(f"OK WIFILAST saved={1 if rest == 'Saved Net' else 0} networks=2")
+        elif verb == "STATE":
+            self.emit("STATE act=Sleep depth=0 stack=-" if self.live else "STATE act=Home depth=0 stack=-")
+            self.emit(f"STATE live={int(self.live)} power={int(self.on_power)} next_s={94 if self.live else -1} "
+                      f"card=day screen=card redraws={self.redraws} wifi={'up' if self.live else 'off'} cycle=1 "
+                      "every=2", noise=True)
+            self.emit("OK STATE")
         elif verb == "KEY":
             time.sleep(self.key_delay)
             self.keys.append(rest)
@@ -334,6 +376,55 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(self.dev.cards, ["day", "default"])
         code, _ = self.cli("card", "bogus")
         self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_sleep_on_power_is_the_live_screen(self):
+        self.ser.close()
+        code, out = self.cli("sleep")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("live sleep screen", out)
+        self.assertTrue(self.dev.live)
+        code, out = self.cli("state")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("live=1", out)
+        self.assertIn("wifi=up", out)
+        # On the live screen SLEEP redraws, and REDRAW does too.
+        code, out = self.cli("sleep")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "live sleep screen: redraw requested\n"))
+        code, out = self.cli("redraw")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "redrawn card=day screen=card next_s=94\n"))
+        self.assertEqual(self.dev.redraws, 2)
+        # SLEEP deep commits: the port goes down with the reply already in.
+        code, out = self.cli("sleep", "deep")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("press Power", out)
+        self.assertEqual(self.dev.sleeps, ["default", "default", "deep"])
+
+    def test_redraw_that_never_lands_is_a_timeout(self):
+        self.ser.close()
+        self.cli("sleep")
+        self.dev.redraw_lands = False
+        code, out = self.cli("--timeout", "1", "redraw")
+        self.assertEqual(code, x4bench.EXIT_TIMEOUT)
+        self.assertEqual(out, "")
+
+    def test_sleep_off_power_and_redraw_refused(self):
+        self.dev.on_power = False
+        self.ser.close()
+        code, _ = self.cli("redraw")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, out = self.cli("sleep")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("press Power", out)
+        self.assertFalse(self.dev.live)
+
+    def test_wifilast_sets_the_last_network(self):
+        self.ser.close()
+        code, out = self.cli("wifilast", "Saved Net")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "saved=1 networks=2\n"))
+        self.assertEqual(self.dev.wifi_last, "Saved Net")
+        code, _ = self.cli("wifilast", "bad\nname")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # a newline never reaches the device
+        self.assertEqual(self.dev.wifi_last, "Saved Net")
 
     def test_lightsleep_toggles_and_ls_still_lists(self):
         self.ser.close()

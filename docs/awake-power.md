@@ -92,7 +92,14 @@ happens after `WIFI_OFF`, after `RadioPower::off()`, or after a start that faile
 came up. `RadioPower::stop()` turns only the RF off for a result screen. The driver stays
 initialised, so the lock stays held until the activity's exit restart. Every network activity's exit
 restarts the reader if a radio ran in that boot (`RadioPower::ranThisBoot()`), so Wi-Fi is never
-left idling in the background. Nothing starts a radio at boot.
+left idling in the background, with one exception: the live sleep screen on the charger
+(docs/sleep-screen-cards.md, "Live sleep on the charger"), which keeps the reader joined by design.
+Its `network/StationKeeper` starts the radio only through RadioPower (with a scan's channel and
+BSSID, `RadioPower::begin()`), never uses `RadioPower::stop()`, and holds the lock for as long as
+the screen is live: full clock and no naps on the charger, where the charger line blocks naps
+anyway. A key turns the radio off and restarts the reader; an unplug ends in deep sleep, whose
+path turns it off first. Nothing starts a radio at boot, except that a timer wake on the charger
+boots into the live screen, whose keeper then joins.
 
 `scripts/check_radio_power.py` is also the ctest `check_radio_power`. It fails in any of these
 cases:
@@ -114,7 +121,9 @@ unchanged. The wait keeps full clock while a radio is up.
 `/sleep.log` gets a `pwr` line every 5 minutes while the reader is awake. The fields are listed in
 `src/util/PowerLedger.h`. `fl`, `wifi`, `usb` and `host` cover the whole window, so a window counts
 as dark or unplugged only if it was dark or unplugged all the way through. `mhz` is a snapshot taken
-when the line is written. STATE reports `ls lsn lsw lsms lsblk mhz radio fls xtal flrun`:
+when the line is written. `live=1` marks a window in which the live sleep screen was up (on the
+charger), and `heap` / `blk` are the free internal heap and its largest block when the line was
+written, to watch fragmentation over a long live session with Wi-Fi up. STATE reports `ls lsn lsw lsms lsblk mhz radio fls xtal flrun`:
 
 - `fls=1`: a lit light keeps napping (`lsblk=light` only when it does not);
 - `xtal`: the IDF's live light-sleep crystal request count, 1 while lit at a nonzero duty, else 0;

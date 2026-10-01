@@ -20,8 +20,10 @@ constexpr size_t RX_BUFFER_BYTES = bench::PUT_CHUNK_MAX + 512;
 
 enum Result : uint8_t {
   NONE = 0,
-  USER_ACTIVITY = 1 << 0,  // a command was accepted: counts like a button press
-  REQUEST_SLEEP = 1 << 1,  // CMD:SLEEP: the caller enters deep sleep
+  USER_ACTIVITY = 1 << 0,       // a command was accepted: counts like a button press
+  REQUEST_SLEEP = 1 << 1,       // CMD:SLEEP: the caller sleeps (the live screen on power; on it, a redraw)
+  REQUEST_DEEP_SLEEP = 1 << 2,  // CMD:SLEEP deep: deep sleep even on power (from the live screen too)
+  REQUEST_REDRAW = 1 << 3,      // CMD:REDRAW: the live sleep screen redraws now
 };
 
 // Once per main-loop pass, after input was updated. exclusiveStorage is set

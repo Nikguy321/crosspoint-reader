@@ -29,10 +29,15 @@
 #include <string>
 
 #include "CrossPointSettings.h"
+#include "LiveSleep.h"
+#include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
+#include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
+#include "network/StationKeeper.h"
 #include "sleepcards/SleepCard.h"
 #include "util/HomeButtonInput.h"
+#include "util/LiveSleepPolicy.h"
 #include "util/PowerButtonTiming.h"
 #include "util/TaskWatchdog.h"
 
@@ -332,6 +337,8 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
   const char* held = "none";
   if (exclusive) {
     held = "usbdrive";
+  } else if (liveSleepActive()) {
+    held = "live";
   } else if (timeoutMs == 0) {
     held = "never";
   } else {
@@ -361,6 +368,17 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
         static_cast<unsigned long>(getCpuFrequencyMhz()), powerManager.radioActive() ? 1 : 0,
         Frontlight.survivesLightSleep() ? 1 : 0, static_cast<long>(Frontlight.sleepClockRequests()),
         static_cast<unsigned long>(Frontlight.napProbeRan()), static_cast<unsigned long>(Frontlight.napProbeChecked()));
+  // The live sleep screen (charging): live = it is up, power = external power now (charger line
+  // or this cable), next_s = seconds to the next redraw (-1: none scheduled), card / screen = what
+  // it shows, redraws since it went live, wifi = the station keeper (off none scan join up wait),
+  // cycle = Card Cycle When Charging, every = Charging Updates in minutes.
+  const auto live = SleepActivity::liveStatus();
+  reply("STATE live=%d power=%d next_s=%ld card=%s screen=%s redraws=%lu wifi=%s cycle=%u every=%u",
+        live.active ? 1 : 0, externalPowerPresent() ? 1 : 0,
+        live.active && live.nextRedrawInMs > 0 ? static_cast<long>((live.nextRedrawInMs + 999) / 1000) : -1L, live.card,
+        live.screen, static_cast<unsigned long>(live.redraws), StationKeeper::stateName(),
+        static_cast<unsigned>(SETTINGS.cardCycleWhenCharging),
+        static_cast<unsigned>(live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval)));
   reply("OK STATE");
 }
 
@@ -908,6 +926,10 @@ void cmdOpen(const char* path, const bool exclusive) {
     return;
   }
   if (!fileVerbAllowed("OPEN", exclusive)) return;
+  if (liveSleepActive()) {
+    reply("ERR OPEN live");  // a key wakes the live sleep screen first
+    return;
+  }
   if (!Storage.exists(path)) {
     reply("ERR OPEN notfound");
     return;
@@ -948,6 +970,10 @@ void cmdCard(char* args, const bool exclusive) {
     reply("ERR CARD busy");
     return;
   }
+  if (liveSleepActive()) {
+    reply("ERR CARD live");  // REDRAW redraws the live sleep screen itself
+    return;
+  }
   snprintf(pathBuf, sizeof(pathBuf), "%s", name);
   if (strcmp(activityManager.benchCurrentName(), SleepCardPreviewActivity::NAME) == 0) {
     static_cast<SleepCardPreviewActivity*>(activityManager.benchCurrentActivity())->show(id);
@@ -964,6 +990,24 @@ void cmdCard(char* args, const bool exclusive) {
   activityManager.pushActivity(std::move(preview));
   pend.kind = Pending::Card;
   pend.passes = 0;
+}
+
+// WIFILAST <ssid>: the Wi-Fi list's last-connected network, so a bench can test the fallback to
+// the next-best saved network where the last one is out of range. Never shows a password.
+void cmdWifiLast(const char* ssid, const bool exclusive) {
+  if (!bench::isValidSsid(ssid)) {
+    reply("ERR WIFILAST usage");
+    return;
+  }
+  if (!fileVerbAllowed("WIFILAST", exclusive)) return;
+  bool saved = false;
+  {
+    RenderLock lock;
+    WIFI_STORE.loadFromFile();
+    saved = WIFI_STORE.hasSavedCredential(ssid);
+    WIFI_STORE.setLastConnectedSsid(ssid);
+  }
+  reply("OK WIFILAST saved=%d networks=%u", saved ? 1 : 0, static_cast<unsigned>(WIFI_STORE.getCredentialCount()));
 }
 
 void cmdLegacyScreenshot() {
@@ -1025,6 +1069,17 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
   } else if (strcmp(verb, "CARD") == 0) {
     cmdCard(args, exclusive);
   } else if (strcmp(verb, "SLEEP") == 0) {
+    bench::SleepKind kind = bench::SleepKind::Default;
+    if (!bench::parseSleepArgs(args, kind)) {
+      reply("ERR SLEEP usage");
+      return NONE;
+    }
+    const bool deep = kind == bench::SleepKind::Deep;
+    if (liveSleepActive()) {
+      // On the live screen: SLEEP redraws it, SLEEP deep commits to deep sleep (the port drops).
+      reply("%s", deep ? "OK SLEEP deep" : "OK SLEEP live redraw");
+      return USER_ACTIVITY | (deep ? REQUEST_DEEP_SLEEP : REQUEST_SLEEP);
+    }
     if (exclusive) {
       reply("ERR SLEEP busy");
       return USER_ACTIVITY;
@@ -1034,8 +1089,21 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
       reply("ERR SLEEP activity");
       return USER_ACTIVITY;
     }
-    reply("OK SLEEP");
-    return USER_ACTIVITY | REQUEST_SLEEP;
+    // live: the console stays up on the live sleep screen; deep: the port drops.
+    const bool live = !deep && live_sleep::liveEligible(BoardConfig::isX4Pro(), externalPowerPresent(),
+                                                        SETTINGS.sleepScreen, SETTINGS.cardCycleWhenCharging != 0);
+    reply("%s", live ? "OK SLEEP live" : "OK SLEEP deep");
+    return USER_ACTIVITY | REQUEST_SLEEP | (deep ? REQUEST_DEEP_SLEEP : 0);
+  } else if (strcmp(verb, "REDRAW") == 0) {
+    if (!liveSleepActive()) {
+      reply("ERR REDRAW notlive");
+      return USER_ACTIVITY;
+    }
+    // The count before this request: the next redraw past it is this one.
+    reply("OK REDRAW redraws=%lu", static_cast<unsigned long>(SleepActivity::liveStatus().redraws));
+    return USER_ACTIVITY | REQUEST_REDRAW;
+  } else if (strcmp(verb, "WIFILAST") == 0) {
+    cmdWifiLast(args, exclusive);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {
     cmdLegacyScreenshot();
   } else {
@@ -1151,7 +1219,7 @@ uint8_t poll(const bool exclusiveStorage, const unsigned long lastActivityMs) {
       continue;
     }
     result |= dispatch(lineBuf, exclusiveStorage, lastActivityMs);
-    if (result & REQUEST_SLEEP) break;
+    if (result & (REQUEST_SLEEP | REQUEST_DEEP_SLEEP | REQUEST_REDRAW)) break;
   }
   return result;
 }

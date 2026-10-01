@@ -433,8 +433,9 @@ def mutations(owner: str, power: str, policy: str):
                 owner, power.replace("    enabled = false;\n  }\n", "    enabled = false;\n  }\n  enabled = true;\n", 1),
                 policy))
     out.append(("begin() releases the lock under a live radio",
-                owner.replace("const wl_status_t status = WiFi.begin(ssid, passphrase);",
-                              "const wl_status_t status = WiFi.begin(ssid, passphrase);\n  powerManager.releaseRadioLock();",
+                owner.replace("const wl_status_t status = WiFi.begin(ssid, passphrase, channel, bssid);",
+                              "const wl_status_t status = WiFi.begin(ssid, passphrase, channel, bssid);\n"
+                              "  powerManager.releaseRadioLock();",
                               1), power, policy))
     out.append(("stop() releases the lock with the driver still initialised",
                 owner.replace("const esp_err_t err = esp_wifi_stop();",

@@ -21,6 +21,7 @@
 #include "CoverDraw.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "LiveSleep.h"
 #include "components/UITheme.h"
 #include "util/BookProgress.h"
 #include "util/BookmarkFile.h"
@@ -249,14 +250,12 @@ SleepCardSettings snapshotSettings() {
 
 }  // namespace
 
-bool cardsDark() {
-  return SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::INVERTED_BLACK_AND_WHITE;
-}
+bool cardsDark() { return SETTINGS.darkCards != 0; }
 
 void buildDeviceContext(CardContext& ctx) {
   ctx = CardContext{};
   time_t now = 0;
-  halClock.invalidate();  // a fresh RTC read: "Asleep since" must not be up to 10 s (a minute) early
+  halClock.invalidate();  // a fresh RTC read: "Screen updated" must not be up to 10 s (a minute) early
   if (halClock.isAvailable() && halClock.utcEpoch(now) && plausibleTime(static_cast<int64_t>(now))) {
     ctx.timeValid = true;
     ctx.utcNow = static_cast<int64_t>(now);
@@ -266,6 +265,7 @@ void buildDeviceContext(CardContext& ctx) {
   }
   ctx.clock12h = SETTINGS.clockFormat == 1;
   ctx.batteryPercent = std::min<int>(100, powerManager.getBatteryPercentage());
+  ctx.charging = externalPowerPresent();
   ctx.awakeSeconds = static_cast<uint32_t>(millis() / 1000UL);
   ctx.settings = snapshotSettings();
   ctx.location.valid = parseLocation(ctx.settings.location, ctx.location.lat, ctx.location.lon);
@@ -276,12 +276,13 @@ void buildDeviceContext(CardContext& ctx) {
   ctx.io = &deviceIo;
 }
 
-CardOutcome drawDeviceCard(GfxRenderer& renderer, CardId requested, CardId* shown) {
+CardOutcome drawDeviceCard(GfxRenderer& renderer, CardId requested, CardId* shown, const CardDrawOptions& options) {
   const unsigned long start = millis();
   CardContext ctx;
   buildDeviceContext(ctx);
+  ctx.repeatLast = options.repeatLast;
   CardId picked = requested;
-  const bool drawn = renderCardOrShuffle(requested, ctx, renderer, picked);
+  const bool drawn = renderCardOrShuffle(requested, ctx, renderer, picked, options.excluded);
   if (shown) *shown = picked;
   if (picked == CardId::Pictures) return CardOutcome::Pictures;
   LOG_INF("CARD", "%s %s in %lu ms", cardName(picked), drawn ? "drawn" : "declined", millis() - start);

@@ -22,6 +22,7 @@
 #include "sleepcards/CardTime.h"
 #include "sleepcards/LocationFix.h"
 #include "sleepcards/SleepCardSettings.h"
+#include "util/LiveSleepPolicy.h"
 
 namespace fui = freeink::ui;
 
@@ -38,6 +39,7 @@ enum Row : uint8_t {
   OWNER_CONTACT_1,
   OWNER_CONTACT_2,
   QUOTE_SOURCE,
+  DARK_CARDS,
   SHUFFLE_NOW_READING,
   SHUFFLE_DAY,
   SHUFFLE_CALENDAR,
@@ -45,14 +47,31 @@ enum Row : uint8_t {
   SHUFFLE_OWNER,
   SHUFFLE_SKY,
   SHUFFLE_PICTURES,
+  CARD_CYCLE_CHARGING,
+  CHARGING_UPDATES,
 };
 
-const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {
-    StrId::STR_LOCATION,        StrId::STR_LOCATE_ME,        StrId::STR_AUTO_LOCATE,   StrId::STR_HUNTING_SEASON,
-    StrId::STR_SEASON_START,    StrId::STR_SEASON_END,       StrId::STR_LEGAL_LIGHT,   StrId::STR_OWNER_NAME,
-    StrId::STR_OWNER_CONTACT_1, StrId::STR_OWNER_CONTACT_2,  StrId::STR_QUOTE_SOURCE,  StrId::STR_SHUFFLE_NOW_READING,
-    StrId::STR_SHUFFLE_DAY,     StrId::STR_SHUFFLE_CALENDAR, StrId::STR_SHUFFLE_QUOTE, StrId::STR_SHUFFLE_OWNER,
-    StrId::STR_SHUFFLE_SKY,     StrId::STR_SHUFFLE_PICTURES};
+const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {StrId::STR_LOCATION,
+                                                                StrId::STR_LOCATE_ME,
+                                                                StrId::STR_AUTO_LOCATE,
+                                                                StrId::STR_HUNTING_SEASON,
+                                                                StrId::STR_SEASON_START,
+                                                                StrId::STR_SEASON_END,
+                                                                StrId::STR_LEGAL_LIGHT,
+                                                                StrId::STR_OWNER_NAME,
+                                                                StrId::STR_OWNER_CONTACT_1,
+                                                                StrId::STR_OWNER_CONTACT_2,
+                                                                StrId::STR_QUOTE_SOURCE,
+                                                                StrId::STR_DARK_CARDS,
+                                                                StrId::STR_SHUFFLE_NOW_READING,
+                                                                StrId::STR_SHUFFLE_DAY,
+                                                                StrId::STR_SHUFFLE_CALENDAR,
+                                                                StrId::STR_SHUFFLE_QUOTE,
+                                                                StrId::STR_SHUFFLE_OWNER,
+                                                                StrId::STR_SHUFFLE_SKY,
+                                                                StrId::STR_SHUFFLE_PICTURES,
+                                                                StrId::STR_CARD_CYCLE_CHARGING,
+                                                                StrId::STR_CHARGING_UPDATES};
 
 uint8_t CrossPointSettings::* shuffleField(const int row) {
   switch (row) {
@@ -255,6 +274,16 @@ void SleepCardSettingsActivity::activateIndex(const int index) {
     case AUTO_LOCATE:
       SETTINGS.autoLocateOnSync = SETTINGS.autoLocateOnSync ? 0 : 1;
       break;
+    case DARK_CARDS:
+      SETTINGS.darkCards = SETTINGS.darkCards ? 0 : 1;
+      break;
+    case CARD_CYCLE_CHARGING:
+      SETTINGS.cardCycleWhenCharging = SETTINGS.cardCycleWhenCharging ? 0 : 1;
+      break;
+    case CHARGING_UPDATES:
+      SETTINGS.chargingUpdateInterval =
+          static_cast<uint8_t>((SETTINGS.chargingUpdateInterval + 1) % live_sleep::INTERVAL_COUNT);
+      break;
     default: {
       const auto field = shuffleField(index);
       if (field == nullptr) return;
@@ -284,6 +313,11 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
                                            StrId::STR_QUOTE_SOURCE_MINE,
                                            StrId::STR_QUOTE_SOURCE_BOOKMARKS};
   static_assert(std::size(QUOTE_LABELS) == static_cast<size_t>(sleepcards::QuoteSource::Count));
+  // In live_sleep::INTERVAL_MINUTES order.
+  static constexpr StrId INTERVAL_LABELS[] = {StrId::STR_CHARGING_EVERY_1_MIN, StrId::STR_CHARGING_EVERY_2_MIN,
+                                              StrId::STR_CHARGING_EVERY_5_MIN, StrId::STR_CHARGING_EVERY_10_MIN,
+                                              StrId::STR_CHARGING_EVERY_15_MIN};
+  static_assert(std::size(INTERVAL_LABELS) == live_sleep::INTERVAL_COUNT);
   const auto pick = [](const StrId* labels, const size_t count, const uint8_t value) {
     return I18N.get(labels[value < count ? value : 0]);
   };
@@ -308,6 +342,16 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   for (int row = SHUFFLE_NOW_READING; row <= SHUFFLE_PICTURES; row++) {
     rowValues_[row] = SETTINGS.*shuffleField(row) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
   }
+  rowValues_[DARK_CARDS] = SETTINGS.darkCards ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  rowItems_[DARK_CARDS].subtitle = tr(STR_DARK_CARDS_HINT);
+  rowValues_[CARD_CYCLE_CHARGING] = SETTINGS.cardCycleWhenCharging ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  rowItems_[CARD_CYCLE_CHARGING].subtitle = tr(STR_CARD_CYCLE_CHARGING_HINT);
+  // An index from a newer firmware reads as the default, as live_sleep::intervalMinutes() does.
+  rowValues_[CHARGING_UPDATES] =
+      pick(INTERVAL_LABELS, std::size(INTERVAL_LABELS),
+           SETTINGS.chargingUpdateInterval < live_sleep::INTERVAL_COUNT ? SETTINGS.chargingUpdateInterval
+                                                                        : live_sleep::DEFAULT_INTERVAL_INDEX);
+  rowItems_[CHARGING_UPDATES].subtitle = tr(STR_CHARGING_UPDATES_HINT);
   for (int i = 0; i < MENU_ITEMS; i++) {
     if (invalid_[i]) rowValues_[i] = tr(STR_INVALID_ENTRY);
     rowItems_[i].value = rowValues_[i].c_str();

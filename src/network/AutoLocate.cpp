@@ -200,6 +200,11 @@ bool due(const bool jobOnline) {
   return true;
 }
 
+void rearm() {
+  answered = false;
+  approved = false;
+}
+
 void run() {
   if (!approved) return;
   approved = false;
@@ -220,6 +225,7 @@ void run() {
 // X4 Pro only (the sleep cards and the location lookup live there).
 bool due(bool) { return false; }
 void run() {}
+void rearm() {}
 
 #endif
 

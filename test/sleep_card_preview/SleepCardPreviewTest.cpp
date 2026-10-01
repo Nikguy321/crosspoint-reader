@@ -63,7 +63,7 @@ TEST(SleepCardPreview, EveryCardRendersWithinBudget) {
   }
 }
 
-// The Inverted filter: every card white on black -> build/cards/dark_<name>.png. The page turns
+// Dark Cards: every card white on black -> build/cards/dark_<name>.png. The page turns
 // black; the moon and the book cover keep their tones.
 TEST(SleepCardPreview, DarkCards) {
   const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote, CardId::Owner, CardId::Sky};

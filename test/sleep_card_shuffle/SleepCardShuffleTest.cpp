@@ -385,6 +385,76 @@ TEST(SleepCardShuffle, RenderMovesOnWhenThePickDeclines) {
   EXPECT_EQ(shown, CardId::Pictures);
 }
 
+// Live sleep's cycle: the picture frame found no picture, so the deal moves on past Pictures
+// (excluded) to the next card instead of showing the logo; Pictures alone has nothing else.
+TEST(SleepCardShuffle, CycleSkipsPicturesWithNoPictures) {
+  MemIo io;
+  CardContext ctx = memContext(io);
+  ctx.settings.shuffleMask = bits({CardId::Pictures, CardId::Day});
+  for (int i = 0; i < 6; i++) {
+    ctx.seed = 0xC0FFEEu + static_cast<uint32_t>(i);
+    CardId shown = CardId::None;
+    EXPECT_TRUE(renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown, cardBit(CardId::Pictures))) << i;
+    EXPECT_EQ(shown, CardId::Day) << i;
+  }
+  // Without the exclusion the deal does come round to Pictures (handed back undrawn).
+  bool sawPictures = false;
+  for (int i = 0; i < 6 && !sawPictures; i++) {
+    ctx.seed = 0xC0FFEEu + static_cast<uint32_t>(i);
+    CardId shown = CardId::None;
+    if (!renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown)) sawPictures = shown == CardId::Pictures;
+  }
+  EXPECT_TRUE(sawPictures);
+  // Pictures the only pick and no picture: nothing drawn (the logo screen).
+  ctx.settings.shuffleMask = bits({CardId::Pictures});
+  CardId shown = CardId::Day;
+  EXPECT_FALSE(renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown, cardBit(CardId::Pictures)));
+  EXPECT_EQ(shown, CardId::None);
+}
+
+// SleepActivity::drawLive's cycle with Pictures ticked and no picture on the card, redraw after
+// redraw: the deal that found Pictures empty retries without Pictures and without the card on
+// screen, and every later deal leaves Pictures out. No card shows twice in a row, and the deck
+// writes its state about once a redraw.
+TEST(SleepCardShuffle, LiveCycleWithNoPicturesNeverRepeatsACard) {
+  for (const uint16_t picks : {bits({CardId::Day, CardId::Calendar, CardId::Pictures}), ALL}) {
+    MemIo io;
+    CardContext ctx = memContext(io);
+    ctx.settings.shuffleMask = picks;
+    bool picturesEmpty = false;
+    bool lastWasCard = false;
+    CardId lastShown = CardId::None;
+    constexpr int REDRAWS = 120;
+    for (int redraw = 0; redraw < REDRAWS; redraw++) {
+      ctx.seed = 0x5EED0000u + static_cast<uint32_t>(redraw) * 7919u;
+      uint16_t base = picturesEmpty ? cardBit(CardId::Pictures) : 0;
+      uint16_t excluded = base;
+      CardId shown = CardId::None;
+      bool drawn = false;
+      for (int attempt = 0; attempt < 3; attempt++) {
+        drawn = renderCardOrShuffle(CardId::Shuffle, ctx, preview::renderer(), shown, excluded);
+        if (drawn) break;
+        if (shown != CardId::Pictures) {
+          if (excluded == base) break;
+          excluded = base;
+          continue;
+        }
+        picturesEmpty = true;
+        excluded |= cardBit(CardId::Pictures);
+        base |= cardBit(CardId::Pictures);
+        if (lastWasCard) excluded |= cardBit(lastShown);
+      }
+      ASSERT_TRUE(drawn) << redraw;
+      if (lastWasCard) EXPECT_NE(shown, lastShown) << "redraw " << redraw << " repeated " << cardName(shown);
+      lastShown = shown;
+      lastWasCard = true;
+    }
+    EXPECT_TRUE(picturesEmpty);
+    // The Quote card writes its own file; without it every write is the deck's.
+    if ((picks & cardBit(CardId::Quote)) == 0) EXPECT_LE(io.writes, REDRAWS + 2);
+  }
+}
+
 // ---- preview + budget --------------------------------------------------------------------------------------
 
 TEST(SleepCardShuffle, PreviewAndBudget) {

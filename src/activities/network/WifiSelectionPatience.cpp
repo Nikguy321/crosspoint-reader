@@ -106,7 +106,7 @@ bool WifiSelectionActivity::patientLoop() {
     RadioPower::mode(WIFI_STA);
     WiFi.disconnect();
     delay(100);
-    RadioPower::scanNetworks(true);
+    RadioPower::scanNetworks(true, /*showHidden=*/true);
   }
   return true;
 }

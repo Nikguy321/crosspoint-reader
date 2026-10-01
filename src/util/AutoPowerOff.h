@@ -29,9 +29,13 @@ constexpr uint64_t timerMicros(const uint8_t index, const bool railCuttable) {
 // A timer wake can only come from the timer above, so it means "cut now" —
 // unless the power button fired in the same instant (esp_sleep_get_wakeup_causes()
 // reports both): then the user wants the device on, and it boots. Any other
-// wake (button, cold boot, USB) boots normally.
-constexpr bool shouldCutRailOnWake(const bool timerWake, const bool buttonWake, const bool railCuttable) {
-  return timerWake && !buttonWake && railCuttable;
+// wake (button, cold boot, USB) boots normally. A reader that is charging
+// (plugged in while it slept) is not cut either: it boots, and setup() takes
+// it straight into the live sleep screen (or cuts it there after all when the
+// sleep screen cannot be live).
+constexpr bool shouldCutRailOnWake(const bool timerWake, const bool buttonWake, const bool railCuttable,
+                                   const bool charging) {
+  return timerWake && !buttonWake && railCuttable && !charging;
 }
 
 }  // namespace auto_power_off

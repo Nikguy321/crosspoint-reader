@@ -34,9 +34,9 @@ bool mode(const wifi_mode_t m) {
   return ok;
 }
 
-wl_status_t begin(const char* ssid, const char* passphrase) {
+wl_status_t begin(const char* ssid, const char* passphrase, const int32_t channel, const uint8_t* bssid) {
   lockForStart();
-  const wl_status_t status = WiFi.begin(ssid, passphrase);
+  const wl_status_t status = WiFi.begin(ssid, passphrase, channel, bssid);
   releaseIfOff();
   return status;
 }
@@ -48,9 +48,9 @@ bool softAP(const char* ssid, const char* passphrase, const int channel, const b
   return ok;
 }
 
-int16_t scanNetworks(const bool async) {
+int16_t scanNetworks(const bool async, const bool showHidden) {
   lockForStart();
-  const int16_t result = WiFi.scanNetworks(async);
+  const int16_t result = WiFi.scanNetworks(async, showHidden);
   releaseIfOff();
   return result;
 }

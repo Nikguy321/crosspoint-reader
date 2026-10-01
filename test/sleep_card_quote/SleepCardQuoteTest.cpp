@@ -554,6 +554,51 @@ TEST(SleepCardQuote, NeverTheSameTwiceInARow) {
   }
 }
 
+// Live sleep without the cycle redraws the card on screen: the same quote, and no SD write.
+TEST(SleepCardQuote, RepeatLastShowsTheSameQuoteAgain) {
+  FakeIo io;
+  io.files[QUOTES_PATH] = THREE_QUOTES;
+  for (const QuoteSource source : {QuoteSource::MineOnly, QuoteSource::All, QuoteSource::BuiltInOnly}) {
+    for (uint32_t seed = 0; seed < 8; seed++) {
+      ASSERT_TRUE(renderQuoteCard(fakeContext(io, source, seed), preview::renderer()));
+      const std::string shown = io.files[STATE_PATH];
+      const int writes = io.writes;
+      for (uint32_t again = 1; again <= 3; again++) {
+        CardContext ctx = fakeContext(io, source, seed * 31 + again);
+        ctx.repeatLast = true;
+        ASSERT_TRUE(renderQuoteCard(ctx, preview::renderer()));
+        EXPECT_EQ(io.files[STATE_PATH], shown) << int(source) << " seed " << seed;
+      }
+      EXPECT_EQ(io.writes, writes) << int(source) << " seed " << seed;
+    }
+  }
+  // Nothing shown yet (or the last one is gone): a fresh pick as usual.
+  io.files.erase(STATE_PATH);
+  CardContext ctx = fakeContext(io, QuoteSource::MineOnly, 5);
+  ctx.repeatLast = true;
+  ASSERT_TRUE(renderQuoteCard(ctx, preview::renderer()));
+  EXPECT_TRUE(isFileEntry(shownHash(io), THREE_QUOTES));
+  io.files[STATE_PATH] = "00000001\n";
+  ASSERT_TRUE(renderQuoteCard(ctx, preview::renderer()));
+  EXPECT_TRUE(isFileEntry(shownHash(io), THREE_QUOTES));
+}
+
+TEST(SleepCardQuote, KeepLastAnswersWithTheLastEntry) {
+  uint32_t rng = 3;
+  FreshPicker p(/*lastHash=*/102, rng);
+  p.keepLast();
+  for (uint32_t i = 0; i < 5; i++) p.offer(100 + i, i, 10 + i);
+  EXPECT_TRUE(p.hasLast());
+  EXPECT_EQ(p.value(), 2u);
+  EXPECT_EQ(p.value2(), 12u);
+  EXPECT_EQ(p.hash(), 102u);
+  FreshPicker none(/*lastHash=*/999, rng);
+  none.keepLast();
+  for (uint32_t i = 0; i < 5; i++) none.offer(100 + i, i);
+  EXPECT_FALSE(none.hasLast());
+  EXPECT_NE(none.hash(), 999u);
+}
+
 TEST(SleepCardQuote, OneQuoteIsShownAgain) {
   FakeIo io;
   io.files[QUOTES_PATH] = "Only me.\n";
