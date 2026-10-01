@@ -1,3 +1,49 @@
+# CrossPoint for the X4 Pro (Nick H.'s fork)
+
+This is a personal fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) for the
+**Xteink X4 Pro**, on the `booksync` branch. It keeps CrossPoint's features and adds the ones below for the X4
+Pro. CrossPoint's own README follows further down.
+
+## What this fork adds
+
+- **Reading-position sync with a [WiPhone](https://github.com/Nikguy321/wiphone-meshtastic) and COVEY**: KOReader
+  Sync pointed at the WiPhone's sync window on its `WiPhone-Books` hotspot, or at a home KOSync server, optionally on
+  book open and close.
+- **Sleep screen cards**, drawn fresh at each sleep:
+  - Now Reading: cover, progress and pace.
+  - Day: sunrise and sunset, the moon, and legal shooting light during hunting season.
+  - Calendar: the month with its moon phases.
+  - Quote: 37 built-in public-domain quotes, your own `/quotes.txt` and your bookmarks.
+  - Owner: return-if-found details.
+  - Sky: the moon and the planets tonight.
+  - Shuffle: a different card each sleep.
+
+  An X4 Pro logo replaces the CrossPoint one, and the cards can be white on black.
+- **Locate Me** sets the cards' location from nearby Wi-Fi (beaconDB), or from your internet address as a fallback.
+  Nothing is sent until you press Locate. It can also refresh the location once a day during a sync.
+- **Battery behaviour like the stock firmware:**
+  - Auto Power Off turns the reader fully off after a set time asleep.
+  - The awake reader naps between key presses, with the light on too.
+  - Wi-Fi is on only while a job needs it.
+- **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
+- **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
+  keys, taps, screenshots, files and card previews.
+
+More: [sleep screen cards](docs/sleep-screen-cards.md), [awake power](docs/awake-power.md) and the
+[user guide](USER_GUIDE.md).
+
+## Installing it
+
+There is no prebuilt release yet. Build the `x4pro` environment with PlatformIO (`pio run -e x4pro`) and flash it
+over USB. Back up the stock firmware first: this fork has no way back to it on its own.
+
+## Credit
+
+The reader, the rendering and the wireless features are CrossPoint's work (MIT License); this fork adds the items
+above. To sync with upstream, `develop` is kept as CrossPoint's own branch.
+
+---
+
 # CrossPoint Reader
 
 [![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/crosspoint-reader/crosspoint-reader)
