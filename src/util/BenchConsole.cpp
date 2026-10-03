@@ -22,6 +22,10 @@
 #include <MD5Builder.h>
 #include <Memory.h>
 #include <PowerPolicy.h>
+#include <WordSearch.h>
+#include <driver/gpio.h>
+#include <soc/gpio_reg.h>
+#include <soc/soc.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -32,6 +36,7 @@
 #include "LiveSleep.h"
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
+#include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
 #include "network/StationKeeper.h"
@@ -80,7 +85,7 @@ bool txStalled = false;
 
 bench::HostPresence host;
 
-enum class Pending : uint8_t { None, Input, Shot, Open, Card };
+enum class Pending : uint8_t { None, Input, Shot, Open, Card, App };
 struct PendingState {
   Pending kind = Pending::None;
   char verb[12] = {};
@@ -992,6 +997,342 @@ void cmdCard(char* args, const bool exclusive) {
   pend.passes = 0;
 }
 
+// APP apps|wordsearch: the Apps list or Word Search, as their Home row / list row opens them.
+// The reply waits until the switch has happened.
+void cmdApp(const char* args, const bool exclusive) {
+  bench::AppTarget target = bench::AppTarget::Apps;
+  if (!bench::parseAppArgs(args, target)) {
+    reply("ERR APP usage");
+    return;
+  }
+  if (liveSleepActive()) {
+    reply("ERR APP live");  // a key wakes the live sleep screen first
+    return;
+  }
+  // Word Search reads and writes the card.
+  if (activityManager.benchSwitchPending() || storageBusy(exclusive)) {
+    reply("ERR APP busy");
+    return;
+  }
+  if (target == bench::AppTarget::Apps) {
+    activityManager.goToApps();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", "Apps");
+  } else {
+    activityManager.goToWordSearch();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", WordSearchActivity::NAME);
+  }
+  pend.kind = Pending::App;
+  pend.passes = 0;
+}
+
+const char* difficultyName(const ws::Difficulty d) {
+  switch (d) {
+    case ws::Difficulty::Easy:
+      return "easy";
+    case ws::Difficulty::Hard:
+      return "hard";
+    default:
+      return "medium";
+  }
+}
+
+// The puzzle as the game holds it. fnv = FNV-1a of the grid rows, the host tests' fingerprint
+// (WS new 1234 medium animals gives 691261517 on every build).
+void dumpWordSearch(const WordSearchActivity& game) {
+  const ws::Puzzle& p = *game.benchPuzzle();
+  uint32_t fnv = 2166136261u;
+  for (int r = 0; r < p.size; r++) {
+    for (int c = 0; c < p.size; c++) fnv = (fnv ^ static_cast<uint8_t>(p.at(r, c))) * 16777619u;
+  }
+  const ws::Cell anchor = game.benchAnchor();
+  char anchorText[12] = "-";
+  if (anchor.valid()) snprintf(anchorText, sizeof(anchorText), "%d,%d", anchor.row, anchor.col);
+  reply(
+      "WS state difficulty=%s size=%u found=%d/%u complete=%d anchor=%s cursor=%d,%d shown=%d elapsed=%lu "
+      "hints=%u hint=%d seed=%lu fnv=%lu",
+      difficultyName(p.difficulty), static_cast<unsigned>(p.size), p.foundCount(), static_cast<unsigned>(p.wordCount),
+      p.complete() ? 1 : 0, anchorText, p.cursor.row, p.cursor.col, game.benchCursorShown() ? 1 : 0,
+      static_cast<unsigned long>(game.benchElapsedSeconds()), static_cast<unsigned>(p.hintsUsed), p.hintWord,
+      static_cast<unsigned long>(p.seed), static_cast<unsigned long>(fnv));
+  reply("WS theme %s", p.themeKey);
+  reply("WS title %s", p.themeTitle);
+  for (int r = 0; r < p.size; r++) reply("WS row %.*s", static_cast<int>(p.size), p.grid + r * ws::MAX_GRID);
+  for (int k = 0; k < p.wordCount; k++) {
+    const ws::PuzzleWord& w = p.words[k];
+    char line[24] = "-";
+    if (w.found) {
+      snprintf(line, sizeof(line), "%d,%d-%d,%d", w.foundLine.a.row, w.foundLine.a.col, w.foundLine.b.row,
+               w.foundLine.b.col);
+    }
+    // found, start row/col, direction (0 right .. 7 up-right, clockwise), letters, the line
+    // the player drew, the display text.
+    reply("WS word %d %d %d %u %u %s %s", w.found ? 1 : 0, w.place.row, w.place.col, static_cast<unsigned>(w.place.dir),
+          static_cast<unsigned>(w.place.len), line, w.display);
+  }
+  const ws::Prefs& prefs = game.benchPrefs();
+  reply("WS prefs difficulty=%s choice=%s recent=%s,%s,%s", difficultyName(prefs.difficulty),
+        prefs.randomChoice() ? ws::RANDOM_CHOICE : prefs.choice, prefs.recent[0][0] ? prefs.recent[0] : "-",
+        prefs.recent[1][0] ? prefs.recent[1] : "-", prefs.recent[2][0] ? prefs.recent[2] : "-");
+}
+
+// WS: the dump. WS new <seed> [easy|medium|hard] [key]: a deterministic puzzle, then the dump.
+// Word Search must be on screen (APP wordsearch); drags are SWIPE x1 y1 x2 y2 1200.
+void cmdWs(char* args, const bool exclusive) {
+  bench::WsArgs ws;
+  if (!bench::parseWsArgs(args, ws)) {
+    reply("ERR WS usage");
+    return;
+  }
+  auto* game = strcmp(activityManager.benchCurrentName(), WordSearchActivity::NAME) == 0
+                   ? static_cast<WordSearchActivity*>(activityManager.benchCurrentActivity())
+                   : nullptr;
+  if (!game || !game->benchPuzzle()) {
+    reply("ERR WS notopen act=%s", activityManager.benchCurrentName());
+    return;
+  }
+  if (ws.newPuzzle) {
+    if (storageBusy(exclusive)) {
+      reply("ERR WS busy");
+      return;
+    }
+    if (!game->benchNewPuzzle(ws.seed, ws.difficulty, ws.themeKey[0] ? ws.themeKey : nullptr)) {
+      reply("ERR WS theme");
+      return;
+    }
+  }
+  dumpWordSearch(*game);
+  if (ws.newPuzzle) {
+    reply("OK WS new seed=%lu", static_cast<unsigned long>(ws.seed));
+  } else {
+    reply("OK WS");
+  }
+}
+
+// --- PINS: the USB/VBUS-detect pin hunt (X4 Pro) --------------------------------------------
+//
+// PINS [seconds] records the raw GPIO input registers for the window: a start snapshot, then
+// every change of a watched pin ("<ms> pin <n> <0|1>", at most PINS_CHANGE_LINES a second, the
+// rest counted), and once a second the charger STAT line, the gauge and whether a computer is
+// on the cable ("<ms> sec ..."). It runs from the console poll, so the main loop keeps going
+// (and the reader stays awake: no inactivity sleep, no idle naps) with no host attached: start
+// it, pull the cable for ~10 s, plug it back, then read /pins.log (overwritten each run). While
+// a host is attached each line is also sent as "PINS <line>"; the last is "<ms> done".
+//
+// Before the snapshot the probe pins (bench::X4PRO_PROBE_PINS; the evidence is there) get their
+// input buffer enabled: no pull, no direction or function change, and never on a pin the live
+// profile names. A reboot restores them. Assigned pins are only read, never configured.
+#if CONFIG_IDF_TARGET_ESP32S3
+constexpr uint32_t PINS_SAMPLE_MS = 20;
+constexpr uint16_t PINS_CHANGE_LINES = 20;
+constexpr char PINS_LOG_PATH[] = "/pins.log";
+constexpr size_t PINS_TEXT_CAP = 2048;
+constexpr size_t PINS_LINE_CAP = 160;
+
+struct PinsRun {
+  bool active = false;
+  uint32_t startMs = 0;
+  uint32_t durationMs = 0;
+  uint32_t lastSampleMs = 0;
+  uint32_t lastSecondMs = 0;
+  uint64_t mask = 0;
+  uint64_t levels = 0;
+  uint16_t changes[bench::PINS_MAX_GPIO + 1] = {};
+  uint32_t secondChanges = 0;
+  bench::ChangeBudget budget{PINS_CHANGE_LINES};
+  HalFile file;
+  bool fileOk = false;
+};
+PinsRun pins;
+char pinsText[PINS_TEXT_CAP];  // lines not yet on the card (written once a second)
+size_t pinsTextLen = 0;
+
+uint64_t readGpioInputs() {
+  return static_cast<uint64_t>(REG_READ(GPIO_IN_REG)) | (static_cast<uint64_t>(REG_READ(GPIO_IN1_REG)) << 32);
+}
+
+// Every pin the live board profile names, whatever its role.
+bool profileUsesPin(const int pin) {
+  const auto& b = BoardConfig::ACTIVE;
+  const int8_t used[] = {b.display.sclk,
+                         b.display.mosi,
+                         b.display.cs,
+                         b.display.dc,
+                         b.display.rst,
+                         b.display.busy,
+                         b.display.powerEnable,
+                         b.sd.sclk,
+                         b.sd.miso,
+                         b.sd.mosi,
+                         b.sd.cs,
+                         b.sd.powerEnable,
+                         b.input.back,
+                         b.input.confirm,
+                         b.input.left,
+                         b.input.right,
+                         b.input.up,
+                         b.input.down,
+                         b.input.power,
+                         b.input.adcLadderPin,
+                         b.batteryAdc,
+                         b.batteryChargeStatus,
+                         b.usbDetect,
+                         b.touch.sda,
+                         b.touch.scl,
+                         b.touch.irq,
+                         b.touch.reset,
+                         b.touch.powerEnable,
+                         b.frontlight.gpio,
+                         b.frontlight.gpioWarm,
+                         b.audio.bclk,
+                         b.audio.lrclk,
+                         b.audio.dout,
+                         b.audio.mclk,
+                         b.audio.enable,
+                         b.audio.ampEnable,
+                         b.audio.codecSda,
+                         b.audio.codecScl,
+                         b.audio.buzzer,
+                         b.leds.data,
+                         b.sdmmc.clk,
+                         b.sdmmc.cmd,
+                         b.sdmmc.d0,
+                         b.sdmmc.d1,
+                         b.sdmmc.d2,
+                         b.sdmmc.d3,
+                         b.batteryGauge.i2cSda,
+                         b.batteryGauge.i2cScl,
+                         b.mic.clk,
+                         b.mic.data,
+                         b.mic.enable,
+                         b.sensors.i2cSda,
+                         b.sensors.i2cScl,
+                         b.power.latch0,
+                         b.power.latch1,
+                         b.power.chargeEnable};
+  return std::find(std::begin(used), std::end(used), pin) != std::end(used);
+}
+
+void flushPinsText() {
+  if (pinsTextLen == 0) return;
+  if (pins.fileOk) {
+    pins.fileOk = pins.file.write(pinsText, pinsTextLen) == pinsTextLen;
+    pins.file.flush();
+  }
+  pinsTextLen = 0;
+}
+
+// One record line: to the log, and to the host while one is on the cable (a write to a missing
+// host would stall the sampling for the console's TX budget).
+__attribute__((format(printf, 1, 2))) void pinsLine(const char* fmt, ...) {
+  char line[PINS_LINE_CAP];
+  va_list args;
+  va_start(args, fmt);
+  const int n = vsnprintf(line, sizeof(line), fmt, args);
+  va_end(args);
+  if (n <= 0) return;
+  const size_t len = std::min(static_cast<size_t>(n), sizeof(line) - 1);
+  if (pinsTextLen + len + 1 > sizeof(pinsText)) flushPinsText();
+  memcpy(pinsText + pinsTextLen, line, len);
+  pinsTextLen += len;
+  pinsText[pinsTextLen++] = '\n';
+  if (HWCDC::isPlugged()) reply("PINS %s", line);
+}
+
+void cmdPins(const char* args, const bool exclusive) {
+  uint32_t seconds = bench::PINS_DEFAULT_SECONDS;
+  if (!bench::parsePinsArgs(args, seconds)) {
+    reply("ERR PINS usage");
+    return;
+  }
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR PINS board");  // the pin lists are the X4 Pro's
+    return;
+  }
+  if (pins.active) {
+    reply("ERR PINS busy");
+    return;
+  }
+  if (liveSleepActive()) {
+    reply("ERR PINS live");
+    return;
+  }
+  if (!fileVerbAllowed("PINS", exclusive)) return;
+
+  pins = PinsRun{};
+  pinsTextLen = 0;
+  char probed[48] = "";
+  size_t probedLen = 0;
+  for (const uint8_t pin : bench::X4PRO_PROBE_PINS) {
+    if (bench::isReservedS3Pin(pin) || profileUsesPin(pin)) continue;
+    gpio_input_enable(static_cast<gpio_num_t>(pin));
+    pins.mask |= 1ULL << pin;
+    probedLen += static_cast<size_t>(
+        snprintf(probed + probedLen, sizeof(probed) - probedLen, "%s%u", probedLen ? "," : "", pin));
+    probedLen = std::min(probedLen, sizeof(probed) - 1);
+  }
+  for (const uint8_t pin : bench::X4PRO_WATCH_ASSIGNED_PINS) pins.mask |= 1ULL << pin;
+  pins.fileOk = Storage.openFileForWrite("BENCH", PINS_LOG_PATH, pins.file);
+  const auto now = static_cast<uint32_t>(millis());
+  pins.active = true;
+  pins.startMs = now;
+  pins.durationMs = seconds * 1000u;
+  pins.lastSampleMs = now;
+  pins.lastSecondMs = now;
+  reply("OK PINS seconds=%lu probe=%s log=%s", static_cast<unsigned long>(seconds), probed,
+        pins.fileOk ? PINS_LOG_PATH : "none");
+
+  pinsLine("0 start seconds=%lu probe=%s", static_cast<unsigned long>(seconds), probed);
+  pins.levels = readGpioInputs() & pins.mask;
+  for (uint8_t pin = 0; pin <= bench::PINS_MAX_GPIO; ++pin) {
+    if (pins.mask & (1ULL << pin)) pinsLine("0 pin %u %u", pin, static_cast<unsigned>((pins.levels >> pin) & 1));
+  }
+}
+
+void servicePins(const bool exclusive) {
+  if (exclusive) {
+    // USB Drive has the card: stop without touching it (the drive's end reboots the reader).
+    pins.active = false;
+    return;
+  }
+  const auto now = static_cast<uint32_t>(millis());
+  const unsigned long t = now - pins.startMs;
+  if (now - pins.lastSampleMs >= PINS_SAMPLE_MS) {
+    pins.lastSampleMs = now;
+    const uint64_t levels = readGpioInputs() & pins.mask;
+    const uint64_t changed = levels ^ pins.levels;
+    pins.levels = levels;
+    for (uint8_t pin = 0; changed != 0 && pin <= bench::PINS_MAX_GPIO; ++pin) {
+      if ((changed & (1ULL << pin)) == 0) continue;
+      pins.changes[pin]++;
+      pins.secondChanges++;
+      if (pins.budget.allow(now)) pinsLine("%lu pin %u %u", t, pin, static_cast<unsigned>((levels >> pin) & 1));
+    }
+  }
+  if (now - pins.lastSecondMs >= 1000) {
+    pins.lastSecondMs = now;
+    const int8_t statPin = BoardConfig::ACTIVE.batteryChargeStatus;
+    const int stat = statPin >= 0 ? static_cast<int>((readGpioInputs() >> statPin) & 1) : -1;
+    pinsLine("%lu sec stat=%d mv=%u soc=%u host=%d usb=%d changes=%lu dropped=%lu", t, stat,
+             powerManager.getBatteryMillivolts(), powerManager.getBatteryPercentage(), host.present() ? 1 : 0,
+             gpio.isUsbConnected() ? 1 : 0, static_cast<unsigned long>(pins.secondChanges),
+             static_cast<unsigned long>(pins.budget.dropped()));
+    pins.secondChanges = 0;
+    flushPinsText();
+  }
+  if (now - pins.startMs >= pins.durationMs) {
+    for (uint8_t pin = 0; pin <= bench::PINS_MAX_GPIO; ++pin) {
+      if (pins.mask & (1ULL << pin)) pinsLine("%lu count pin %u %u", t, pin, static_cast<unsigned>(pins.changes[pin]));
+    }
+    pinsLine("%lu done", t);
+    flushPinsText();
+    pins.file.close();
+    pins.active = false;
+  }
+}
+#else
+void cmdPins(const char*, bool) { reply("ERR PINS board"); }
+#endif
+
 // WIFILAST <ssid>: the Wi-Fi list's last-connected network, so a bench can test the fallback to
 // the next-best saved network where the last one is out of range. Never shows a password.
 void cmdWifiLast(const char* ssid, const bool exclusive) {
@@ -1102,6 +1443,12 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     // The count before this request: the next redraw past it is this one.
     reply("OK REDRAW redraws=%lu", static_cast<unsigned long>(SleepActivity::liveStatus().redraws));
     return USER_ACTIVITY | REQUEST_REDRAW;
+  } else if (strcmp(verb, "APP") == 0) {
+    cmdApp(args, exclusive);
+  } else if (strcmp(verb, "WS") == 0) {
+    cmdWs(args, exclusive);
+  } else if (strcmp(verb, "PINS") == 0) {
+    cmdPins(args, exclusive);
   } else if (strcmp(verb, "WIFILAST") == 0) {
     cmdWifiLast(args, exclusive);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {
@@ -1157,6 +1504,21 @@ void servicePending() {
           result.ms);
     return;
   }
+  if (pend.kind == Pending::App) {
+    if (activityManager.benchSwitchPending()) {
+      if (++pend.passes < OPEN_MAX_PASSES) return;
+      pend.kind = Pending::None;
+      reply("ERR APP timeout");
+      return;
+    }
+    pend.kind = Pending::None;
+    if (strcmp(activityManager.benchCurrentName(), pathBuf) == 0) {
+      reply("OK APP act=%s", pathBuf);
+    } else {
+      reply("ERR APP failed act=%s", activityManager.benchCurrentName());
+    }
+    return;
+  }
   if (pend.kind != Pending::Input) return;
 
   switch (pend.waiter.poll(now, gpio.benchInjectionDone(), gpio.benchKeyPressDelivered())) {
@@ -1190,10 +1552,16 @@ uint8_t poll(const bool exclusiveStorage, const unsigned long lastActivityMs) {
   host.update(static_cast<uint32_t>(millis()), HWCDC::isPlugged());
 
   uint8_t result = NONE;
+#if CONFIG_IDF_TARGET_ESP32S3
+  if (pins.active) {
+    servicePins(exclusiveStorage);
+    result |= USER_ACTIVITY;  // a PINS run keeps the reader awake and the loop at full rate
+  }
+#endif
   if (pend.kind != Pending::None) {
     servicePending();
     // A command in flight keeps the loop at full cadence so its timing holds.
-    if (pend.kind != Pending::None) return USER_ACTIVITY;
+    if (pend.kind != Pending::None) return result | USER_ACTIVITY;
     result |= USER_ACTIVITY;
   }
 

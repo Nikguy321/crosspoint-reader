@@ -831,3 +831,138 @@ TEST(BenchWifiLast, SsidIsTheRestOfTheLine) {
   EXPECT_FALSE(isValidSsid("tab\there"));
   EXPECT_FALSE(isValidSsid("del\x7f"));
 }
+
+TEST(BenchApp, AppsOrWordSearch) {
+  AppTarget target = AppTarget::Apps;
+  EXPECT_TRUE(parseAppArgs("wordsearch", target));
+  EXPECT_EQ(target, AppTarget::WordSearch);
+  EXPECT_TRUE(parseAppArgs(" APPS ", target));
+  EXPECT_EQ(target, AppTarget::Apps);
+  EXPECT_TRUE(parseAppArgs("WordSearch", target));
+  EXPECT_EQ(target, AppTarget::WordSearch);
+  EXPECT_FALSE(parseAppArgs("", target));
+  EXPECT_FALSE(parseAppArgs(nullptr, target));
+  EXPECT_FALSE(parseAppArgs("word search", target));
+  EXPECT_FALSE(parseAppArgs("crossword", target));
+  EXPECT_FALSE(parseAppArgs("apps now", target));
+  EXPECT_FALSE(parseAppArgs("wordsearchwordsearch", target));
+}
+
+TEST(BenchWs, DumpOrNewPuzzle) {
+  WsArgs ws;
+  char none[] = "";
+  EXPECT_TRUE(parseWsArgs(none, ws));
+  EXPECT_FALSE(ws.newPuzzle);
+  EXPECT_TRUE(parseWsArgs(nullptr, ws));
+  EXPECT_FALSE(ws.newPuzzle);
+
+  char seedOnly[] = "new 1234";
+  ASSERT_TRUE(parseWsArgs(seedOnly, ws));
+  EXPECT_TRUE(ws.newPuzzle);
+  EXPECT_EQ(ws.seed, 1234u);
+  EXPECT_EQ(ws.difficulty, -1);
+  EXPECT_STREQ(ws.themeKey, "");
+
+  char full[] = "NEW 7 Hard animals";
+  ASSERT_TRUE(parseWsArgs(full, ws));
+  EXPECT_EQ(ws.seed, 7u);
+  EXPECT_EQ(ws.difficulty, 2);
+  EXPECT_STREQ(ws.themeKey, "animals");
+
+  char easy[] = "new 0 easy";
+  ASSERT_TRUE(parseWsArgs(easy, ws));
+  EXPECT_EQ(ws.difficulty, 0);
+  EXPECT_STREQ(ws.themeKey, "");
+
+  // No difficulty: the rest of the line is the key, spaces and all.
+  char file[] = "new 99 file:Pond Life.words  ";
+  ASSERT_TRUE(parseWsArgs(file, ws));
+  EXPECT_EQ(ws.difficulty, -1);
+  EXPECT_STREQ(ws.themeKey, "file:Pond Life.words");
+
+  char fileWithLevel[] = "new 4294967295 medium file:My Words.words";
+  ASSERT_TRUE(parseWsArgs(fileWithLevel, ws));
+  EXPECT_EQ(ws.seed, 4294967295u);
+  EXPECT_EQ(ws.difficulty, 1);
+  EXPECT_STREQ(ws.themeKey, "file:My Words.words");
+
+  // "mediums" is a key, not a difficulty.
+  char nearMiss[] = "new 1 mediums";
+  ASSERT_TRUE(parseWsArgs(nearMiss, ws));
+  EXPECT_EQ(ws.difficulty, -1);
+  EXPECT_STREQ(ws.themeKey, "mediums");
+
+  char noSeed[] = "new";
+  EXPECT_FALSE(parseWsArgs(noSeed, ws));
+  char badSeed[] = "new -3";
+  EXPECT_FALSE(parseWsArgs(badSeed, ws));
+  char other[] = "dump";
+  EXPECT_FALSE(parseWsArgs(other, ws));
+  char tooLong[] = "new 1 file:0123456789012345678901234567890123456789.words";
+  EXPECT_FALSE(parseWsArgs(tooLong, ws));
+  char control[] = "new 1 ani\x01mals";
+  EXPECT_FALSE(parseWsArgs(control, ws));
+}
+
+TEST(BenchPins, Seconds) {
+  uint32_t s = 0;
+  EXPECT_TRUE(parsePinsArgs("", s));
+  EXPECT_EQ(s, PINS_DEFAULT_SECONDS);
+  EXPECT_TRUE(parsePinsArgs(nullptr, s));
+  EXPECT_EQ(s, PINS_DEFAULT_SECONDS);
+  EXPECT_TRUE(parsePinsArgs(" 30 ", s));
+  EXPECT_EQ(s, 30u);
+  EXPECT_TRUE(parsePinsArgs("180", s));
+  EXPECT_EQ(s, 180u);
+  EXPECT_TRUE(parsePinsArgs("1", s));
+  EXPECT_EQ(s, 1u);
+  EXPECT_FALSE(parsePinsArgs("0", s));
+  EXPECT_FALSE(parsePinsArgs("181", s));
+  EXPECT_FALSE(parsePinsArgs("ten", s));
+  EXPECT_FALSE(parsePinsArgs("10 20", s));
+  EXPECT_FALSE(parsePinsArgs("99999999999999", s));
+}
+
+TEST(BenchPins, ProbePinsAreFreeAndSafe) {
+  for (const uint8_t pin : X4PRO_PROBE_PINS) {
+    EXPECT_FALSE(isReservedS3Pin(pin)) << int(pin);
+    for (const uint8_t used : X4PRO_ASSIGNED_PINS) EXPECT_NE(pin, used);
+  }
+  for (const uint8_t pin : X4PRO_WATCH_ASSIGNED_PINS) {
+    EXPECT_FALSE(isReservedS3Pin(pin)) << int(pin);
+    bool assigned = false;
+    for (const uint8_t used : X4PRO_ASSIGNED_PINS) assigned = assigned || used == pin;
+    EXPECT_TRUE(assigned) << int(pin);
+  }
+  // The power latch is never watched or probed.
+  for (const uint8_t pin : X4PRO_PROBE_PINS) EXPECT_NE(pin, 1);
+  for (const uint8_t pin : X4PRO_WATCH_ASSIGNED_PINS) EXPECT_NE(pin, 1);
+  // Every GPIO the S3 has is either assigned, reserved or probed: none was forgotten.
+  for (uint8_t pin = 0; pin <= PINS_MAX_GPIO; ++pin) {
+    bool known = isReservedS3Pin(pin);
+    for (const uint8_t used : X4PRO_ASSIGNED_PINS) known = known || used == pin;
+    for (const uint8_t probe : X4PRO_PROBE_PINS) known = known || probe == pin;
+    EXPECT_TRUE(known) << int(pin);
+  }
+  EXPECT_TRUE(isReservedS3Pin(19));
+  EXPECT_TRUE(isReservedS3Pin(20));
+  EXPECT_TRUE(isReservedS3Pin(26));
+  EXPECT_TRUE(isReservedS3Pin(37));
+  EXPECT_TRUE(isReservedS3Pin(43));
+  EXPECT_TRUE(isReservedS3Pin(44));
+  EXPECT_TRUE(isReservedS3Pin(49));
+  EXPECT_FALSE(isReservedS3Pin(38));
+}
+
+TEST(BenchPins, ChangeBudgetPerSecond) {
+  ChangeBudget budget(3);
+  EXPECT_TRUE(budget.allow(100));
+  EXPECT_TRUE(budget.allow(150));
+  EXPECT_TRUE(budget.allow(900));
+  EXPECT_FALSE(budget.allow(1000));
+  EXPECT_FALSE(budget.allow(1099));
+  EXPECT_EQ(budget.dropped(), 2u);
+  EXPECT_TRUE(budget.allow(1100));  // a new window
+  EXPECT_TRUE(budget.allow(2050));
+  EXPECT_EQ(budget.dropped(), 2u);
+}

@@ -38,6 +38,7 @@
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
@@ -153,7 +154,9 @@ constexpr uint32_t SILENT_REBOOT_TARGET_HOME = 0;
 constexpr uint32_t SILENT_REBOOT_TARGET_READER = 1;
 constexpr uint32_t SILENT_REBOOT_TARGET_SETTINGS = 2;
 constexpr uint32_t SILENT_REBOOT_TARGET_SLEEP_CARDS = 3;
-constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_SLEEP_CARDS;
+// The app in APP_STATE.lastSleepApp (a live sleep screen's wake inside an app).
+constexpr uint32_t SILENT_REBOOT_TARGET_APP = 4;
+constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_APP;
 constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
 // A key on the live sleep screen: the reopen is a wake, so Pull on Open runs as after deep sleep.
 constexpr uint32_t SILENT_REBOOT_LIVE_WAKE = 1U << 1;
@@ -519,6 +522,7 @@ static void wakeFromLiveSleep() {
   if (APP_STATE.lastSleepFromReader && !APP_STATE.openEpubPath.empty()) {
     silentRestartWithLight(SILENT_REBOOT_TARGET_READER, "reader", lightOn, /*liveWake=*/true);
   }
+  if (APP_STATE.lastSleepApp != 0) silentRestartWithLight(SILENT_REBOOT_TARGET_APP, "app", lightOn, /*liveWake=*/true);
   silentRestartWithLight(SILENT_REBOOT_TARGET_HOME, "home", lightOn, /*liveWake=*/true);
 }
 
@@ -596,6 +600,8 @@ void enterDeepSleep(bool fromTimeout = false, bool forceDeep = false) {
   const bool live = !forceDeep && live_sleep::liveEligible(BoardConfig::isX4Pro(), externalPowerPresent(),
                                                            SETTINGS.sleepScreen, SETTINGS.cardCycleWhenCharging != 0);
   APP_STATE.lastSleepFromReader = activityManager.isReaderActivity();
+  // Before the save below: the app's own onExit runs too late to record it.
+  APP_STATE.lastSleepApp = APP_STATE.lastSleepFromReader ? 0 : activityManager.resumeApp();
 
   // Live wins over Quick Resume after timeout: its screen is redrawn.
   const bool isQuickResumeSleep =
@@ -618,6 +624,25 @@ void enterDeepSleep(bool fromTimeout = false, bool forceDeep = false) {
   deepSleepInProgress = true;
   activityManager.goToSleep(fromTimeout);
   commitDeepSleep(isQuickResumeSleep, fromTimeout ? 1 : 0);
+}
+
+// Reopens the app the last sleep left (APP_STATE.lastSleepApp). One-shot, cleared and saved first:
+// an app that crashes on load can never boot-loop (the X4 Pro has no Back key to hold). A single
+// replace: a push after BootActivity would drop the pending replace.
+static void clearLastSleepApp() {
+  if (APP_STATE.lastSleepApp == 0) return;
+  APP_STATE.lastSleepApp = 0;
+  APP_STATE.saveToFile();
+}
+
+static void resumeLastApp() {
+  const uint8_t app = APP_STATE.lastSleepApp;
+  clearLastSleepApp();
+  if (app == WordSearchActivity::APP_ID) {
+    activityManager.goToWordSearch();
+  } else {
+    activityManager.goHome();
+  }
 }
 
 void setupDisplayAndFonts(bool seamless = false) {
@@ -937,6 +962,9 @@ void setup() {
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_SLEEP_CARDS) {
     // Back from Locate Me: the Location row shows what was saved.
     activityManager.goToSleepCardSettings();
+  } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_APP &&
+             APP_STATE.lastSleepApp != 0) {
+    resumeLastApp();
   } else if (resume == BootResume::Silent && BookSyncHooks::bootToLibrary()) {
     // A sync on closing a book with the library-bound Back finishes there.
     activityManager.goToFileBrowser(APP_STATE.openEpubPath);
@@ -944,7 +972,16 @@ void setup() {
     // target == home (or reader with no open book): land on home — don't fall
     // through to the sleep-wake "resume reader" logic, which fires on stale
     // openEpubPath + lastSleepFromReader from a prior session.
+    clearLastSleepApp();
     activityManager.goHome();
+  } else if (APP_STATE.lastSleepApp != 0 && !mappedInputManager.isPressed(MappedInputManager::Button::Back)) {
+    // Asleep inside an app (deep wake, a wake after Auto Power Off cut the rail, a cold boot or a
+    // flash): back into it, as the reader reopens its book.
+    resumeLastApp();
+  } else if (APP_STATE.lastSleepApp != 0) {
+    // Back held skips the app, and for good: the next boot must not reopen it either.
+    clearLastSleepApp();
+    activityManager.goHome(HomeMenuItem::NONE, needsWakeRefresh);
   } else if (APP_STATE.openEpubPath.empty() || !APP_STATE.lastSleepFromReader ||
              mappedInputManager.isPressed(MappedInputManager::Button::Back) || APP_STATE.readerActivityLoadCount > 0) {
     // Boot to home screen if no book is open, last sleep was not from reader, back button is held, or reader activity

@@ -81,6 +81,73 @@ bool parseSleepArgs(const char* args, SleepKind& out);
 constexpr size_t SSID_MAX_BYTES = 32;
 bool isValidSsid(const char* ssid);
 
+// APP apps|wordsearch: open the Apps list or Word Search (case ignored).
+enum class AppTarget : uint8_t { Apps, WordSearch };
+bool parseAppArgs(const char* args, AppTarget& out);
+
+// WS                                         the puzzle on screen, dumped
+// WS new <seed> [easy|medium|hard] [key]     a deterministic new puzzle; the key (a built-in
+//                                            theme or "file:<name>.words") is the rest of the
+//                                            line, so a file name may hold spaces
+// difficulty -1 = the player's choice; an empty key = a built-in theme the seed picks (never the
+// choice, the card's files or the recent list, so the puzzle stays reproducible). Parses in place.
+constexpr size_t WS_KEY_MAX = 47;  // ws::MAX_THEME_KEY
+struct WsArgs {
+  bool newPuzzle = false;
+  uint32_t seed = 0;
+  int8_t difficulty = -1;
+  char themeKey[WS_KEY_MAX + 1] = {};
+};
+bool parseWsArgs(char* args, WsArgs& out);
+
+// PINS [seconds]: the USB/VBUS-detect pin hunt (default 60, 1..180).
+constexpr uint32_t PINS_DEFAULT_SECONDS = 60;
+constexpr uint32_t PINS_MAX_SECONDS = 180;
+bool parsePinsArgs(const char* args, uint32_t& seconds);
+
+// X4 Pro pins for PINS. ASSIGNED is every pin the X4 Pro profile uses (freeink-sdk BoardConfig.h,
+// XTEINK_X4_PRO): display SCLK 12 MOSI 11 CS 13 DC 18 RST 14 BUSY 6; SD (SDMMC CLK 41 CMD 42
+// DAT0 40, the SPI view's CS 45, enable 5); keys up 0, down 7, power 3; charger STAT 21; GT911
+// SDA 39 SCL 38 INT 10 RST 4 power 2 (the RTC and the gauge share 38/39); frontlight 8 and 9;
+// the power-rail latch 1. The ESP32-S3 pins nothing may touch: 19/20 (USB D-/D+), 26-37 (the
+// flash and the octal PSRAM), 43/44 (UART0), and 22-25 do not exist.
+//
+// PROBE is what remains, input-enabled only (no pull, no direction or function change):
+//   15, 16  XTAL_32K_P/N: the firmware runs its RTC on the internal RC
+//           (CONFIG_RTC_CLK_SRC_INT_RC in the X4 Pro's dio_opi sdkconfig), so no 32 kHz crystal
+//           is driven from them; no BoardConfig field or HAL file names them.
+//   17      no BoardConfig field, HAL file (lib/hal) or SDK driver names it.
+//   46      a strap (ROM log / boot mode) read only at reset; nothing names it after boot.
+//   47, 48  no BoardConfig field, HAL file or SDK driver names them.
+// None is on ADC1 (GPIO1-10, all assigned), so the per-second line reads no ADC.
+// The device re-checks every probe pin against the live profile before touching it.
+constexpr uint8_t X4PRO_ASSIGNED_PINS[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
+                                           12, 13, 14, 18, 21, 38, 39, 40, 41, 42, 45};
+constexpr uint8_t X4PRO_PROBE_PINS[] = {15, 16, 17, 46, 47, 48};
+// Watched as well (read from the input registers, never reconfigured): the two charge/USB
+// suspects the profile already uses (GT911 INT 10, the SDK's usbDetect guess; STAT 21) and the
+// keys (a known level change for comparison). Bus, PWM and refresh pins are left out: they
+// toggle on their own.
+constexpr uint8_t X4PRO_WATCH_ASSIGNED_PINS[] = {0, 3, 7, 10, 21};
+constexpr uint8_t PINS_MAX_GPIO = 48;
+// A pin the chip reserves (USB, flash/PSRAM, UART0) or that does not exist.
+bool isReservedS3Pin(uint8_t pin);
+
+// At most `perSecond` pin-change lines in any one-second window; the rest are counted.
+class ChangeBudget {
+ public:
+  explicit ChangeBudget(uint16_t perSecond) : limit(perSecond) {}
+  bool allow(uint32_t nowMs);
+  uint32_t dropped() const { return droppedCount; }
+
+ private:
+  uint16_t limit;
+  uint16_t used = 0;
+  uint32_t windowStart = 0;
+  bool started = false;
+  uint32_t droppedCount = 0;
+};
+
 // Bookkeeping for one PUT receive: which bytes to read next, when to ACK, NAK
 // or abort. The firmware does the serial and card I/O around it.
 class PutSession {

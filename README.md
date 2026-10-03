@@ -27,6 +27,8 @@ Pro. CrossPoint's own README follows further down.
   - Auto Power Off turns the reader fully off after a set time asleep.
   - The awake reader naps between key presses, with the light on too.
   - Wi-Fi is on only while a job needs it, or while the sleep screen is live on the charger.
+- **Apps on the Home screen**, starting with **Word Search**: touch or key play, three difficulties, 31
+  built-in themes plus your own `.words` lists in `/Puzzles/WordSearch/`, hints, and the puzzle kept across sleep.
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.

@@ -10,6 +10,7 @@
 
 #include "MappedInputManager.h"
 #include "UITheme.h"
+#include "icons/apps.h"
 #include "icons/blocks.h"
 #include "icons/book.h"
 #include "icons/folder.h"
@@ -266,9 +267,12 @@ void CoverGridHomeUi::drawGrid(UiScreen& screen) {
 }
 
 void CoverGridHomeUi::drawTabs(UiScreen& screen, fui::Rect rect) {
-  static constexpr const uint8_t* ICONS[] = {FolderIcon, LibraryIcon, BlocksIcon, TransferIcon, Settings2Icon};
+  // The Home rows in order (OPDS, index 2, only with a server); tabItems holds one per entry.
+  static constexpr const uint8_t* ICONS[] = {FolderIcon,   LibraryIcon, BlocksIcon,
+                                             TransferIcon, AppsIcon,    Settings2Icon};
+  static_assert(sizeof(ICONS) / sizeof(ICONS[0]) == std::tuple_size<decltype(tabItems)>::value);
   int count = 0;
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < static_cast<int>(sizeof(ICONS) / sizeof(ICONS[0])); ++i) {
     if (i == 2 && !hasOpds) continue;
     auto& tab = tabItems[count];
     tab.value = books->size() + count;

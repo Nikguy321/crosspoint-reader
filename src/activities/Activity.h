@@ -47,6 +47,8 @@ class Activity {
   // transitions so no filesystem code races a raw SD-card owner.
   virtual bool requiresExclusiveStorageLoop() const { return false; }
   virtual bool isReaderActivity() const { return false; }
+  // An app that reopens after sleep or a boot (CrossPointState::lastSleepApp ids); 0 = none.
+  virtual uint8_t resumeApp() const { return 0; }
   // Returns true when the activity schedules its own forced refresh.
   virtual bool handleForcedRefresh() { return false; }
   virtual bool isHomeActivity() const { return false; }

@@ -22,6 +22,9 @@ class CrossPointState : public PersistableStore<CrossPointState> {
   uint8_t recentOverlaySleepFill = 0;
   uint8_t readerActivityLoadCount = 0;
   bool lastSleepFromReader = false;
+  // The app to reopen after a sleep or boot (Activity::resumeApp): 0 none, 1 Word Search
+  // (2 is kept for Crossword). One-shot: cleared before the app opens.
+  uint8_t lastSleepApp = 0;
   bool showBootScreen = true;
 
   static const char* getFilePath() { return "/.crosspoint/state.json"; }

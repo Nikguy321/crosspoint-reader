@@ -12,6 +12,8 @@
 
 #include "CrossPointSettings.h"
 #include "OpdsServerStore.h"
+#include "apps/AppsActivity.h"
+#include "apps/WordSearchActivity.h"
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
 #include "browser/OpdsBookBrowserActivity.h"
@@ -123,7 +125,8 @@ void ActivityManager::loop() {
     bool statusBarTap = false;
     if (mappedInput.hasTouch() &&
         (currentActivity->name == "Home" || currentActivity->name == "FileBrowser" ||
-         currentActivity->name == "Settings" || currentActivity->name == "NetworkModeSelection")) {
+         currentActivity->name == "Settings" || currentActivity->name == "NetworkModeSelection" ||
+         currentActivity->name == "Apps")) {
       int tx = 0;
       int ty = 0;
       // The header back button shares this band; its taps stay Back.
@@ -298,6 +301,24 @@ void ActivityManager::goToLibrary() {
   replaceActivity(std::move(activity));
 }
 
+void ActivityManager::goToApps() {
+  auto activity = makeUniqueNoThrow<AppsActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: apps activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+
+void ActivityManager::goToWordSearch() {
+  auto activity = makeUniqueNoThrow<WordSearchActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: word search activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -352,6 +373,9 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem, bool cleanInitialRefr
       initialMenuItem = HomeMenuItem::OPDS_BROWSER;
     } else if (activityName == "CrossPointWebServer") {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
+    } else if (activityName == "Apps" || activityName.rfind("WordSearch", 0) == 0) {
+      // The Apps list and every Word Search screen (game, menu, theme picker).
+      initialMenuItem = HomeMenuItem::APPS;
     } else if (activityName == "Settings") {
       initialMenuItem = HomeMenuItem::SETTINGS_MENU;
     }
@@ -391,6 +415,14 @@ bool ActivityManager::isReaderActivity() const {
   return std::any_of(stackActivities.begin(), stackActivities.end(),
                      [](const auto& activity) { return activity->isReaderActivity(); }) ||
          (currentActivity && currentActivity->isReaderActivity());
+}
+
+uint8_t ActivityManager::resumeApp() const {
+  if (currentActivity && currentActivity->resumeApp() != 0) return currentActivity->resumeApp();
+  for (const auto& activity : stackActivities) {
+    if (activity->resumeApp() != 0) return activity->resumeApp();
+  }
+  return 0;
 }
 
 #if CROSSPOINT_BENCH_CONSOLE

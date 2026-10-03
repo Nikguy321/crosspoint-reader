@@ -332,4 +332,111 @@ bool parseCatArgs(char* args, uint32_t& tailBytes, char*& path) {
   return true;
 }
 
+namespace {
+// Case-insensitive equality of a whole token.
+bool tokenIs(const char* tok, const char* word) {
+  while (*word != '\0' && toLower(*tok) == *word) {
+    ++tok;
+    ++word;
+  }
+  return *word == '\0' && *tok == '\0';
+}
+}  // namespace
+
+bool parseAppArgs(const char* args, AppTarget& out) {
+  if (args == nullptr) return false;
+  while (isSpace(*args)) ++args;
+  char word[16] = {};
+  size_t n = 0;
+  while (args[n] != '\0' && !isSpace(args[n])) {
+    if (n + 1 >= sizeof(word)) return false;
+    word[n] = args[n];
+    ++n;
+  }
+  for (const char* rest = args + n; *rest != '\0'; ++rest) {
+    if (!isSpace(*rest)) return false;
+  }
+  if (tokenIs(word, "apps")) {
+    out = AppTarget::Apps;
+    return true;
+  }
+  if (tokenIs(word, "wordsearch")) {
+    out = AppTarget::WordSearch;
+    return true;
+  }
+  return false;
+}
+
+bool parseWsArgs(char* args, WsArgs& out) {
+  out = WsArgs{};
+  if (args == nullptr) return true;
+  char* tok = nullptr;
+  if (!nextToken(args, tok)) return true;  // WS: the dump
+  if (!tokenIs(tok, "new")) return false;
+  out.newPuzzle = true;
+  if (!nextToken(args, tok) || !parseU32(tok, out.seed)) return false;
+  // An optional difficulty, then the rest of the line is the theme key.
+  while (isSpace(*args)) ++args;
+  char* key = args;
+  size_t word = 0;
+  while (key[word] != '\0' && !isSpace(key[word])) ++word;
+  static constexpr const char* NAMES[] = {"easy", "medium", "hard"};
+  for (int8_t d = 0; d < 3; ++d) {
+    const char* name = NAMES[d];
+    size_t i = 0;
+    while (i < word && name[i] != '\0' && toLower(key[i]) == name[i]) ++i;
+    if (i == word && name[i] == '\0') {
+      out.difficulty = d;
+      key += word;
+      while (isSpace(*key)) ++key;
+      break;
+    }
+  }
+  size_t n = strlen(key);
+  while (n > 0 && isSpace(key[n - 1])) key[--n] = '\0';
+  if (n > WS_KEY_MAX) return false;
+  for (size_t i = 0; i < n; ++i) {
+    const auto c = static_cast<unsigned char>(key[i]);
+    if (c < 0x20 || c == 0x7F) return false;
+  }
+  memcpy(out.themeKey, key, n);
+  out.themeKey[n] = '\0';
+  return true;
+}
+
+bool parsePinsArgs(const char* args, uint32_t& seconds) {
+  seconds = PINS_DEFAULT_SECONDS;
+  if (args == nullptr) return true;
+  while (isSpace(*args)) ++args;
+  size_t n = strlen(args);
+  while (n > 0 && isSpace(args[n - 1])) --n;
+  if (n == 0) return true;
+  char number[12] = {};
+  if (n >= sizeof(number)) return false;
+  memcpy(number, args, n);
+  uint32_t value = 0;
+  if (!parseU32(number, value) || value < 1 || value > PINS_MAX_SECONDS) return false;
+  seconds = value;
+  return true;
+}
+
+bool isReservedS3Pin(const uint8_t pin) {
+  return pin > PINS_MAX_GPIO || pin == 19 || pin == 20 || (pin >= 22 && pin <= 25) || (pin >= 26 && pin <= 37) ||
+         pin == 43 || pin == 44;
+}
+
+bool ChangeBudget::allow(const uint32_t nowMs) {
+  if (!started || nowMs - windowStart >= 1000) {
+    started = true;
+    windowStart = nowMs;
+    used = 0;
+  }
+  if (used < limit) {
+    ++used;
+    return true;
+  }
+  ++droppedCount;
+  return false;
+}
+
 }  // namespace bench

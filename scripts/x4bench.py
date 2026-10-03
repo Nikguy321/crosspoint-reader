@@ -20,6 +20,10 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py sleep                # on this cable: the live sleep screen (charging)
   scripts/x4bench.py redraw               # the live sleep screen redraws now
   scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
+  scripts/x4bench.py app wordsearch       # open Word Search (or: app apps)
+  scripts/x4bench.py ws                   # dump the puzzle on screen
+  scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
+  scripts/x4bench.py pins 60              # USB-detect pin hunt: pull the cable mid-run
   scripts/x4bench.py sleep deep           # end of a bench session (deep sleep)
 
 Protocol (proto=1)
@@ -110,6 +114,39 @@ Verbs
                            ERR REDRAW notlive otherwise. The draw lands on a
                            later loop pass: "x4bench.py redraw" waits for
                            STATE redraws= to pass that count.
+  APP apps|wordsearch      open the Apps list or Word Search the way their rows
+                           do (a replace): OK APP act=<name> once it is up.
+  WS                       the Word Search puzzle on screen (ERR WS notopen
+                           otherwise): WS state difficulty= size= found=n/m
+                           complete= anchor=r,c|- cursor=r,c shown= (the key
+                           cursor) elapsed=<s> hints= hint=<word|-1> seed=
+                           fnv=<FNV-1a of the grid rows>, WS theme <key>,
+                           WS title <text>, one WS row <letters> per row, one
+                           WS word <found> <row> <col> <dir> <len> <r0,c0-r1,c1
+                           drawn|-> <display text> per word (dir 0 right,
+                           1 down-right, 2 down, 3 down-left, 4 left, 5 up-left,
+                           6 up, 7 up-right), WS prefs difficulty= choice=
+                           recent=, then OK WS.
+  WS new <seed> [easy|medium|hard] [key]
+                           a deterministic puzzle now (the theme key is the
+                           rest of the line: a built-in key such as animals,
+                           or file:<name>.words; without one the seed picks
+                           a built-in theme); the dump, then OK WS new.
+                           ERR WS theme: that theme made no puzzle. "WS new
+                           1234 medium animals" always gives fnv=691261517.
+                           Drag a word with SWIPE x1 y1 x2 y2 1200 (over 700 ms
+                           is a drag, not a swipe); tap-tap with two TAPs.
+  PINS [seconds]           X4 Pro USB/VBUS-detect hunt, 1-180 s (default 60):
+                           OK PINS seconds= probe=<pins> log=/pins.log, then
+                           "PINS <ms> pin <n> <0|1>" lines (a start snapshot,
+                           then every change), "PINS <ms> sec stat= mv= soc=
+                           host= usb= changes= dropped=" once a second, the
+                           per-pin "count" lines and "PINS <ms> done". It runs
+                           with no computer attached and keeps the reader
+                           awake: pull the cable ~10 s mid-run, plug it back,
+                           then read /pins.log (overwritten each run). The
+                           probe pins get their input buffer enabled only; a
+                           reboot restores them.
   WIFILAST <ssid>          dev only: the Wi-Fi list's last-connected network
                            (the rest of the line), so the fallback to the
                            next-best saved network can be tested where the
@@ -735,6 +772,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("redraw", help="the live sleep screen redraws now")
     s = sub.add_parser("wifilast", help="dev: set the Wi-Fi list's last-connected network (fallback tests)")
     s.add_argument("ssid")
+    s = sub.add_parser("app", help="open the Apps list or Word Search")
+    s.add_argument("name", choices=("apps", "wordsearch"))
+    s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
+    s.add_argument("args", nargs=argparse.REMAINDER)
+    s = sub.add_parser("pins", help="X4 Pro USB-detect pin hunt (pull the cable mid-run)")
+    s.add_argument("seconds", nargs="?", type=int, default=60)
     s = sub.add_parser("cmd", help="raw passthrough: prints every console line")
     s.add_argument("text", nargs=argparse.REMAINDER)
     return p
@@ -835,6 +878,17 @@ def run(args, link: Link, out=sys.stdout) -> int:
         fields = wait_live_redraw(link, before, t or 30)
         print(f"redrawn card={fields.get('card', '?')} screen={fields.get('screen', '?')} "
               f"next_s={fields.get('next_s', '?')}", file=out)
+    elif op == "app":
+        rest, _ = link.command(f"APP {args.name}", t or 30)
+        print(rest, file=out)
+    elif op == "ws":
+        text = " ".join(["WS", *args.args]).strip()
+        rest, body = link.command(text, t or 30)
+        for line in body:
+            print(line[3:] if line.startswith("WS ") else line, file=out)
+        print(f"OK WS {rest}".rstrip(), file=out)
+    elif op == "pins":
+        return run_pins(link, args.seconds, t, out)
     elif op == "wifilast":
         rest, _ = link.command(f"WIFILAST {check_arg(args.ssid)}", t or 10)
         print(rest, file=out)
@@ -866,6 +920,29 @@ def run(args, link: Link, out=sys.stdout) -> int:
         rest, _ = link.command(text, t or 30, on_line=lambda line: print(line, file=out))
         print(f"OK {text.split(' ', 1)[0].upper()} {rest}".rstrip(), file=out)
     return EXIT_OK
+
+
+def run_pins(link: Link, seconds: int, timeout, out) -> int:
+    """PINS: start the run, then print its lines until "done". The cable is meant to be pulled
+    mid-run: then the port goes and the run carries on by itself, recording to /pins.log."""
+    rest, _ = link.command(f"PINS {seconds}", timeout or 10)
+    print(f"started {rest}", file=out)
+    deadline = time.monotonic() + seconds + 15
+    try:
+        while True:
+            line = link.next_bench(deadline)
+            if line is None:
+                raise BenchTimeout(f"PINS: no 'done' within {seconds + 15} s")
+            if not line.startswith("PINS "):
+                continue
+            print(line[5:], file=out)
+            if line.split()[-1] == "done":
+                return EXIT_OK
+    except OSError as exc:  # pyserial's SerialException is an OSError
+        print(f"port dropped ({exc}): the run goes on without the cable and records to /pins.log. "
+              f"Plug back in and, after the {seconds} s, read it with: x4bench.py cat --tail 16384 /pins.log",
+              file=out)
+        return EXIT_OK
 
 
 def main(argv=None, out=sys.stdout) -> int:

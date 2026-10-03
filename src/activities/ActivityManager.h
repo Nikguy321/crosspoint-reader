@@ -17,7 +17,7 @@
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, LIBRARY, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
+enum class HomeMenuItem { NONE, FILE_BROWSER, LIBRARY, OPDS_BROWSER, FILE_TRANSFER, APPS, SETTINGS_MENU };
 
 /**
  * ActivityManager
@@ -94,6 +94,9 @@ class ActivityManager {
   void goToFileBrowser(std::string path = {});
   void goToLibrary();
   void goToBrowser();
+  // The Apps list, and its games (replaces, so the way back survives sleep: see resumeApp()).
+  void goToApps();
+  void goToWordSearch();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   // live: the live sleep screen (charging, X4 Pro), which stays up and is redrawn; popup = show
   // "Entering sleep" first (not at a boot straight into the live screen).
@@ -113,6 +116,8 @@ class ActivityManager {
   bool preventAutoSleep() const;
   bool requiresExclusiveStorageLoop() const;
   bool isReaderActivity() const;
+  // The app to reopen after sleep (Activity::resumeApp) on the stack or current; 0 = none.
+  uint8_t resumeApp() const;
   bool handleForcedRefresh();
   bool skipLoopDelay() const;
   ScreenshotInfo getScreenshotInfo() const;

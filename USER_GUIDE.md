@@ -37,6 +37,7 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
       - [Cover settings](#cover-settings)
       - [Custom images](#custom-images)
     - [3.8 Custom Fonts (SD Card)](#38-custom-fonts-sd-card)
+    - [3.9 Apps: Word Search](#39-apps-word-search)
   - [4. Reading Mode](#4-reading-mode)
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
@@ -107,7 +108,7 @@ Upon turning the device on for the first time, you will be placed on the **[Home
 
 ### 3.1 Home Screen
 
-The Home screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Browse Files](#33-browse-files-screen)**, the **[Library](#34-library-screen)**, **[File Transfer](#35-file-transfer-screen)**, or **[Settings](#36-settings)**.
+The Home screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Browse Files](#33-browse-files-screen)**, the **[Library](#34-library-screen)**, **[File Transfer](#35-file-transfer-screen)**, **[Apps](#39-apps-word-search)**, or **[Settings](#36-settings)**.
 
 ### 3.2 Reading Mode
 
@@ -632,6 +633,46 @@ There are three ways to install fonts:
 Once installed, custom fonts appear in **Settings → Reader → Font Family** alongside the built-in fonts.
 
 See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation details and SD card folder structure.
+
+---
+
+### 3.9 Apps: Word Search
+
+**Apps** on the Home screen (a row in the list styles, a tab in Cover Grid) lists the games. Back from Apps returns to Home.
+
+**Word Search** shows a grid of letters with a list of hidden words under it. Words run in a straight line, and a found word gets a ring around it and is struck through in the list.
+
+- **By touch:** drag from the first letter of a word to its last. Or tap the first letter (it turns black) and then tap the last; tapping the black letter again lets it go. A word counts forwards or backwards, in any direction.
+- **By keys (X4 Pro):** the first key press shows the cursor box where it is; after that, press the right or left key to move it to the next or previous letter, and hold the right key to "tap" the letter under it. Hold the left key to let the black letter go. Hold the **Home** key to open the menu (a short Home press still goes Home). Touching the grid hides the box again.
+- **By keys (readers with front buttons):** the first press shows the cursor box; then the arrow buttons move it, **Confirm** taps, holding **Confirm** opens the menu, and **Back** lets the black letter go, or leaves the game.
+- **When every word is found:** hold the right key (press **Confirm** on readers with front buttons), or tap **New puzzle**, for the next puzzle.
+- **Leaving:** the back arrow in the header returns to Apps, and so does a swipe in from the left edge that starts above or below the grid (one that starts on the letters selects them).
+
+The bar at the bottom shows how many words are found (or "No match") and the **Menu** button. When every word is found, the time it took appears with a **New puzzle** button.
+
+**Difficulty:**
+
+| | Grid | Words | Directions |
+|---|---|---|---|
+| Easy | 10 x 10 | 8 | across and down |
+| Medium (default) | 12 x 12 | 12 | across, down and the two forward diagonals |
+| Hard | 15 x 15 | 16 | all eight, backwards too |
+
+**The menu:** **New puzzle**; **Difficulty** and **Theme**, which apply from the next puzzle; **Show a hint**, which rings the first letter of one word you have not found (one at a time); **Back to puzzle**.
+
+**Themes:** 31 built-in word lists. **Random** (the default) never repeats one of the last three themes played. You can add your own lists as files ending in `.words` in the `/Puzzles/WordSearch/` folder on the SD card (File Transfer can create the folder and upload them):
+
+```
+# Lines starting with # are comments; blank lines are skipped.
+Pond Life
+FROG
+DRAGONFLY
+WATER LILY
+```
+
+The first line that is not a comment is the theme's title (up to 32 characters). Then one word or phrase per line, with 3 to 15 letters; spaces, hyphens and apostrophes may appear and are left out of the grid. A line with digits, accented letters or other symbols is skipped. A file needs at least 8 usable words (one with fewer is listed, but picking it only marks it "Too few words"); up to 400 words and 64 files are read, 16 KB each. If a chosen theme file is deleted, Word Search goes back to Random.
+
+**Saving:** the puzzle is saved each time you find a word and when you leave. Put the reader to sleep in the middle of a puzzle and it comes back to the same puzzle on wake, from the live sleep screen on the charger, and after Auto Power Off or a restart.
 
 ---
 

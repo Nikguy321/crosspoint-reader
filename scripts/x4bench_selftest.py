@@ -57,6 +57,10 @@ class FakeDevice(threading.Thread):
         self.redraw_lands = True  # False: REDRAW is accepted but the draw never comes
         self.sleeps = []
         self.wifi_last = None
+        self.act = "Home"
+        self.ws_new = []
+        self.pins_runs = []
+        self.pins_drop = False  # True: the cable goes mid-run
         self.fb = b""
         self.shot = {}
         self.stop = False
@@ -227,6 +231,48 @@ class FakeDevice(threading.Thread):
             self.emit(f"OK REDRAW redraws={self.redraws}")
             if self.redraw_lands:
                 self.redraws += 1
+        elif verb == "APP":
+            names = {"apps": "Apps", "wordsearch": "WordSearch"}
+            if rest.lower() not in names:
+                self.emit("ERR APP usage")
+                return
+            self.act = names[rest.lower()]
+            self.emit(f"OK APP act={self.act}", noise=True)
+        elif verb == "WS":
+            if self.act != "WordSearch":
+                self.emit(f"ERR WS notopen act={self.act}")
+                return
+            parts = rest.split(" ", 3)
+            if rest and (parts[0].lower() != "new" or len(parts) < 2 or not parts[1].isdigit()):
+                self.emit("ERR WS usage")
+                return
+            if rest:
+                self.ws_new.append(rest)
+            self.emit("WS state difficulty=medium size=3 found=1/2 complete=0 anchor=- cursor=0,0 shown=0 "
+                      "elapsed=12 hints=0 hint=-1 seed=1234 fnv=691261517")
+            self.emit("WS theme animals")
+            self.emit("WS title Animals", noise=True)
+            for row in ("CAT", "OWL", "XYZ"):
+                self.emit(f"WS row {row}")
+            self.emit("WS word 1 0 0 0 3 0,0-0,2 CAT")
+            self.emit("WS word 0 1 0 0 3 - OWL")
+            self.emit("WS prefs difficulty=medium choice=random recent=animals,-,-")
+            self.emit("OK WS new seed=" + parts[1] if rest else "OK WS")
+        elif verb == "PINS":
+            seconds = rest or "60"
+            if not seconds.isdigit() or not 1 <= int(seconds) <= 180:
+                self.emit("ERR PINS usage")
+                return
+            self.pins_runs.append(int(seconds))
+            self.emit(f"OK PINS seconds={seconds} probe=15,16,17,46,47,48 log=/pins.log")
+            self.emit("PINS 0 start seconds=" + seconds)
+            self.emit("PINS 0 pin 21 1", noise=True)
+            if self.pins_drop:
+                raise ConnectionError  # the cable is pulled
+            self.emit("PINS 1000 sec stat=1 mv=4100 soc=90 host=1 usb=1 changes=0 dropped=0")
+            self.emit("STATE act=Home depth=0 stack=-")  # another command's line is ignored
+            self.emit("PINS 1020 count pin 21 0")
+            self.emit("PINS 1020 done")
         elif verb == "WIFILAST":
             if not rest or len(rest.encode()) > 32:
                 self.emit("ERR WIFILAST usage")
@@ -416,6 +462,50 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(code, x4bench.EXIT_OK)
         self.assertIn("press Power", out)
         self.assertFalse(self.dev.live)
+
+    def test_app_and_word_search(self):
+        self.ser.close()
+        code, _ = self.cli("ws")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # not open yet
+        code, out = self.cli("app", "wordsearch")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=WordSearch\n"))
+        code, out = self.cli("ws")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertIn("fnv=691261517", lines[0])
+        self.assertEqual(lines[1], "theme animals")
+        self.assertEqual(lines[3:6], ["row CAT", "row OWL", "row XYZ"])
+        self.assertEqual(lines[-1], "OK WS")
+        code, out = self.cli("ws", "new", "1234", "medium", "file:Pond", "Life.words")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines()[-1], "OK WS new seed=1234")
+        self.assertEqual(self.dev.ws_new, ["new 1234 medium file:Pond Life.words"])
+        code, _ = self.cli("ws", "new", "x")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, out = self.cli("app", "apps")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=Apps\n"))
+
+    def test_pins_streams_until_done(self):
+        self.ser.close()
+        code, out = self.cli("pins", "30")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "started seconds=30 probe=15,16,17,46,47,48 log=/pins.log")
+        self.assertIn("0 pin 21 1", lines)
+        self.assertEqual(lines[-1], "1020 done")
+        self.assertFalse(any(line.startswith("STATE") for line in lines))
+        self.assertEqual(self.dev.pins_runs, [30])
+        code, _ = self.cli("pins", "500")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_pins_survives_the_cable_being_pulled(self):
+        self.dev.pins_drop = True
+        self.ser.close()
+        code, out = self.cli("pins")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("port dropped", out)
+        self.assertIn("/pins.log", out)
+        self.assertEqual(self.dev.pins_runs, [60])
 
     def test_wifilast_sets_the_last_network(self):
         self.ser.close()

@@ -92,6 +92,9 @@ add_subdirectory(sleep_card_sky)
 add_subdirectory(sleep_card_shuffle)
 add_subdirectory(sleep_card_location)
 add_subdirectory(geolocate)
+# Word Search: the pure half, then its drawing (links SleepCardHost above).
+add_subdirectory(word_search)
+add_subdirectory(word_search_preview)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)
