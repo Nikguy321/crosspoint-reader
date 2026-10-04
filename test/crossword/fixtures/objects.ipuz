@@ -1,0 +1,221 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": [
+  "http://ipuz.org/crossword#1"
+ ],
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "title": "Shelter",
+ "author": "CrossPoint tests",
+ "copyright": "Public domain test data",
+ "puzzle": [
+  [
+   "#",
+   "#",
+   {
+    "cell": "1"
+   },
+   {
+    "cell": "2"
+   },
+   {
+    "cell": "3"
+   }
+  ],
+  [
+   "#",
+   {
+    "cell": "4"
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   }
+  ],
+  [
+   {
+    "cell": "5"
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0,
+    "style": {
+     "shapebg": "circle"
+    }
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   }
+  ],
+  [
+   {
+    "cell": "6"
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   },
+   "#"
+  ],
+  [
+   {
+    "cell": "7"
+   },
+   {
+    "cell": 0
+   },
+   {
+    "cell": 0
+   },
+   "#",
+   "#"
+  ]
+ ],
+ "solution": [
+  [
+   "#",
+   "#",
+   "H",
+   "U",
+   "T"
+  ],
+  [
+   "#",
+   "C",
+   "A",
+   "S",
+   "E"
+  ],
+  [
+   "R",
+   "A",
+   "V",
+   "E",
+   "N"
+  ],
+  [
+   "A",
+   "G",
+   "E",
+   "D",
+   "#"
+  ],
+  [
+   "P",
+   "E",
+   "N",
+   "#",
+   "#"
+  ]
+ ],
+ "clues": {
+  "Across:Theme": [
+   {
+    "number": 1,
+    "clue": "Simple shelter in the woods",
+    "enumeration": "0"
+   },
+   {
+    "number": 4,
+    "clue": "Detective's puzzle to crack",
+    "enumeration": "0"
+   },
+   {
+    "number": 5,
+    "clue": "Large black bird with a croak",
+    "enumeration": "0"
+   },
+   {
+    "number": 6,
+    "clue": "Like fine cheese or wine",
+    "enumeration": "0"
+   },
+   {
+    "number": 7,
+    "clue": "Ballpoint, for one",
+    "enumeration": "0"
+   }
+  ],
+  "Down:Theme": [
+   {
+    "number": 1,
+    "clue": "Safe harbor",
+    "enumeration": "0"
+   },
+   {
+    "number": 2,
+    "clue": "Secondhand",
+    "enumeration": "0"
+   },
+   {
+    "number": 3,
+    "clue": "Fingers on two hands",
+    "enumeration": "0"
+   },
+   {
+    "number": 4,
+    "clue": "Home for a pet hamster",
+    "enumeration": "0"
+   },
+   {
+    "number": 5,
+    "clue": "Knock on a door",
+    "enumeration": "0"
+   }
+  ]
+ },
+ "saved": [
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ ]
+}

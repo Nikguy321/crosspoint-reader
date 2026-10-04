@@ -64,6 +64,7 @@ class FakeDevice(threading.Thread):
         self.soc = 100
         self.act = "Home"
         self.ws_new = []
+        self.cw_ops = []
         self.pins_runs = []
         self.pins_drop = False  # True: the cable goes mid-run
         self.fb = b""
@@ -237,7 +238,7 @@ class FakeDevice(threading.Thread):
             if self.redraw_lands:
                 self.redraws += 1
         elif verb == "APP":
-            names = {"apps": "Apps", "wordsearch": "WordSearch"}
+            names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword"}
             if rest.lower() not in names:
                 self.emit("ERR APP usage")
                 return
@@ -263,6 +264,33 @@ class FakeDevice(threading.Thread):
             self.emit("WS word 0 1 0 0 3 - OWL")
             self.emit("WS prefs difficulty=medium choice=random recent=animals,-,-")
             self.emit("OK WS new seed=" + parts[1] if rest else "OK WS")
+        elif verb == "CW":
+            op = rest.split(" ", 1)[0].lower() if rest else ""
+            if op not in ("", "open", "type", "cursor", "check", "reveal", "solve", "list"):
+                self.emit("ERR CW usage")
+                return
+            if op == "list":
+                self.emit("CW builtin mini-001 5x5 fnv=1a2b3c4d Shelter")
+                self.emit("OK CW list n=1")
+                return
+            if self.act != "Crossword":
+                self.emit(f"ERR CW notopen act={self.act}")
+                return
+            if op == "open" and not rest.split(" ", 1)[1:]:
+                self.emit("ERR CW usage")
+                return
+            if op == "open" and rest.endswith(".jpz"):
+                self.emit("ERR CW open notcrossword 0x0")
+                return
+            if op:
+                self.cw_ops.append(rest)
+            solved = op == "solve"
+            self.emit(f"CW key=builtin:mini-001 fnv=1a2b3c4d w=5 h=5 cur=0,2 dir=A filled={21 if solved else 3}/21 "
+                      f"wrong=0 solved={1 if solved else 0} elapsed=12 checks=0 reveals=0 skip=1")
+            for row in ("##HUT", "#....", ".....", "....#", "...##"):
+                self.emit(f"CW row {row}")
+            self.emit("CW clue 1A Simple shelter in the woods", noise=True)
+            self.emit(f"OK CW {op}".rstrip())
         elif verb == "PINS":
             seconds = rest or "60"
             if not seconds.isdigit() or not 1 <= int(seconds) <= 180:
@@ -525,6 +553,35 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(code, x4bench.EXIT_ERR)
         code, out = self.cli("app", "apps")
         self.assertEqual((code, out), (x4bench.EXIT_OK, "act=Apps\n"))
+
+    def test_app_and_crossword(self):
+        self.ser.close()
+        code, out = self.cli("cw", "list")  # works on any screen
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines(), ["builtin mini-001 5x5 fnv=1a2b3c4d Shelter", "OK CW list n=1"])
+        code, _ = self.cli("cw")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # not open yet
+        code, out = self.cli("app", "crossword")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=Crossword\n"))
+        code, out = self.cli("cw")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("key=builtin:mini-001 fnv=1a2b3c4d"))
+        self.assertEqual(lines[1:6], ["row ##HUT", "row #....", "row .....", "row ....#", "row ...##"])
+        self.assertEqual(lines[6], "clue 1A Simple shelter in the woods")
+        self.assertEqual(lines[-1], "OK CW")
+        code, out = self.cli("cw", "open", "/Puzzles/Crossword/My", "Pack/Sunday.ipuz")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines()[-1], "OK CW open")
+        code, out = self.cli("cw", "type", "HUT")
+        self.assertEqual(out.splitlines()[-1], "OK CW type")
+        code, out = self.cli("cw", "solve")
+        self.assertIn("solved=1", out.splitlines()[0])
+        self.assertEqual(self.dev.cw_ops, ["open /Puzzles/Crossword/My Pack/Sunday.ipuz", "type HUT", "solve"])
+        code, _ = self.cli("cw", "open", "/Puzzles/Crossword/x.jpz")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, _ = self.cli("cw", "fill")
+        self.assertEqual(code, x4bench.EXIT_ERR)
 
     def test_pins_streams_until_done(self):
         self.ser.close()

@@ -97,6 +97,7 @@ class ActivityManager {
   // The Apps list, and its games (replaces, so the way back survives sleep: see resumeApp()).
   void goToApps();
   void goToWordSearch();
+  void goToCrossword();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   // live: the live sleep screen (charging, X4 Pro), which stays up and is redrawn; popup = show
   // "Entering sleep" first (not at a boot straight into the live screen).

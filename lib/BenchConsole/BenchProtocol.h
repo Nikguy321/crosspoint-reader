@@ -81,8 +81,8 @@ bool parseSleepArgs(const char* args, SleepKind& out);
 constexpr size_t SSID_MAX_BYTES = 32;
 bool isValidSsid(const char* ssid);
 
-// APP apps|wordsearch: open the Apps list or Word Search (case ignored).
-enum class AppTarget : uint8_t { Apps, WordSearch };
+// APP apps|wordsearch|crossword: open the Apps list or a game (case ignored).
+enum class AppTarget : uint8_t { Apps, WordSearch, Crossword };
 bool parseAppArgs(const char* args, AppTarget& out);
 
 // WEATHER [show|fetch|clear]: the Weather card's cache summarised (the default), a fetch now on a
@@ -111,6 +111,27 @@ struct WsArgs {
   char themeKey[WS_KEY_MAX + 1] = {};
 };
 bool parseWsArgs(char* args, WsArgs& out);
+
+// CW                                  the crossword on screen, dumped
+// CW open builtin:<id>|<path>          open a puzzle (the key is the rest of the line)
+// CW type <letters>                    A-Z (case ignored) through the keyboard's handler; '-' = Del
+// CW cursor <row> <col> [A|D]          the cursor on a white square (0-based)
+// CW check|reveal letter|word|puzzle
+// CW solve                             types the answers in (completion tests)
+// CW list                              the built-in puzzles
+// Parses in place.
+enum class CwOp : uint8_t { Dump, Open, Type, Cursor, Check, Reveal, Solve, List };
+constexpr size_t CW_TEXT_MAX = 120;  // a key (cw::MAX_SOURCE_KEY 96) or the letters typed at once
+constexpr int CW_SIDE_MAX = 15;      // cw::MAX_SIDE
+struct CwArgs {
+  CwOp op = CwOp::Dump;
+  char text[CW_TEXT_MAX + 1] = {};  // Open: the key; Type: the letters, upper case
+  int8_t row = -1;
+  int8_t col = -1;
+  int8_t dir = -1;    // Cursor: 0 Across, 1 Down, -1 keep
+  uint8_t scope = 0;  // Check / Reveal: 0 letter, 1 word, 2 puzzle (cw::Scope)
+};
+bool parseCwArgs(char* args, CwArgs& out);
 
 // PINS [seconds]: the USB/VBUS-detect pin hunt (default 60, 1..180).
 constexpr uint32_t PINS_DEFAULT_SECONDS = 60;

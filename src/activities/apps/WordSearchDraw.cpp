@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 
+#include "AppDraw.h"
 #include "fontIds.h"
 #include "sleepcards/CardDraw.h"
 
@@ -20,23 +21,8 @@ constexpr int STRIKE = 2;  // found word's bar, px
 constexpr int HINT_LINE = 2;
 constexpr int HINT_DASHES = 8;
 
-const EpdFontFamily* familyFor(const GfxRenderer& r, const int fontId) {
-  const auto& fonts = r.getFontMap();
-  const auto it = fonts.find(fontId);
-  return it == fonts.end() ? nullptr : &it->second;
-}
-
-// Height of the capitals above the baseline ('H'), for centring upper-case text.
-int capHeight(const GfxRenderer& r, const int fontId, const EpdFontFamily::Style style) {
-  const EpdFontFamily* family = familyFor(r, fontId);
-  const EpdGlyph* h = family ? family->getGlyph('H', style) : nullptr;
-  return h ? h->top : r.getFontAscenderSize(fontId) * 3 / 4;
-}
-
-// The top y for drawText so capitals sit centred on cy.
-int capTopFor(const GfxRenderer& r, const int fontId, const EpdFontFamily::Style style, const int cy) {
-  return cy + capHeight(r, fontId, style) / 2 - r.getFontAscenderSize(fontId);
-}
+using appdraw::capHeight;
+using appdraw::capTopFor;
 
 int measureList(void* ctx, const ListFont font, const char* text) {
   return static_cast<const GfxRenderer*>(ctx)->getTextWidth(listFontId(font), text);
@@ -121,27 +107,6 @@ bool needsHalo(const Puzzle& p, const BoardLayout& l, const BoardView& view, con
   return false;
 }
 
-void drawLetter(GfxRenderer& r, const int fontId, const int capH, const int ascender, const char letter, const int cx,
-                const int cy, const bool black, const bool halo) {
-  const EpdFontFamily* family = familyFor(r, fontId);
-  const EpdGlyph* g = family ? family->getGlyph(static_cast<unsigned char>(letter), EpdFontFamily::BOLD) : nullptr;
-  if (!g) return;
-  const char text[2] = {letter, '\0'};
-  // Centre the ink: horizontally on its own bounding box, vertically on the capital height.
-  const int x = cx - (g->left + g->width / 2);
-  const int y = cy + capH / 2 - ascender;
-  if (halo) {
-    // A white outline a pixel wide, so a capsule line crossing this cell stops short of the
-    // letter instead of running through it.
-    for (int oy = -1; oy <= 1; oy++) {
-      for (int ox = -1; ox <= 1; ox++) {
-        if (ox != 0 || oy != 0) r.drawText(fontId, x + ox, y + oy, text, !black, EpdFontFamily::BOLD);
-      }
-    }
-  }
-  r.drawText(fontId, x, y, text, black, EpdFontFamily::BOLD);
-}
-
 // A ring `thickness` px wide (outer edge `radius`) in HINT_DASHES dashes with equal gaps.
 void drawDashedRing(GfxRenderer& r, const int cx, const int cy, const int radius, const int thickness) {
   const int outer2 = radius * radius;
@@ -158,11 +123,7 @@ void drawDashedRing(GfxRenderer& r, const int cx, const int cy, const int radius
   }
 }
 
-void drawButton(GfxRenderer& r, const Rect& b, const char* label) {
-  r.drawRoundedRect(b.x, b.y, b.w, b.h, 2, 10, true);
-  const int top = capTopFor(r, UI_12_FONT_ID, EpdFontFamily::BOLD, b.y + b.h / 2);
-  sleepcards::draw::drawTextCenteredAt(r, UI_12_FONT_ID, b.x + b.w / 2, top, label, true, EpdFontFamily::BOLD);
-}
+void drawButton(GfxRenderer& r, const Rect& b, const char* label) { appdraw::drawButton(r, b.x, b.y, b.w, b.h, label); }
 
 }  // namespace
 
@@ -258,7 +219,7 @@ void drawGrid(GfxRenderer& r, const Puzzle& p, const BoardLayout& l, const Board
     for (int col = 0; col < l.size; col++) {
       const bool onDisc = inGrid(disc, l.size) && disc.row == row && disc.col == col;
       const bool halo = !onDisc && needsHalo(p, l, view, dragging, row, col);
-      drawLetter(r, fontId, capH, ascender, p.at(row, col), l.centerX(col), l.centerY(row), !onDisc, halo);
+      appdraw::drawLetter(r, fontId, capH, ascender, p.at(row, col), l.centerX(col), l.centerY(row), !onDisc, halo);
     }
   }
 

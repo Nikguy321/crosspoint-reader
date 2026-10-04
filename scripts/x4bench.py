@@ -21,9 +21,11 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py redraw               # the live sleep screen redraws now
   scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
   scripts/x4bench.py weather              # the Weather card's cache (or: weather fetch|clear)
-  scripts/x4bench.py app wordsearch       # open Word Search (or: app apps)
+  scripts/x4bench.py app wordsearch       # open Word Search (or: app apps / app crossword)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
+  scripts/x4bench.py cw open builtin:mini-001     # Crossword: open a puzzle, then the dump
+  scripts/x4bench.py cw type HUT          # type through the keyboard's handler ('-' = Del)
   scripts/x4bench.py pins 60              # USB-detect pin hunt: pull the cable mid-run
   scripts/x4bench.py power fake absent    # live screen: act unplugged (the full-charge hold)
   scripts/x4bench.py power fake real      # ... and back (or just: power, to read it)
@@ -122,7 +124,8 @@ Verbs
                            ERR REDRAW notlive otherwise. The draw lands on a
                            later loop pass: "x4bench.py redraw" waits for
                            STATE redraws= to pass that count.
-  APP apps|wordsearch      open the Apps list or Word Search the way their rows
+  APP apps|wordsearch|crossword
+                           open the Apps list or a game the way their rows
                            do (a replace): OK APP act=<name> once it is up.
   WS                       the Word Search puzzle on screen (ERR WS notopen
                            otherwise): WS state difficulty= size= found=n/m
@@ -144,6 +147,31 @@ Verbs
                            1234 medium animals" always gives fnv=691261517.
                            Drag a word with SWIPE x1 y1 x2 y2 1200 (over 700 ms
                            is a drag, not a swipe); tap-tap with two TAPs.
+  CW                       the Crossword on screen (ERR CW notopen otherwise):
+                           CW key=<source> fnv=<8 hex> w= h= cur=r,c dir=A|D
+                           filled=n/m wrong=<squares marked by a check>
+                           solved=0|1 elapsed=<s> checks= reveals= skip=0|1
+                           (Skip filled squares), one CW row <letters> per row
+                           ('.' empty, '#' block), CW clue <14A> <text>, then
+                           OK CW.
+  CW open builtin:<id>|<path>    open a puzzle (the key is the rest of the
+                           line); the dump, then OK CW open. ERR CW open
+                           <reason> <w>x<h> when refused (toobig, rebus,
+                           locked, nosolution, notcrossword, damaged, ...).
+  CW type <letters>        A-Z through the same handler as the on-screen keys
+                           ('-' = Del), at most 120 at once; OK CW type.
+  CW cursor <r> <c> [A|D]  the cursor on a white square (0-based); OK CW cursor.
+  CW check|reveal letter|word|puzzle
+                           as the menu rows; OK CW check / OK CW reveal.
+  CW solve                 types every missing or wrong answer letter
+                           (completion tests); OK CW solve.
+  CW list                  the built-ins: CW builtin <id> <w>x<h> fnv=<hex>
+                           <title> lines, then OK CW list n=<count>. Works on
+                           any screen.
+                           Taps: the keyboard's rows are y 658 / 714 / 770 (key
+                           centres x 30 + 46.6 n; row 2 from x 53; row 3: Menu
+                           x 42, Z..M from x 100, Del x 438); "<" (31,592),
+                           ">" (449,592), the clue text (240,592).
   PINS [seconds]           X4 Pro USB/VBUS-detect hunt, 1-180 s (default 60):
                            OK PINS seconds= probe=<pins> log=/pins.log, then
                            "PINS <ms> pin <n> <0|1>" lines (a start snapshot,
@@ -818,9 +846,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", nargs="?", default="show", choices=("show", "fetch", "clear"))
     s = sub.add_parser("power", help="dev: read external power, or 'fake absent' / 'fake real' (live screen)")
     s.add_argument("words", nargs="*", metavar="fake absent|fake real")
-    s = sub.add_parser("app", help="open the Apps list or Word Search")
-    s.add_argument("name", choices=("apps", "wordsearch"))
+    s = sub.add_parser("app", help="open the Apps list, Word Search or Crossword")
+    s.add_argument("name", choices=("apps", "wordsearch", "crossword"))
     s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
+    s.add_argument("args", nargs=argparse.REMAINDER)
+    s = sub.add_parser("cw", help="Crossword: dump, or open/type/cursor/check/reveal/solve/list (see the top)")
     s.add_argument("args", nargs=argparse.REMAINDER)
     s = sub.add_parser("pins", help="X4 Pro USB-detect pin hunt (pull the cable mid-run)")
     s.add_argument("seconds", nargs="?", type=int, default=60)
@@ -939,6 +969,12 @@ def run(args, link: Link, out=sys.stdout) -> int:
         for line in body:
             print(line[3:] if line.startswith("WS ") else line, file=out)
         print(f"OK WS {rest}".rstrip(), file=out)
+    elif op == "cw":
+        text = " ".join(["CW", *args.args]).strip()
+        rest, body = link.command(text, t or 30)
+        for line in body:
+            print(line[3:] if line.startswith("CW ") else line, file=out)
+        print(f"OK CW {rest}".rstrip(), file=out)
     elif op == "pins":
         return run_pins(link, args.seconds, t, out)
     elif op == "wifilast":

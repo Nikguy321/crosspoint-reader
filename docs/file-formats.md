@@ -507,3 +507,123 @@ make a real book disappear.
 
 `selfSize` is the expected file size. Comparing it against the real one is a free
 truncation guard: a build cut short by a power failure cannot pass.
+
+## Crossword
+
+The Crossword app (`src/activities/apps/Crossword*`, the pure half in `lib/Crossword`) reads puzzles from flash and
+from the SD card, and keeps its own small text files. Every text format below is parsed by a pure codec with host
+tests (`test/crossword`); anything that does not parse and validate completely is treated as missing.
+
+### Built-in puzzle text (`scripts/crossword/builtin.txt`)
+
+The source of the built-in puzzles. `scripts/crossword/gen_builtin.py` validates it and generates
+`lib/Crossword/CwBuiltinData.cpp`, which holds each puzzle's block of this file (comments and blank lines left out);
+the firmware parses a block with the same parser the host tests run on every built-in (`cw::parseTextPuzzle`).
+
+```
+# a comment: '#' then a space (or '#' alone); blank lines are ignored
+=== mini-001 | Mini 1
+##MOO
+STORM
+LANCE
+OCEAN
+TOY##
+A 1 Sound from a dairy cow
+...
+D 5 Folded tortilla with a filling
+```
+
+- `=== <id> | <title>`: the id is `[a-z0-9-]{1,24}`, unique; the title 1..48 bytes.
+- Comments: a line that is exactly `#`, or `#` followed by a space, is a comment, anywhere in the file; a line of
+  spaces and tabs only is blank and ignored. **Every other line is read as it stands**, so a line made only of
+  `A`-`Z` and `#` is a grid row wherever it appears: a `#####` divider or `#NOTE` inside a block is a row (it breaks
+  the grid, or is refused after the clues), and `#note` (no space) is refused. Write every comment as `# text`. The
+  generator and the firmware's parser apply this same rule, and a grid row never holds a space, so the two never meet.
+- Then the grid: rows of equal width, 3..15 squares a side, `A`-`Z` for a white square's answer and `#` for a
+  block.
+- Then one `A <number> <clue>` line per Across entry and one `D <number> <clue>` per Down entry. Numbers follow the
+  standard rule: row by row, a white square gets the next number when it starts an Across run (no white square to
+  its left, one to its right) or a Down run (the same above and below); runs are 2 squares or more. Every run has
+  exactly one clue.
+- A puzzle's identity is `fnv` = FNV-1a 32 over `"<w>x<h>:"` followed by the solution rows (blocks as `#`).
+
+### Card puzzles (`/Puzzles/Crossword/`)
+
+```
+/Puzzles/Crossword/*.ipuz, *.puz          the collection "On the card"
+/Puzzles/Crossword/<pack>/*.ipuz, *.puz   one collection per folder, named after it (one level only)
+```
+
+Extensions are matched without regard to case; dot files and dot folders are ignored, and so is any other file. At
+most 32 pack folders and 200 files a folder are listed; an `.ipuz` file may be up to 128 KB, a `.puz` up to 64 KB.
+A puzzle's source key is `builtin:<id>` or its full card path (at most 96 bytes; longer paths are not listed).
+
+- **ipuz** (ipuz is a trademark of Puzzazz, Inc., used with permission): JSON, streamed with a filter.
+  `kind` must hold a string starting `http://ipuz.org/crossword`; `dimensions` `{width, height}`; `puzzle` rows of
+  cells (a number, `0` or the file's `empty` value for a white square, `#` or the file's `block` value for a block,
+  `null` for an omitted square = a block, or `{cell, style}`; `style.shapebg: "circle"` = a circled square, any
+  `barred` style = refused); `solution` is required, one letter A-Z a square (case folded); `clues` `Across` / `Down`
+  (a key may be `Across:<label>`), each clue a string, a `[number, text]` pair or `{number, clue}`; `title`,
+  `author`, `copyright`. When the file numbers its squares, the numbers must match the rule above. HTML in titles
+  and clues is stripped and its entities decoded.
+- **puz** (Across Lite, binary, little-endian): `ACROSS&DOWN\0` at 0x02, width 0x2C, height 0x2D, clue count 0x2E,
+  puzzle type 0x30 (0x0401 diagramless: refused), scrambled state 0x32 (non-zero: refused as locked); then the
+  solution grid (`.` = block), the player grid (ignored), and NUL-terminated title, author, copyright, the clues in
+  numbering order (Across first for a shared number) and notes. Text is ISO-8859-1 below version `2.0` and UTF-8 from
+  it. Extensions: `GEXT` bit 0x80 = circled; a `GRBS` with any non-zero square = rebus, refused. Checksums are
+  counted (logged) but never required.
+- Refused files show a reason in the picker: bigger than 15 x 15, rebus, locked, diagramless, barred, no solution,
+  not a crossword, damaged, too many clues (over 100 entries or 16 KB of clue text), numbering that does not match,
+  clues that do not match the grid. A clue longer than 400 bytes is cut, not refused.
+- Clue text is cleaned to UTF-8 with single spaces: typographic quotes, dashes and the ellipsis become ASCII, and any
+  other character the UI fonts cannot draw becomes `?`.
+
+### Save files (`/.crosspoint/crossword/`)
+
+Written tmp -> remove -> rename (a cut between the last two reads as "no save"), except the solved list, which is
+appended to.
+
+`prefs.dat`:
+
+```
+CP1
+current <source key> | -
+skip 0|1
+collection builtin | card | pack:<folder> | -
+seq <u32>
+end
+```
+
+`current` is the puzzle being played, `skip` the Skip filled squares option, `collection` the picker's last
+collection, `seq` the last progress sequence number handed out.
+
+`progress/<fnv8hex>.dat`, one per puzzle (its identity in lower-case hex):
+
+```
+CW1
+key <source key>
+fnv <8 hex digits>
+size <w> <h>
+cursor <row> <col> <A|D>
+elapsed <seconds>
+counts <checks> <reveals>
+solved 0|1
+seq <u32>
+row <w characters: '.' empty, A-Z>                 (h lines; a block holds '#')
+flags <w characters: '.' none, 'w' wrong, 'r' revealed>   (h lines)
+end
+```
+
+When a puzzle opens, its source is parsed again and the progress must match it (fnv, size, blocks, revealed squares
+holding their answers, the cursor on a white square); otherwise the puzzle starts fresh. At most 40 progress files are
+kept: past that, the one with the lowest `seq` that is not the current puzzle is deleted (`seq` is set each time a
+puzzle is opened).
+
+`solved.dat`, one line per solved puzzle, oldest first, at most 2000 (the oldest are dropped when the list is
+rewritten). A built-in counts as solved only when its key and its fnv both match a line, so an id given new content is
+unsolved again. Card files are marked by key alone (the picker does not parse them), so a new puzzle on the card needs
+a new file name:
+
+```
+<fnv8hex> <source key>
+```

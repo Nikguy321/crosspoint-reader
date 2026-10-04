@@ -886,9 +886,111 @@ TEST(BenchApp, AppsOrWordSearch) {
   EXPECT_FALSE(parseAppArgs("", target));
   EXPECT_FALSE(parseAppArgs(nullptr, target));
   EXPECT_FALSE(parseAppArgs("word search", target));
-  EXPECT_FALSE(parseAppArgs("crossword", target));
+  EXPECT_TRUE(parseAppArgs("crossword", target));
+  EXPECT_EQ(target, AppTarget::Crossword);
+  EXPECT_TRUE(parseAppArgs(" CrossWord ", target));
+  EXPECT_EQ(target, AppTarget::Crossword);
+  EXPECT_FALSE(parseAppArgs("cross word", target));
   EXPECT_FALSE(parseAppArgs("apps now", target));
   EXPECT_FALSE(parseAppArgs("wordsearchwordsearch", target));
+}
+
+TEST(BenchCw, DumpListSolve) {
+  CwArgs cw;
+  char none[] = "";
+  ASSERT_TRUE(parseCwArgs(none, cw));
+  EXPECT_EQ(cw.op, CwOp::Dump);
+  ASSERT_TRUE(parseCwArgs(nullptr, cw));
+  EXPECT_EQ(cw.op, CwOp::Dump);
+  char list[] = "LIST";
+  ASSERT_TRUE(parseCwArgs(list, cw));
+  EXPECT_EQ(cw.op, CwOp::List);
+  char solve[] = " solve ";
+  ASSERT_TRUE(parseCwArgs(solve, cw));
+  EXPECT_EQ(cw.op, CwOp::Solve);
+  char extra[] = "solve now";
+  EXPECT_FALSE(parseCwArgs(extra, cw));
+  char unknown[] = "fill";
+  EXPECT_FALSE(parseCwArgs(unknown, cw));
+}
+
+TEST(BenchCw, OpenTakesTheRestOfTheLine) {
+  CwArgs cw;
+  char builtin[] = "open builtin:mini-001";
+  ASSERT_TRUE(parseCwArgs(builtin, cw));
+  EXPECT_EQ(cw.op, CwOp::Open);
+  EXPECT_STREQ(cw.text, "builtin:mini-001");
+  char path[] = "OPEN  /Puzzles/Crossword/My Pack/Sunday Mini.ipuz  ";
+  ASSERT_TRUE(parseCwArgs(path, cw));
+  EXPECT_STREQ(cw.text, "/Puzzles/Crossword/My Pack/Sunday Mini.ipuz");
+  char empty[] = "open";
+  EXPECT_FALSE(parseCwArgs(empty, cw));
+  char control[] = "open builtin:\x01";
+  EXPECT_FALSE(parseCwArgs(control, cw));
+  // A source key is at most 96 bytes (the parse works in place: a fresh line each time).
+  std::string longKey = "open /Puzzles/Crossword/" + std::string(78, 'a');
+  ASSERT_EQ(longKey.size() - 5, 97u);
+  EXPECT_FALSE(parseCwArgs(longKey.data(), cw));
+  std::string fits = "open /Puzzles/Crossword/" + std::string(77, 'a');
+  EXPECT_TRUE(parseCwArgs(fits.data(), cw));
+  EXPECT_EQ(std::strlen(cw.text), 96u);
+}
+
+TEST(BenchCw, TypeLettersAndDel) {
+  CwArgs cw;
+  char letters[] = "type huT-x";
+  ASSERT_TRUE(parseCwArgs(letters, cw));
+  EXPECT_EQ(cw.op, CwOp::Type);
+  EXPECT_STREQ(cw.text, "HUT-X");
+  char digit[] = "type HU7";
+  EXPECT_FALSE(parseCwArgs(digit, cw));
+  char two[] = "type HUT CASE";
+  EXPECT_FALSE(parseCwArgs(two, cw));
+  char none[] = "type";
+  EXPECT_FALSE(parseCwArgs(none, cw));
+  std::string most = "type " + std::string(CW_TEXT_MAX, 'A');
+  EXPECT_TRUE(parseCwArgs(most.data(), cw));
+  std::string over = "type " + std::string(CW_TEXT_MAX + 1, 'A');
+  EXPECT_FALSE(parseCwArgs(over.data(), cw));
+}
+
+TEST(BenchCw, CursorAndScopes) {
+  CwArgs cw;
+  char plain[] = "cursor 2 3";
+  ASSERT_TRUE(parseCwArgs(plain, cw));
+  EXPECT_EQ(cw.op, CwOp::Cursor);
+  EXPECT_EQ(cw.row, 2);
+  EXPECT_EQ(cw.col, 3);
+  EXPECT_EQ(cw.dir, -1);
+  char down[] = "CURSOR 14 0 d";
+  ASSERT_TRUE(parseCwArgs(down, cw));
+  EXPECT_EQ(cw.row, 14);
+  EXPECT_EQ(cw.dir, 1);
+  char across[] = "cursor 0 0 A";
+  ASSERT_TRUE(parseCwArgs(across, cw));
+  EXPECT_EQ(cw.dir, 0);
+  char off[] = "cursor 15 0";
+  EXPECT_FALSE(parseCwArgs(off, cw));
+  char badDir[] = "cursor 1 1 x";
+  EXPECT_FALSE(parseCwArgs(badDir, cw));
+  char oneNumber[] = "cursor 1";
+  EXPECT_FALSE(parseCwArgs(oneNumber, cw));
+
+  char check[] = "check word";
+  ASSERT_TRUE(parseCwArgs(check, cw));
+  EXPECT_EQ(cw.op, CwOp::Check);
+  EXPECT_EQ(cw.scope, 1);
+  char reveal[] = "Reveal PUZZLE";
+  ASSERT_TRUE(parseCwArgs(reveal, cw));
+  EXPECT_EQ(cw.op, CwOp::Reveal);
+  EXPECT_EQ(cw.scope, 2);
+  char letter[] = "check letter";
+  ASSERT_TRUE(parseCwArgs(letter, cw));
+  EXPECT_EQ(cw.scope, 0);
+  char noScope[] = "reveal";
+  EXPECT_FALSE(parseCwArgs(noScope, cw));
+  char badScope[] = "check grid";
+  EXPECT_FALSE(parseCwArgs(badScope, cw));
 }
 
 TEST(BenchWs, DumpOrNewPuzzle) {

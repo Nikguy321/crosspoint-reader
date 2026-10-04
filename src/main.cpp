@@ -38,6 +38,7 @@
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/apps/CrosswordActivity.h"
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
@@ -758,6 +759,8 @@ static void resumeLastApp() {
   clearLastSleepApp();
   if (app == WordSearchActivity::APP_ID) {
     activityManager.goToWordSearch();
+  } else if (app == CrosswordActivity::APP_ID) {
+    activityManager.goToCrossword();
   } else {
     activityManager.goHome();
   }

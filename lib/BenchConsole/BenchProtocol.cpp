@@ -429,7 +429,99 @@ bool parseAppArgs(const char* args, AppTarget& out) {
     out = AppTarget::WordSearch;
     return true;
   }
+  if (tokenIs(word, "crossword")) {
+    out = AppTarget::Crossword;
+    return true;
+  }
   return false;
+}
+
+bool parseCwArgs(char* args, CwArgs& out) {
+  out = CwArgs{};
+  if (args == nullptr) return true;
+  char* tok = nullptr;
+  if (!nextToken(args, tok)) return true;  // CW: the dump
+  if (tokenIs(tok, "open")) {
+    // The rest of the line is the key (a card path may hold spaces).
+    while (isSpace(*args)) ++args;
+    size_t n = strlen(args);
+    while (n > 0 && isSpace(args[n - 1])) --n;
+    if (n == 0 || n > 96) return false;
+    for (size_t i = 0; i < n; ++i) {
+      const auto c = static_cast<unsigned char>(args[i]);
+      if (c < 0x20 || c == 0x7F) return false;
+    }
+    memcpy(out.text, args, n);
+    out.text[n] = '\0';
+    out.op = CwOp::Open;
+    return true;
+  }
+  if (tokenIs(tok, "type")) {
+    char* letters = nullptr;
+    if (!nextToken(args, letters) || nextToken(args, tok)) return false;
+    const size_t n = strlen(letters);
+    if (n == 0 || n > CW_TEXT_MAX) return false;
+    for (size_t i = 0; i < n; ++i) {
+      const char c = letters[i];
+      if (c == '-') {
+        out.text[i] = c;
+      } else if (toLower(c) >= 'a' && toLower(c) <= 'z') {
+        out.text[i] = static_cast<char>(toLower(c) - 'a' + 'A');
+      } else {
+        return false;
+      }
+    }
+    out.text[n] = '\0';
+    out.op = CwOp::Type;
+    return true;
+  }
+  if (tokenIs(tok, "cursor")) {
+    uint32_t row = 0;
+    uint32_t col = 0;
+    char* r = nullptr;
+    char* c = nullptr;
+    if (!nextToken(args, r) || !nextToken(args, c) || !parseU32(r, row) || !parseU32(c, col)) return false;
+    if (row >= static_cast<uint32_t>(CW_SIDE_MAX) || col >= static_cast<uint32_t>(CW_SIDE_MAX)) return false;
+    out.row = static_cast<int8_t>(row);
+    out.col = static_cast<int8_t>(col);
+    if (nextToken(args, tok)) {
+      if (tokenIs(tok, "a")) {
+        out.dir = 0;
+      } else if (tokenIs(tok, "d")) {
+        out.dir = 1;
+      } else {
+        return false;
+      }
+      if (nextToken(args, tok)) return false;
+    }
+    out.op = CwOp::Cursor;
+    return true;
+  }
+  if (tokenIs(tok, "check") || tokenIs(tok, "reveal")) {
+    const CwOp op = tokenIs(tok, "check") ? CwOp::Check : CwOp::Reveal;
+    char* scope = nullptr;
+    if (!nextToken(args, scope) || nextToken(args, tok)) return false;
+    static constexpr const char* SCOPES[] = {"letter", "word", "puzzle"};
+    for (uint8_t i = 0; i < 3; ++i) {
+      if (tokenIs(scope, SCOPES[i])) {
+        out.op = op;
+        out.scope = i;
+        return true;
+      }
+    }
+    return false;
+  }
+  CwOp op = CwOp::Dump;
+  if (tokenIs(tok, "solve")) {
+    op = CwOp::Solve;
+  } else if (tokenIs(tok, "list")) {
+    op = CwOp::List;
+  } else {
+    return false;
+  }
+  if (nextToken(args, tok)) return false;
+  out.op = op;
+  return true;
 }
 
 bool parseWsArgs(char* args, WsArgs& out) {

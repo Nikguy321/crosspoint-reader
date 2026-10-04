@@ -1,0 +1,19 @@
+# The fill tool's downloads and outputs (README.md): fetched or generated at run time, never committed.
+wordlist/
+*.dict
+words.txt
+words_ok.txt
+words_hybrid.txt
+exclude.tmp
+candidates*.json
+selected*.json
+round*.json
+round*.log
+fill
+fill.dSYM/
+__pycache__/
+# The family-friendly blocklist is kept OUTSIDE the repository on purpose (familyfilter.py reads $CW_BLOCKLIST);
+# a copy dropped here stays untracked, and so do its editor swap/backup files and renamed copies.
+*blocklist*
+# The review lists (deny.txt, allow3.txt, ok.txt) are the owner's working files, kept outside the repository too.
+lists/

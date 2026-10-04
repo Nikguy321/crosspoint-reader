@@ -1,0 +1,170 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": [
+  "http://ipuz.org/sudoku#1"
+ ],
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "title": "Test grid",
+ "author": "CrossPoint tests",
+ "copyright": "Public domain test data",
+ "puzzle": [
+  [
+   "#",
+   "#",
+   1,
+   2,
+   3
+  ],
+  [
+   "#",
+   4,
+   0,
+   0,
+   0
+  ],
+  [
+   5,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   6,
+   0,
+   0,
+   0,
+   "#"
+  ],
+  [
+   7,
+   0,
+   0,
+   "#",
+   "#"
+  ]
+ ],
+ "solution": [
+  [
+   "#",
+   "#",
+   "H",
+   "U",
+   "T"
+  ],
+  [
+   "#",
+   "C",
+   "A",
+   "S",
+   "E"
+  ],
+  [
+   "R",
+   "A",
+   "V",
+   "E",
+   "N"
+  ],
+  [
+   "A",
+   "G",
+   "E",
+   "D",
+   "#"
+  ],
+  [
+   "P",
+   "E",
+   "N",
+   "#",
+   "#"
+  ]
+ ],
+ "clues": {
+  "Across": [
+   [
+    1,
+    "Simple shelter in the woods"
+   ],
+   [
+    4,
+    "Detective's puzzle to crack"
+   ],
+   [
+    5,
+    "Large black bird with a croak"
+   ],
+   [
+    6,
+    "Like fine cheese or wine"
+   ],
+   [
+    7,
+    "Ballpoint, for one"
+   ]
+  ],
+  "Down": [
+   [
+    1,
+    "Safe harbor"
+   ],
+   [
+    2,
+    "Secondhand"
+   ],
+   [
+    3,
+    "Fingers on two hands"
+   ],
+   [
+    4,
+    "Home for a pet hamster"
+   ],
+   [
+    5,
+    "Knock on a door"
+   ]
+  ]
+ },
+ "saved": [
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ ]
+}

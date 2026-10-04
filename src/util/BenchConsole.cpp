@@ -10,6 +10,7 @@
 #include <BenchInjection.h>
 #include <BenchProtocol.h>
 #include <BoardConfig.h>
+#include <Crossword.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalDisplay.h>
@@ -36,6 +37,7 @@
 #include "LiveSleep.h"
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
+#include "activities/apps/CrosswordActivity.h"
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
@@ -1004,8 +1006,8 @@ void cmdCard(char* args, const bool exclusive) {
   pend.passes = 0;
 }
 
-// APP apps|wordsearch: the Apps list or Word Search, as their Home row / list row opens them.
-// The reply waits until the switch has happened.
+// APP apps|wordsearch|crossword: the Apps list or a game, as their Home row / list row opens
+// them. The reply waits until the switch has happened.
 void cmdApp(const char* args, const bool exclusive) {
   bench::AppTarget target = bench::AppTarget::Apps;
   if (!bench::parseAppArgs(args, target)) {
@@ -1016,7 +1018,7 @@ void cmdApp(const char* args, const bool exclusive) {
     reply("ERR APP live");  // a key wakes the live sleep screen first
     return;
   }
-  // Word Search reads and writes the card.
+  // The games read and write the card.
   if (activityManager.benchSwitchPending() || storageBusy(exclusive)) {
     reply("ERR APP busy");
     return;
@@ -1024,6 +1026,9 @@ void cmdApp(const char* args, const bool exclusive) {
   if (target == bench::AppTarget::Apps) {
     activityManager.goToApps();
     snprintf(pathBuf, sizeof(pathBuf), "%s", "Apps");
+  } else if (target == bench::AppTarget::Crossword) {
+    activityManager.goToCrossword();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", CrosswordActivity::NAME);
   } else {
     activityManager.goToWordSearch();
     snprintf(pathBuf, sizeof(pathBuf), "%s", WordSearchActivity::NAME);
@@ -1113,6 +1118,145 @@ void cmdWs(char* args, const bool exclusive) {
   } else {
     reply("OK WS");
   }
+}
+
+// The crossword as the game holds it: the state line, one CW row per grid row ('.' empty, '#'
+// block, the letter otherwise), the current clue.
+void dumpCrossword(const CrosswordActivity& game) {
+  const cw::Puzzle& p = *game.benchPuzzle();
+  const cw::Progress& prog = *game.benchProgress();
+  const cw::Tally t = cw::tally(p, prog);
+  reply(
+      "CW key=%s fnv=%08lx w=%u h=%u cur=%d,%d dir=%c filled=%u/%u wrong=%u solved=%d elapsed=%lu checks=%u "
+      "reveals=%u skip=%d",
+      p.sourceKey, static_cast<unsigned long>(p.fnv), static_cast<unsigned>(p.w), static_cast<unsigned>(p.h),
+      p.rowOf(prog.cursor), p.colOf(prog.cursor), prog.dir == cw::DOWN ? 'D' : 'A', static_cast<unsigned>(t.filled),
+      static_cast<unsigned>(t.white), static_cast<unsigned>(t.marked), prog.solved ? 1 : 0,
+      static_cast<unsigned long>(game.benchElapsedSeconds()), static_cast<unsigned>(prog.checks),
+      static_cast<unsigned>(prog.reveals), game.benchPrefs().skipFilled ? 1 : 0);
+  char row[cw::MAX_SIDE + 1];
+  for (int r = 0; r < p.h; r++) {
+    for (int c = 0; c < p.w; c++) {
+      const int i = p.index(r, c);
+      const char f = prog.fill[i];
+      row[c] = p.isBlock(i) ? '#' : (f >= 'A' && f <= 'Z' ? f : '.');
+    }
+    row[p.w] = '\0';
+    reply("CW row %s", row);
+  }
+  const int e = cw::currentEntry(p, prog);
+  char label[8];
+  cw::formatClueLabel(p, e, label, sizeof(label));
+  reply("CW clue %s %s", label, p.clue(e));
+}
+
+const char* cwErrorName(const cw::Error e) {
+  switch (e) {
+    case cw::Error::None:
+      return "none";
+    case cw::Error::TooBig:
+      return "toobig";
+    case cw::Error::TooSmall:
+      return "toosmall";
+    case cw::Error::FileTooLarge:
+      return "filetoolarge";
+    case cw::Error::Rebus:
+      return "rebus";
+    case cw::Error::Locked:
+      return "locked";
+    case cw::Error::Diagramless:
+      return "diagramless";
+    case cw::Error::Barred:
+      return "barred";
+    case cw::Error::NoSolution:
+      return "nosolution";
+    case cw::Error::NotCrossword:
+      return "notcrossword";
+    case cw::Error::Damaged:
+      return "damaged";
+    case cw::Error::TooManyClues:
+      return "toomanyclues";
+    case cw::Error::BadNumbering:
+      return "badnumbering";
+    case cw::Error::ClueMismatch:
+      return "cluemismatch";
+    case cw::Error::OutOfMemory:
+      return "nomemory";
+  }
+  return "?";
+}
+
+// CW [open <key>|type <letters>|cursor <r> <c> [A|D]|check <scope>|reveal <scope>|solve|list]:
+// the action through the game's own handlers, then the dump (list: the built-ins). Crossword must
+// be on screen (APP crossword) for everything but list.
+void cmdCw(char* args, const bool exclusive) {
+  bench::CwArgs cw;
+  if (!bench::parseCwArgs(args, cw)) {
+    reply("ERR CW usage");
+    return;
+  }
+  if (cw.op == bench::CwOp::List) {
+    for (size_t i = 0; i < cw::builtinCount(); i++) {
+      const cw::BuiltinPuzzle& b = cw::builtinPuzzle(i);
+      reply("CW builtin %s %ux%u fnv=%08lx %s", b.id, static_cast<unsigned>(b.w), static_cast<unsigned>(b.h),
+            static_cast<unsigned long>(b.fnv), b.title);
+    }
+    reply("OK CW list n=%u", static_cast<unsigned>(cw::builtinCount()));
+    return;
+  }
+  auto* game = strcmp(activityManager.benchCurrentName(), CrosswordActivity::NAME) == 0
+                   ? static_cast<CrosswordActivity*>(activityManager.benchCurrentActivity())
+                   : nullptr;
+  if (!game || !game->benchPuzzle() || !game->benchProgress()) {
+    reply("ERR CW notopen act=%s", activityManager.benchCurrentName());
+    return;
+  }
+  // Everything but the dump can write the card (progress, prefs, the solved list).
+  if (cw.op != bench::CwOp::Dump && storageBusy(exclusive)) {
+    reply("ERR CW busy");
+    return;
+  }
+  const char* op = "";
+  switch (cw.op) {
+    case bench::CwOp::Open: {
+      const cw::LoadStatus st = game->benchOpen(cw.text);
+      if (!st.ok()) {
+        reply("ERR CW open %s %ux%u", cwErrorName(st.error), static_cast<unsigned>(st.width),
+              static_cast<unsigned>(st.height));
+        return;
+      }
+      op = " open";
+      break;
+    }
+    case bench::CwOp::Type:
+      game->benchType(cw.text);
+      op = " type";
+      break;
+    case bench::CwOp::Cursor:
+      if (!game->benchCursor(cw.row, cw.col, cw.dir)) {
+        reply("ERR CW cursor block or off the grid");
+        return;
+      }
+      op = " cursor";
+      break;
+    case bench::CwOp::Check:
+      game->benchCheck(static_cast<cw::Scope>(cw.scope));
+      op = " check";
+      break;
+    case bench::CwOp::Reveal:
+      game->benchReveal(static_cast<cw::Scope>(cw.scope));
+      op = " reveal";
+      break;
+    case bench::CwOp::Solve:
+      game->benchSolve();
+      op = " solve";
+      break;
+    case bench::CwOp::Dump:
+    case bench::CwOp::List:
+      break;
+  }
+  dumpCrossword(*game);
+  reply("OK CW%s", op);
 }
 
 // POWER [fake absent|fake real]: external power as live sleep reads it, or a fake absence so the
@@ -1510,6 +1654,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdApp(args, exclusive);
   } else if (strcmp(verb, "WS") == 0) {
     cmdWs(args, exclusive);
+  } else if (strcmp(verb, "CW") == 0) {
+    cmdCw(args, exclusive);
   } else if (strcmp(verb, "PINS") == 0) {
     cmdPins(args, exclusive);
   } else if (strcmp(verb, "WIFILAST") == 0) {

@@ -1,0 +1,442 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": [
+  "http://ipuz.org/crossword#1"
+ ],
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "title": "Nine",
+ "author": "CrossPoint tests",
+ "copyright": "Public domain test data",
+ "puzzle": [
+  [
+   1,
+   0,
+   2,
+   3,
+   4,
+   0,
+   0,
+   5,
+   6
+  ],
+  [
+   0,
+   "#",
+   7,
+   0,
+   0,
+   "#",
+   "#",
+   8,
+   0
+  ],
+  [
+   9,
+   10,
+   0,
+   "#",
+   11,
+   12,
+   13,
+   "#",
+   0
+  ],
+  [
+   14,
+   0,
+   "#",
+   15,
+   0,
+   0,
+   0,
+   "#",
+   0
+  ],
+  [
+   16,
+   0,
+   17,
+   0,
+   0,
+   0,
+   0,
+   18,
+   0
+  ],
+  [
+   0,
+   "#",
+   19,
+   0,
+   0,
+   0,
+   "#",
+   20,
+   0
+  ],
+  [
+   0,
+   "#",
+   21,
+   0,
+   0,
+   "#",
+   22,
+   0,
+   0
+  ],
+  [
+   23,
+   24,
+   "#",
+   "#",
+   25,
+   26,
+   0,
+   "#",
+   0
+  ],
+  [
+   27,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ ],
+ "solution": [
+  [
+   "W",
+   "Z",
+   "S",
+   "I",
+   "S",
+   "Z",
+   "D",
+   "M",
+   "S"
+  ],
+  [
+   "U",
+   "#",
+   "I",
+   "E",
+   "O",
+   "#",
+   "#",
+   "P",
+   "R"
+  ],
+  [
+   "R",
+   "R",
+   "D",
+   "#",
+   "G",
+   "A",
+   "C",
+   "#",
+   "R"
+  ],
+  [
+   "E",
+   "U",
+   "#",
+   "I",
+   "O",
+   "L",
+   "Q",
+   "#",
+   "N"
+  ],
+  [
+   "W",
+   "Z",
+   "S",
+   "I",
+   "S",
+   "Z",
+   "D",
+   "M",
+   "S"
+  ],
+  [
+   "U",
+   "#",
+   "I",
+   "E",
+   "O",
+   "P",
+   "#",
+   "R",
+   "R"
+  ],
+  [
+   "R",
+   "#",
+   "D",
+   "G",
+   "A",
+   "#",
+   "C",
+   "R",
+   "E"
+  ],
+  [
+   "U",
+   "I",
+   "#",
+   "#",
+   "O",
+   "L",
+   "Q",
+   "#",
+   "N"
+  ],
+  [
+   "W",
+   "Z",
+   "S",
+   "I",
+   "S",
+   "Z",
+   "D",
+   "M",
+   "S"
+  ]
+ ],
+ "clues": {
+  "Across": [
+   [
+    1,
+    "Across entry 1 of a 9x9 test grid"
+   ],
+   [
+    7,
+    "Across entry 7 of a 9x9 test grid"
+   ],
+   [
+    8,
+    "Across entry 8 of a 9x9 test grid"
+   ],
+   [
+    9,
+    "Across entry 9 of a 9x9 test grid"
+   ],
+   [
+    11,
+    "Across entry 11 of a 9x9 test grid"
+   ],
+   [
+    14,
+    "Across entry 14 of a 9x9 test grid"
+   ],
+   [
+    15,
+    "Across entry 15 of a 9x9 test grid"
+   ],
+   [
+    16,
+    "Across entry 16 of a 9x9 test grid"
+   ],
+   [
+    19,
+    "Across entry 19 of a 9x9 test grid"
+   ],
+   [
+    20,
+    "Across entry 20 of a 9x9 test grid"
+   ],
+   [
+    21,
+    "Across entry 21 of a 9x9 test grid"
+   ],
+   [
+    22,
+    "Across entry 22 of a 9x9 test grid"
+   ],
+   [
+    23,
+    "Across entry 23 of a 9x9 test grid"
+   ],
+   [
+    25,
+    "Across entry 25 of a 9x9 test grid"
+   ],
+   [
+    27,
+    "Across entry 27 of a 9x9 test grid"
+   ]
+  ],
+  "Down": [
+   [
+    1,
+    "Down entry 1 of a 9x9 test grid"
+   ],
+   [
+    2,
+    "Down entry 2 of a 9x9 test grid"
+   ],
+   [
+    3,
+    "Down entry 3 of a 9x9 test grid"
+   ],
+   [
+    4,
+    "Down entry 4 of a 9x9 test grid"
+   ],
+   [
+    5,
+    "Down entry 5 of a 9x9 test grid"
+   ],
+   [
+    6,
+    "Down entry 6 of a 9x9 test grid"
+   ],
+   [
+    10,
+    "Down entry 10 of a 9x9 test grid"
+   ],
+   [
+    12,
+    "Down entry 12 of a 9x9 test grid"
+   ],
+   [
+    13,
+    "Down entry 13 of a 9x9 test grid"
+   ],
+   [
+    15,
+    "Down entry 15 of a 9x9 test grid"
+   ],
+   [
+    17,
+    "Down entry 17 of a 9x9 test grid"
+   ],
+   [
+    18,
+    "Down entry 18 of a 9x9 test grid"
+   ],
+   [
+    22,
+    "Down entry 22 of a 9x9 test grid"
+   ],
+   [
+    24,
+    "Down entry 24 of a 9x9 test grid"
+   ],
+   [
+    26,
+    "Down entry 26 of a 9x9 test grid"
+   ]
+  ]
+ },
+ "saved": [
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ ]
+}

@@ -31,6 +31,12 @@ Pro. CrossPoint's own README follows further down.
   - Wi-Fi is on only while a job needs it, or while the sleep screen is live on the charger.
 - **Apps on the Home screen**, starting with **Word Search**: touch or key play, three difficulties, 31
   built-in themes plus your own `.words` lists in `/Puzzles/WordSearch/`, hints, and the puzzle kept across sleep.
+- **Crossword** (touch readers): American-style crosswords typed on an on-screen keyboard, with checks, reveals, a
+  clue list, 48 built-in puzzles written for this repository (30 5x5, 12 7x7, 6 9x9; grids filled on a computer from
+  the MIT Collaborative Word List, every clue written fresh: see
+  [scripts/crossword/README.md](scripts/crossword/README.md)), and your own `.ipuz` / `.puz` files in
+  `/Puzzles/Crossword/` (ipuz is a trademark of Puzzazz, Inc., used with permission); progress is kept per puzzle
+  and across sleep.
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.

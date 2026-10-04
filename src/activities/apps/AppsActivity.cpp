@@ -13,8 +13,35 @@ AppsActivity::AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInpu
   wordSearch.label = tr(STR_WORD_SEARCH);
   wordSearch.subtitle = tr(STR_WORD_SEARCH_DESC);
   wordSearch.icon = fui::bitmapFromIcon(icon_word_search_32);  // subtitle rows carry the larger icon
-  wordSearch.actionValue = 0;
-  rowItems_[0] = wordSearch;
+  apps_[appCount_] = App::WordSearch;
+  rowItems_[appCount_++] = wordSearch;
+  // Crossword is typed on its on-screen keyboard: touch boards only.
+  if (mappedInput.hasTouch()) {
+    fui::ListItem crossword;
+    crossword.label = tr(STR_CROSSWORD);
+    crossword.subtitle = tr(STR_CROSSWORD_DESC);
+    crossword.icon = fui::bitmapFromIcon(icon_crossword_32);
+    apps_[appCount_] = App::Crossword;
+    rowItems_[appCount_++] = crossword;
+  }
+  for (int i = 0; i < appCount_; i++) rowItems_[i].actionValue = static_cast<int16_t>(i);
+}
+
+bool AppsActivity::hasPendingSelect_ = false;
+AppsActivity::App AppsActivity::pendingSelect_ = AppsActivity::App::WordSearch;
+
+void AppsActivity::selectOnNextOpen(const App app) {
+  pendingSelect_ = app;
+  hasPendingSelect_ = true;
+}
+
+void AppsActivity::onEnter() {
+  UiListActivity::onEnter();
+  if (!hasPendingSelect_) return;
+  hasPendingSelect_ = false;
+  for (int i = 0; i < appCount_; i++) {
+    if (apps_[i] == pendingSelect_) nav.selected = i;
+  }
 }
 
 const char* AppsActivity::headerTitle() const { return tr(STR_APPS); }
@@ -24,7 +51,15 @@ void AppsActivity::activateIndex(const int index) {
   // render.
   app.clearTapFlash();
   nav.selected = index;
-  if (index == 0) activityManager.goToWordSearch();
+  if (index < 0 || index >= appCount_) return;
+  switch (apps_[index]) {
+    case App::WordSearch:
+      activityManager.goToWordSearch();
+      return;
+    case App::Crossword:
+      activityManager.goToCrossword();
+      return;
+  }
 }
 
 // Not finish(): with nothing under this screen it would go Home with no row selected.
@@ -39,7 +74,7 @@ void AppsActivity::buildScreen(UiScreen& screen) {
 
   fui::ListProps props;
   props.items = rowItems_;
-  props.count = static_cast<uint16_t>(APP_COUNT);
+  props.count = static_cast<uint16_t>(appCount_);
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
   props.subtitleText = screen.theme().smallText;

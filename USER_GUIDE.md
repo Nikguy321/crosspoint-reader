@@ -37,7 +37,9 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
       - [Cover settings](#cover-settings)
       - [Custom images](#custom-images)
     - [3.8 Custom Fonts (SD Card)](#38-custom-fonts-sd-card)
-    - [3.9 Apps: Word Search](#39-apps-word-search)
+    - [3.9 Apps](#39-apps)
+      - [Word Search](#word-search)
+      - [Crossword](#crossword)
   - [4. Reading Mode](#4-reading-mode)
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
@@ -108,7 +110,7 @@ Upon turning the device on for the first time, you will be placed on the **[Home
 
 ### 3.1 Home Screen
 
-The Home screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Browse Files](#33-browse-files-screen)**, the **[Library](#34-library-screen)**, **[File Transfer](#35-file-transfer-screen)**, **[Apps](#39-apps-word-search)**, or **[Settings](#36-settings)**.
+The Home screen is the main entry point to the firmware. From here you can navigate to **[Reading Mode](#4-reading-mode)** with the most recently read book, **[Browse Files](#33-browse-files-screen)**, the **[Library](#34-library-screen)**, **[File Transfer](#35-file-transfer-screen)**, **[Apps](#39-apps)**, or **[Settings](#36-settings)**.
 
 ### 3.2 Reading Mode
 
@@ -639,9 +641,13 @@ See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation detai
 
 ---
 
-### 3.9 Apps: Word Search
+### 3.9 Apps
 
-**Apps** on the Home screen (a row in the list styles, a tab in Cover Grid) lists the games. Back from Apps returns to Home.
+**Apps** on the Home screen (a row in the list styles, a tab in Cover Grid) lists the games: **Word Search**, and on
+readers with a touch screen **Crossword**. Back from Apps returns to Home. Each game remembers where you were: put the
+reader to sleep in the middle of one and it comes back to the same game on wake.
+
+#### Word Search
 
 **Word Search** shows a grid of letters with a list of hidden words under it. Words run in a straight line, and a found word gets a ring around it and is struck through in the list.
 
@@ -676,6 +682,66 @@ WATER LILY
 The first line that is not a comment is the theme's title (up to 32 characters). Then one word or phrase per line, with 3 to 15 letters; spaces, hyphens and apostrophes may appear and are left out of the grid. A line with digits, accented letters or other symbols is skipped. A file needs at least 8 usable words (one with fewer is listed, but picking it only marks it "Too few words"); up to 400 words and 64 files are read, 16 KB each. If a chosen theme file is deleted, Word Search goes back to Random.
 
 **Saving:** the puzzle is saved each time you find a word and when you leave. Put the reader to sleep in the middle of a puzzle and it comes back to the same puzzle on wake, from the live sleep screen on the charger, and after Auto Power Off or a restart.
+
+#### Crossword
+
+**Crossword** is an American-style crossword: a grid of white squares and black blocks, numbered entries, and Across
+and Down clues. It is typed on its own keyboard, so it is listed only on readers with a touch screen (the X4 Pro). It
+comes with 48 built-in puzzles (30 of 5 x 5, 12 of 7 x 7 and 6 of 9 x 9), and plays `.ipuz` and `.puz` files you put
+on the SD card. The built-ins are original to this firmware: the grids were filled on a computer from an open word list
+and every clue was written fresh for this firmware (how they are made:
+[scripts/crossword/README.md](scripts/crossword/README.md)).
+
+The screen, top to bottom: the puzzle's title and the back arrow; the grid; the **clue bar** with the current clue
+between **<** and **>**; the keyboard (Q to P, A to L, then **Menu**, Z to M and **Del**). The square you are on is
+checkered (it shows grey on the screen, so it never looks like a black block), with its letter and number in black,
+and the word it belongs to has a heavy outline.
+
+- **Moving:** tap a square to go there. Tap the square you are on, or the clue text, to switch between Across and
+  Down. **<** and **>** go to the previous and next clue (all the Across clues, then all the Down ones, round and
+  round), to the clue's first empty square.
+- **Typing:** a letter goes into your square and the cursor moves on through the word, skipping squares already
+  filled (**Skip filled squares** in the menu turns that off). At the end of a word it goes back to the word's first
+  empty square, or on to the next clue that has one. A key counts when your finger lifts on the key it went down on;
+  sliding off a key cancels it. On a fast run of taps the screen catches up a letter or two at a time.
+- **Del** clears your square, or, on an empty one, steps back one square and clears that. Hold **Del** to clear the
+  whole word. Letters given by a reveal stay put.
+- **By keys (X4 Pro):** a short press of the right or left key goes to the next or previous clue; hold the right key
+  to switch Across / Down, the left key for the clue list. Hold the **Home** key for the menu (a short Home press still
+  goes Home).
+- **Leaving:** the back arrow in the header, or a swipe in from the left edge, returns to Apps.
+
+When every square is filled the game checks the grid: all right, and a banner shows the time it took (and how many
+checks and reveals you used) with a **Next puzzle** button (the next unsolved puzzle from the same place; "All
+solved here" when there is none; holding the right key does the same); not all right, and the clue bar says
+**Not quite - 3 squares are wrong** until you change a letter (it does not say which).
+
+**The menu:** **Clue list** (with the time so far and the checks and reveals used); **Check letter / word / puzzle**
+marks wrong letters with a slash (never fixing them, and never marking empty squares); **Reveal letter / word /
+puzzle** writes in the answer, with a small black corner, and that letter is then fixed (revealing the whole puzzle
+solves it); **Clear word**; **Clear puzzle** (tap it twice; this also resets the time and the counts); **Puzzles...**;
+**Next unsolved**; **Skip filled squares** (on or off); **Back to puzzle**.
+
+**The clue list** shows every clue under ACROSS and DOWN, with your letters so far under each (`CA__S`) and **Done**
+on the full ones. Tap a clue to go to it. The puzzle's author and copyright, if it has them, are at the end.
+
+**Puzzles...** lists where puzzles come from: **Built-in** (with how many you have solved), **On the card** (files in
+the folder below), then one entry for each folder inside it. Choose one to see its puzzles; solved ones are marked.
+A file the game cannot play stays in the list with the reason under it.
+
+**Your own puzzles:** copy `.ipuz` or `.puz` files to the `/Puzzles/Crossword/` folder on the SD card (File Transfer
+can create the folder and upload them). Each folder directly inside it shows as a pack of its own (one level only).
+Up to 32 folders and 200 files a folder are listed; an `.ipuz` file may be up to 128 KB and a `.puz` file 64 KB. The
+game reads grids up to 15 x 15 and these kinds are refused, with the reason shown: bigger grids ("17x17 - up to
+15x15"), rebus squares (more than one letter in a square), locked (scrambled) `.puz` files, diagramless and barred
+puzzles, files without the answers, and damaged files. A very long clue is cut short. Circled squares are drawn with
+a circle. ipuz is a trademark of Puzzazz, Inc., used with permission.
+
+**Saving:** your letters, marks and time are kept for each puzzle (the 40 most recently opened), saved at every word
+you finish, every check or reveal, and when you leave; reopening a puzzle carries on where you were. If a card file
+changes, its old progress is dropped. The game reopens after sleep, on the live sleep screen's wake, and after Auto
+Power Off or a restart; if the puzzle you were playing has been deleted from the card, it starts the next unsolved
+built-in puzzle instead. The time counts only while the puzzle is on screen.
 
 ---
 

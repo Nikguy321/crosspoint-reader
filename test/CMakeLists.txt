@@ -97,6 +97,9 @@ add_subdirectory(weather_protocol)
 # Word Search: the pure half, then its drawing (links SleepCardHost above).
 add_subdirectory(word_search)
 add_subdirectory(word_search_preview)
+# Crossword: the pure half (parsers, play rules, layout, saves, built-ins), then its drawing.
+add_subdirectory(crossword)
+add_subdirectory(crossword_preview)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)

@@ -1,0 +1,140 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": [
+  "http://ipuz.org/crossword#1"
+ ],
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "title": "Shelter",
+ "author": "CrossPoint tests",
+ "copyright": "Public domain test data",
+ "puzzle": [
+  [
+   "#",
+   "#",
+   1,
+   2,
+   3
+  ],
+  [
+   "#",
+   4,
+   0,
+   0,
+   0
+  ],
+  [
+   5,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   6,
+   0,
+   0,
+   0,
+   "#"
+  ],
+  [
+   7,
+   0,
+   0,
+   "#",
+   "#"
+  ]
+ ],
+ "solution": [
+  [
+   "#",
+   "#",
+   "h",
+   "u",
+   "t"
+  ],
+  [
+   "#",
+   "c",
+   "a",
+   "s",
+   "e"
+  ],
+  [
+   "r",
+   "a",
+   "v",
+   "e",
+   "n"
+  ],
+  [
+   "a",
+   "g",
+   "e",
+   "d",
+   "#"
+  ],
+  [
+   "p",
+   "e",
+   "n",
+   "#",
+   "#"
+  ]
+ ],
+ "clues": {
+  "Across": [
+   "Simple shelter in the woods",
+   "Detective's puzzle to crack",
+   "Large black bird with a croak",
+   "Like fine cheese or wine",
+   "Ballpoint, for one"
+  ],
+  "Down": [
+   "Safe harbor",
+   "Secondhand",
+   "Fingers on two hands",
+   "Home for a pet hamster",
+   "Knock on a door"
+  ]
+ },
+ "saved": [
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   0,
+   0,
+   0,
+   0,
+   0
+  ]
+ ]
+}

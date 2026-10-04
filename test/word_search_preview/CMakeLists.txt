@@ -5,6 +5,7 @@ file(GLOB WORD_SEARCH_PREVIEW_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/lib/WordSea
 add_executable(WordSearchPreviewTest
   WordSearchPreviewTest.cpp
   ${REPO_ROOT}/src/activities/apps/WordSearchDraw.cpp
+  ${REPO_ROOT}/src/activities/apps/AppDraw.cpp
   ${WORD_SEARCH_PREVIEW_SOURCES}
 )
 target_include_directories(WordSearchPreviewTest PRIVATE ${REPO_ROOT}/lib/WordSearch)
