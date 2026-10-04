@@ -10,7 +10,7 @@
 //
 //   <unix> pwr up=<s> soc=<%> mv=<mV> mhz=<n> fl=<n> wifi=<0|1> usb=<0|1>
 //          host=<0|1> rnd=<n> ls=<permille> lsn=<n> lse=<0|1> live=<0|1>
-//          heap=<bytes> blk=<bytes>
+//          heap=<bytes> blk=<bytes> hold=<0|1>
 //   mhz   CPU clock at the instant the line was written (a snapshot, and
 //         nearly always 80: the write follows an idle pass)
 //   fl    the highest frontlight brightness % seen in the window, 0 = dark all
@@ -23,6 +23,8 @@
 //   live  the live sleep screen (charging, util/LiveSleepPolicy.h) was up at any
 //         time in the window;  heap / blk = free internal heap and its largest
 //         block when the line was written (fragmentation over a long live session)
+//   hold  the live screen's full-charge hold (charger idle at full, Wi-Fi off,
+//         naps allowed; LiveSleepPolicy.h) was on at any time in the window
 // Reading current off the gauge: over windows with fl=0 wifi=0 usb=0 within one
 // boot, mA ~= 11 x (sum of soc drops) / (sum of hours); the mv slope agrees.
 namespace power_ledger {
@@ -47,6 +49,7 @@ struct Window {
   bool live = false;
   uint32_t heapFree = 0;
   uint32_t heapLargest = 0;
+  bool hold = false;
 };
 
 // The window's conditions, noted on every loop pass: a window counts as dark,
@@ -57,14 +60,16 @@ struct WindowLatch {
   bool usb = false;
   bool host = false;
   bool live = false;
+  bool hold = false;
 
   void note(const unsigned frontlight, const bool wifiOn, const bool usbOn, const bool hostOn,
-            const bool liveOn = false) {
+            const bool liveOn = false, const bool holdOn = false) {
     if (frontlight > frontlightMax) frontlightMax = frontlight;
     wifi = wifi || wifiOn;
     usb = usb || usbOn;
     host = host || hostOn;
     live = live || liveOn;
+    hold = hold || holdOn;
   }
   void applyTo(Window& w) const {
     w.frontlight = frontlightMax;
@@ -72,6 +77,7 @@ struct WindowLatch {
     w.usb = usb;
     w.host = host;
     w.live = live;
+    w.hold = hold;
   }
 };
 
@@ -84,14 +90,14 @@ constexpr unsigned permille(const uint64_t sleptUs, const uint64_t windowUs) {
 
 // Returns the length written (excluding the terminator), 0 if it does not fit.
 inline size_t formatLine(char* buf, const size_t cap, const Window& w) {
-  const int n = snprintf(buf, cap,
-                         "%lu pwr up=%lu soc=%u mv=%u mhz=%u fl=%u wifi=%d usb=%d host=%d rnd=%lu ls=%u lsn=%lu "
-                         "lse=%d live=%d heap=%lu blk=%lu\n",
-                         static_cast<unsigned long>(w.unixTime), static_cast<unsigned long>(w.uptimeS), w.socPercent,
-                         w.millivolts, w.cpuMhz, w.frontlight, w.wifi ? 1 : 0, w.usb ? 1 : 0, w.host ? 1 : 0,
-                         static_cast<unsigned long>(w.renders), w.lightSleepPermille,
-                         static_cast<unsigned long>(w.lightSleeps), w.lightSleepEnabled ? 1 : 0, w.live ? 1 : 0,
-                         static_cast<unsigned long>(w.heapFree), static_cast<unsigned long>(w.heapLargest));
+  const int n = snprintf(
+      buf, cap,
+      "%lu pwr up=%lu soc=%u mv=%u mhz=%u fl=%u wifi=%d usb=%d host=%d rnd=%lu ls=%u lsn=%lu "
+      "lse=%d live=%d heap=%lu blk=%lu hold=%d\n",
+      static_cast<unsigned long>(w.unixTime), static_cast<unsigned long>(w.uptimeS), w.socPercent, w.millivolts,
+      w.cpuMhz, w.frontlight, w.wifi ? 1 : 0, w.usb ? 1 : 0, w.host ? 1 : 0, static_cast<unsigned long>(w.renders),
+      w.lightSleepPermille, static_cast<unsigned long>(w.lightSleeps), w.lightSleepEnabled ? 1 : 0, w.live ? 1 : 0,
+      static_cast<unsigned long>(w.heapFree), static_cast<unsigned long>(w.heapLargest), w.hold ? 1 : 0);
   if (n <= 0 || static_cast<size_t>(n) >= cap) return 0;
   return static_cast<size_t>(n);
 }

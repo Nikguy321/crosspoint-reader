@@ -11,7 +11,9 @@ class HalFile;
 // The sleep screen. Normally drawn once on entry, after which main.cpp deep-sleeps. Live (X4 Pro
 // on external power, util/LiveSleepPolicy.h): it stays up, loop() redraws it on the minute every
 // Charging Updates interval and ticks the Wi-Fi station keeper, until main.cpp ends it with a
-// key (a restart to where the reader was) or an unplug (a final redraw, then deep sleep).
+// key (a restart to where the reader was) or an unplug (a final redraw, then deep sleep). In the
+// full-charge hold (main.cpp: the charger idle at full, Wi-Fi off) the redraws come every
+// max(Charging Updates, 15 min) and the keeper is not ticked.
 class SleepActivity final : public Activity {
  public:
   explicit SleepActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, bool fromTimeout = false,
@@ -39,6 +41,9 @@ class SleepActivity final : public Activity {
   // The last redraw before deep sleep: the card on screen again with a fresh time and battery
   // (nothing for a picture or the logo, which show neither).
   static void finalLiveRedraw();
+  // The full-charge hold began (true) or ended with power back (false): a card is redrawn now (its
+  // footer's bolt goes or comes back), then on the hold's interval or the live one.
+  static void setLiveHold(bool holding);
 
  private:
   enum class LiveScreen : uint8_t { None, Card, Picture, Logo };

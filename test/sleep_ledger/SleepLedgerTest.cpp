@@ -68,3 +68,26 @@ TEST(SleepLedger, RotatesOnlyPastTheCap) {
   EXPECT_TRUE(shouldRotate(170 * 1024));
   EXPECT_FALSE(shouldRotate(60 * 1024));
 }
+
+// The live screen's full-charge hold (util/LiveSleepPolicy.h): the same layout, so a reader of
+// /sleep.log needs no new parser - "hold" x is the SOC when power vanished, "holdend" x the reason.
+TEST(SleepLedger, HoldEventsKeepTheLayout) {
+  Entry e;
+  e.unixTime = 1791000000;
+  e.event = "hold";
+  e.uptimeS = 2400;
+  e.resetReason = 5;
+  e.wakeCause = 7;
+  e.extra = 99;
+  e.socPercent = 99;
+  e.millivolts = 4180;
+  char buf[LINE_CAP];
+  ASSERT_GT(formatLine(buf, sizeof buf, e), 0u);
+  EXPECT_EQ(std::string(buf), "1791000000 hold up=2400 rst=5 wake=7 x=99 soc=99 mv=4180\n");
+  e.event = "holdend";
+  e.uptimeS = 30000;
+  e.extra = 4;
+  e.socPercent = 96;
+  ASSERT_GT(formatLine(buf, sizeof buf, e), 0u);
+  EXPECT_EQ(std::string(buf), "1791000000 holdend up=30000 rst=5 wake=7 x=4 soc=96 mv=4180\n");
+}

@@ -90,6 +90,13 @@ bool parseAppArgs(const char* args, AppTarget& out);
 enum class WeatherOp : uint8_t { Show, Fetch, Clear };
 bool parseWeatherArgs(const char* args, WeatherOp& out);
 
+// POWER [fake absent|fake real]: external power as live sleep reads it (the default), or a fake:
+// "fake absent" makes it read absent whatever the charger line and this cable say, so the unplug
+// and the full-charge hold can be tried on the bench; "fake real" (or "real") ends the fake.
+// Case ignored.
+enum class PowerOp : uint8_t { Show, FakeAbsent, Real };
+bool parsePowerArgs(const char* args, PowerOp& out);
+
 // WS                                         the puzzle on screen, dumped
 // WS new <seed> [easy|medium|hard] [key]     a deterministic new puzzle; the key (a built-in
 //                                            theme or "file:<name>.words") is the rest of the

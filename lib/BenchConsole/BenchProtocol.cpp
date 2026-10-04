@@ -371,6 +371,43 @@ bool parseWeatherArgs(const char* args, WeatherOp& out) {
   return false;
 }
 
+bool parsePowerArgs(const char* args, PowerOp& out) {
+  if (args == nullptr) args = "";
+  char words[2][8] = {};
+  size_t count = 0;
+  while (true) {
+    while (isSpace(*args)) ++args;
+    if (*args == '\0') break;
+    if (count == 2) return false;
+    size_t n = 0;
+    while (args[n] != '\0' && !isSpace(args[n])) {
+      if (n + 1 >= sizeof(words[0])) return false;
+      words[count][n] = args[n];
+      ++n;
+    }
+    args += n;
+    ++count;
+  }
+  if (count == 0) {
+    out = PowerOp::Show;
+    return true;
+  }
+  const char* mode = words[0];
+  if (count == 2) {
+    if (!tokenIs(words[0], "fake")) return false;
+    mode = words[1];
+    if (tokenIs(mode, "absent")) {
+      out = PowerOp::FakeAbsent;
+      return true;
+    }
+  }
+  if (tokenIs(mode, "real")) {
+    out = PowerOp::Real;
+    return true;
+  }
+  return false;
+}
+
 bool parseAppArgs(const char* args, AppTarget& out) {
   if (args == nullptr) return false;
   while (isSpace(*args)) ++args;

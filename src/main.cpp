@@ -276,6 +276,13 @@ struct LiveSession {
   uint32_t wakePressAt = 0;  // when that key went down (live_sleep::wakeNow)
   uint32_t rotatedAt = 0;    // the last /sleep.log rotation check (the pwr lines go on for days)
   live_sleep::UnplugDebounce unplug;
+  unsigned socAtLoss = 0;  // the gauge's SOC when external power last vanished
+  // The full-charge hold (live_sleep::holdEligible): the charger went idle at full, the screen
+  // stays up quietly until power comes back or the battery drops.
+  bool holding = false;
+  unsigned holdStartSoc = 0;
+  uint32_t holdSince = 0;
+  uint32_t holdCheckedAt = 0;  // the last gauge read for the drop and the cap
 };
 static LiveSession liveSession;
 
@@ -285,10 +292,33 @@ constexpr int LIVE_FROM_TIMEOUT = 1;
 constexpr int LIVE_FROM_TIMER_BOOT = 2;
 constexpr int SLEEP_AFTER_UNPLUG = 2;
 constexpr int SLEEP_AFTER_BENCH = 3;
+// The hold's ends (live_sleep::holdEndReason): 4 the drop, 5 the cap, as "holdend" and "sleep" x=.
+static_assert(live_sleep::holdEndReason(live_sleep::HoldExit::Drop) == 4 &&
+                  live_sleep::holdEndReason(live_sleep::HoldExit::Cap) == 5 &&
+                  live_sleep::holdEndReason(live_sleep::HoldExit::PowerBack) == 0,
+              "/sleep.log's hold reasons (util/SleepLedger.h)");
 constexpr unsigned long LIVE_LOOP_DELAY_MS = 20;
 constexpr uint32_t LIVE_ROTATE_EVERY_MS = 60UL * 60UL * 1000UL;
+// While holding, the gauge is read this often for the drop and the cap (power back is seen on
+// every pass).
+constexpr uint32_t HOLD_CHECK_EVERY_MS = 60UL * 1000UL;
 
 bool liveSleepActive() { return liveSession.active; }
+
+LiveHold liveHoldStatus() {
+  LiveHold hold;
+  if (!liveSession.active || !liveSession.holding) return hold;
+  hold.holding = true;
+  hold.startSoc = liveSession.holdStartSoc;
+  hold.heldMs = millis() - liveSession.holdSince;
+  return hold;
+}
+
+#if CROSSPOINT_BENCH_CONSOLE
+static bool powerFakedAbsent = false;
+void setExternalPowerFakedAbsent(const bool absent) { powerFakedAbsent = absent; }
+bool externalPowerFakedAbsent() { return powerFakedAbsent; }
+#endif
 
 // A computer on the USB cable (SOF frames), sampled once per loop pass. The
 // bench console tracks it in dev builds; release builds read the same monitor.
@@ -305,7 +335,16 @@ static bool usbHostAttached() {
 #endif
 }
 
-bool externalPowerPresent() { return live_sleep::externalPower(gpio.isUsbConnected(), usbHostAttached()); }
+// External power as live sleep reads it: the charger line or a computer, unless the bench's
+// POWER fake absent hides both.
+static bool externalPowerFrom(const bool stat, const bool usbHost) {
+#if CROSSPOINT_BENCH_CONSOLE
+  if (powerFakedAbsent) return false;
+#endif
+  return live_sleep::externalPower(stat, usbHost);
+}
+
+bool externalPowerPresent() { return externalPowerFrom(gpio.isUsbConnected(), usbHostAttached()); }
 
 constexpr char SLEEP_FRAME_FILE[] = "/.crosspoint/sleep_frame.bin";
 
@@ -382,7 +421,7 @@ static void powerLedgerTick(const bool usbHost) {
   static uint64_t sleptUsAtStart = 0;
   static power_ledger::WindowLatch latch;
   latch.note((Frontlight.present() && Frontlight.isOn()) ? Frontlight.brightness() : 0, powerManager.radioActive(),
-             gpio.usbConnectedAtUpdate(), usbHost, liveSession.active);
+             gpio.usbConnectedAtUpdate(), usbHost, liveSession.active, liveSession.active && liveSession.holding);
   const uint32_t now = millis();
   const uint32_t windowMs = now - windowStartMs;
   if (windowMs < power_ledger::WINDOW_MS) return;
@@ -538,6 +577,72 @@ static void endLiveSleep(const int ledgerExtra, const char* why) {
   commitDeepSleep(false, ledgerExtra);
 }
 
+// The charger went idle at full (live_sleep::holdEligible): assume the cable is still in and
+// stay up quietly. Wi-Fi goes off through RadioPower::off() - the driver torn down, never
+// RadioPower::stop(), so StationKeeper::start() can bring it up again in this boot when power
+// comes back, exactly as at live entry - which also lets the idle loop light-sleep between the
+// redraws (SleepActivity: every max(Charging Updates, 15 min)).
+static void enterHold(const uint32_t now) {
+  HalPowerManager::Lock powerLock;
+  liveSession.holding = true;
+  liveSession.holdStartSoc = liveSession.socAtLoss;
+  liveSession.holdSince = now;
+  liveSession.holdCheckedAt = now;
+  LOG_INF("SLP", "Live sleep: charger idle at %u %%, holding (Wi-Fi off) until power is back or it drops %u %%",
+          liveSession.holdStartSoc, live_sleep::HOLD_DROP_PCT);
+  sleepLedger("hold", static_cast<int>(liveSession.holdStartSoc));
+  StationKeeper::stop();
+  RadioPower::off();
+  SleepActivity::setLiveHold(true);
+}
+
+// Power back while holding: fully live again (the keeper rejoins, the normal interval, the bolt).
+static void leaveHoldPowerBack() {
+  liveSession.holding = false;
+  LOG_INF("SLP", "Live sleep: external power back, live again");
+  sleepLedger("holdend", live_sleep::holdEndReason(live_sleep::HoldExit::PowerBack));
+  SleepActivity::setLiveHold(false);
+  StationKeeper::start();
+}
+
+// One hold pass: power back is seen at once; the gauge, every HOLD_CHECK_EVERY_MS. Returns true
+// when the session ended (a drop or the cap: deep sleep).
+static bool holdPass(const bool power, const uint32_t now) {
+  if (power) {
+    leaveHoldPowerBack();
+    return false;
+  }
+  if (now - liveSession.holdCheckedAt < HOLD_CHECK_EVERY_MS) return false;
+  liveSession.holdCheckedAt = now;
+  const unsigned soc = powerManager.getBatteryPercentage();
+  const auto end = live_sleep::holdExit(false, soc, liveSession.holdStartSoc, now - liveSession.holdSince);
+  if (end == live_sleep::HoldExit::Stay) return false;
+  const bool dropped = end == live_sleep::HoldExit::Drop;
+  const int reason = live_sleep::holdEndReason(end);
+  LOG_INF("SLP", "Live sleep: hold ends (%s, %u %% from %u %%)", dropped ? "dropped" : "cap", soc,
+          liveSession.holdStartSoc);
+  sleepLedger("holdend", reason);
+  endLiveSleep(reason, dropped ? "unplugged at full" : "hold cap");
+  return true;
+}
+
+// The idle end of a hold pass: one light-sleep slice, as the main loop's idle (the radio is off;
+// HalPowerManager refuses under every guard, a computer on the cable included).
+static void holdIdle(const bool usbHost) {
+  bool slept = false;
+  {
+    RenderLock lock(RenderLock::Mode::Try);
+    if (lock.ownsLock()) {
+      HalPowerManager::LightSleepContext ctx;
+      ctx.usbHost = usbHost;
+      ctx.activityBusy = activityManager.preventAutoSleep() || activityManager.skipLoopDelay();
+      ctx.renderQueued = activityManager.renderQueued();
+      slept = powerManager.lightSleep(gpio, ctx);
+    }
+  }
+  if (!slept) delay(LIVE_LOOP_DELAY_MS);
+}
+
 static bool anyKeyDown() {
   for (uint8_t button = HalGPIO::BTN_BACK; button <= HalGPIO::BTN_POWER; button++) {
     if (gpio.isPressed(button)) return true;
@@ -546,8 +651,8 @@ static bool anyKeyDown() {
 }
 
 // One main-loop pass while the live screen is up: no inactivity or power-hold
-// sleep, no naps (the charger and the radio block them anyway). SleepActivity's
-// loop() redraws and ticks the station keeper.
+// sleep, no naps (the charger and the radio block them anyway) except in the
+// full-charge hold. SleepActivity's loop() redraws and ticks the station keeper.
 static void liveSleepLoop() {
   const uint32_t now = millis();
 #if CROSSPOINT_BENCH_CONSOLE
@@ -561,12 +666,21 @@ static void liveSleepLoop() {
   // The unplug first, on every pass: nothing (not even a key held down) keeps the screen live
   // on the battery.
   const bool usbHost = usbHostAttached();
-  liveSession.unplug.note(live_sleep::externalPower(gpio.usbConnectedAtUpdate(), usbHost), now);
-  if (liveSession.unplug.unplugged(now)) {
-    LOG_INF("SLP", "Live sleep: no external power for %lu s (charger line low, no USB host)",
-            static_cast<unsigned long>(live_sleep::UNPLUG_DEBOUNCE_MS / 1000));
-    endLiveSleep(SLEEP_AFTER_UNPLUG, "unplugged");
-    return;
+  const bool power = externalPowerFrom(gpio.usbConnectedAtUpdate(), usbHost);
+  const bool wasAbsent = liveSession.unplug.absent();
+  liveSession.unplug.note(power, now);
+  // The SOC at the moment power vanished decides the hold (the gauge read once, not every pass).
+  if (!wasAbsent && liveSession.unplug.absent()) liveSession.socAtLoss = powerManager.getBatteryPercentage();
+  if (liveSession.holding) {
+    if (holdPass(power, now)) return;
+  } else if (liveSession.unplug.unplugged(now)) {
+    LOG_INF("SLP", "Live sleep: no external power for %lu s (charger line low, no USB host), %u %%",
+            static_cast<unsigned long>(live_sleep::UNPLUG_DEBOUNCE_MS / 1000), liveSession.socAtLoss);
+    if (!live_sleep::holdEligible(liveSession.socAtLoss)) {
+      endLiveSleep(SLEEP_AFTER_UNPLUG, "unplugged");
+      return;
+    }
+    enterHold(now);
   }
 
   // Any physical key wakes it (not touch). The wake waits until every key is up
@@ -590,6 +704,10 @@ static void liveSleepLoop() {
 
   activityManager.loop();
   powerManager.setPowerSaving(true);  // refused while a radio is up
+  if (liveSession.holding) {
+    holdIdle(usbHost);
+    return;
+  }
   delay(LIVE_LOOP_DELAY_MS);
 }
 

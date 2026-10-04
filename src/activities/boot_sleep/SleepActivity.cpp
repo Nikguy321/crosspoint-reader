@@ -513,11 +513,15 @@ void releaseSdFontCachesForDecode(const GfxRenderer& renderer) {
 SleepActivity* liveInstance = nullptr;
 bool liveRedrawRequested = false;
 bool liveHalfRequested = false;  // the requested redraw shows new data (a new forecast): a clean pass
+bool liveHold = false;           // the full-charge hold (main.cpp): the slower redraws, no station keeper
 
 }  // namespace
 
 SleepActivity::~SleepActivity() {
-  if (liveInstance == this) liveInstance = nullptr;
+  if (liveInstance == this) {
+    liveInstance = nullptr;
+    liveHold = false;
+  }
 }
 
 void SleepActivity::onEnter() {
@@ -675,8 +679,9 @@ void SleepActivity::scheduleNextRedraw() {
                           sleepcards::plausibleTime(static_cast<int64_t>(utc)) && halClock.localTime(wall);
   const uint32_t secondsOfDay =
       clockValid ? static_cast<uint32_t>(wall.tm_hour * 3600 + wall.tm_min * 60 + wall.tm_sec) : 0;
-  nextRedrawAt = millis() + live_sleep::nextRedrawDelayMs(clockValid, secondsOfDay,
-                                                          live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval));
+  const uint8_t minutes = live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval);
+  nextRedrawAt = millis() + (liveHold ? live_sleep::holdRedrawDelayMs(clockValid, secondsOfDay, minutes)
+                                      : live_sleep::nextRedrawDelayMs(clockValid, secondsOfDay, minutes));
 }
 
 void SleepActivity::loop() {
@@ -687,7 +692,7 @@ void SleepActivity::loop() {
     scheduleNextRedraw();
     return;  // the station keeper takes the next pass: keys are read between the steps
   }
-  StationKeeper::tick();
+  if (!liveHold) StationKeeper::tick();
 }
 
 void SleepActivity::drawLive(const bool entry, const bool final) {
@@ -805,6 +810,18 @@ void SleepActivity::requestLiveRedraw(const bool halfRefresh) {
 
 void SleepActivity::finalLiveRedraw() {
   if (liveInstance != nullptr) liveInstance->drawLive(/*entry=*/false, /*final=*/true);
+}
+
+void SleepActivity::setLiveHold(const bool holding) {
+  if (liveInstance == nullptr) return;
+  liveHold = holding;
+  // A card's footer carries the bolt: redraw it now. A picture or the logo shows none: only the
+  // next redraw moves to the new interval.
+  if (liveInstance->lastScreen == LiveScreen::Card) {
+    liveRedrawRequested = true;
+  } else {
+    liveInstance->scheduleNextRedraw();
+  }
 }
 
 // Sleep screens paint with a single HALF refresh (stock parity): the OEM X4

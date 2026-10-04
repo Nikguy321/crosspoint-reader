@@ -25,6 +25,8 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
   scripts/x4bench.py pins 60              # USB-detect pin hunt: pull the cable mid-run
+  scripts/x4bench.py power fake absent    # live screen: act unplugged (the full-charge hold)
+  scripts/x4bench.py power fake real      # ... and back (or just: power, to read it)
   scripts/x4bench.py sleep deep           # end of a bench session (deep sleep)
 
 Protocol (proto=1)
@@ -67,6 +69,11 @@ Verbs
                               none) card screen (card|picture|logo) redraws
                               wifi (station keeper: off none scan join up wait)
                               cycle (Card Cycle When Charging) every (minutes)
+                              hold (1: the full-charge hold - the charger idle
+                              at full, Wi-Fi off, naps, a redraw every 15 min
+                              at most) holdsoc (the SOC it started at, 0 when
+                              not holding) hold_s (seconds held) fakepower (1:
+                              POWER fake absent is on)
   LS on|off                idle light sleep on or off until the next boot (a
                            deep-sleep wake is a boot: it comes back on);
                            OK LS lightsleep=on|off. For A/B power runs: the
@@ -174,6 +181,19 @@ Verbs
                            ok 200/200 1.2 s changed=1 | failed <why> |
                            skipped <why> (no-wifi, off, device-network ...).
                            clear: the cache and the retry stamp removed.
+  POWER [fake absent|fake real]
+                           dev only: external power as the live sleep screen
+                           reads it: OK POWER fake=absent|real power= stat=
+                           host= soc= holdable=<1: the SOC would hold> hold=.
+                           "fake absent" (live screen only, else ERR POWER
+                           notlive) makes power read absent whatever the
+                           charger line and this cable say: 20 s later the
+                           live screen takes the unplug path - the full-charge
+                           hold at 97 % or more (STATE hold=1, wifi=off;
+                           /sleep.log "hold x=<soc>"), else its final redraw
+                           and deep sleep (the port drops). "fake real" (or
+                           "real") ends it: from the hold, fully live again
+                           ("holdend x=0"). A reboot clears it.
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).
@@ -796,6 +816,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("ssid")
     s = sub.add_parser("weather", help="dev: the Weather card's cache: show (default), fetch now, or clear")
     s.add_argument("action", nargs="?", default="show", choices=("show", "fetch", "clear"))
+    s = sub.add_parser("power", help="dev: read external power, or 'fake absent' / 'fake real' (live screen)")
+    s.add_argument("words", nargs="*", metavar="fake absent|fake real")
     s = sub.add_parser("app", help="open the Apps list or Word Search")
     s.add_argument("name", choices=("apps", "wordsearch"))
     s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
@@ -902,6 +924,12 @@ def run(args, link: Link, out=sys.stdout) -> int:
         fields = wait_live_redraw(link, before, t or 30)
         print(f"redrawn card={fields.get('card', '?')} screen={fields.get('screen', '?')} "
               f"next_s={fields.get('next_s', '?')}", file=out)
+    elif op == "power":
+        words = [w.lower() for w in args.words]
+        if words not in ([], ["fake", "absent"], ["fake", "real"], ["real"]):
+            raise BenchError("POWER", "usage: power [fake absent|fake real]")
+        rest, _ = link.command(" ".join(["POWER", *words]), t or 10)
+        print(rest, file=out)
     elif op == "app":
         rest, _ = link.command(f"APP {args.name}", t or 30)
         print(rest, file=out)

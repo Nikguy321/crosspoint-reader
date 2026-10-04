@@ -24,7 +24,7 @@ TEST(PowerLedger, FormatsOneWindow) {
   const size_t n = formatLine(buf, sizeof buf, w);
   EXPECT_EQ(std::string(buf),
             "1759100000 pwr up=1800 soc=83 mv=3987 mhz=80 fl=0 wifi=0 usb=0 host=0 rnd=7 ls=912 lsn=5470 lse=1 live=0 "
-            "heap=0 blk=0\n");
+            "heap=0 blk=0 hold=0\n");
   EXPECT_EQ(n, strlen(buf));
 }
 
@@ -42,7 +42,7 @@ TEST(PowerLedger, FlagsAndLight) {
   ASSERT_GT(formatLine(buf, sizeof buf, w), 0u);
   EXPECT_EQ(std::string(buf),
             "0 pwr up=0 soc=0 mv=0 mhz=240 fl=35 wifi=1 usb=1 host=1 rnd=0 ls=0 lsn=0 lse=0 live=1 heap=61234 "
-            "blk=40960\n");
+            "blk=40960 hold=0\n");
 }
 
 TEST(PowerLedger, WidestLineFitsBothCaps) {
@@ -53,7 +53,7 @@ TEST(PowerLedger, WidestLineFitsBothCaps) {
   w.millivolts = 65535;
   w.cpuMhz = 240;
   w.frontlight = 100;
-  w.wifi = w.usb = w.host = w.lightSleepEnabled = w.live = true;
+  w.wifi = w.usb = w.host = w.lightSleepEnabled = w.live = w.hold = true;
   w.heapFree = 4294967295u;
   w.heapLargest = 4294967295u;
   w.renders = 4294967295u;
@@ -134,4 +134,28 @@ TEST(PowerLedger, LatchHoldsLiveForTheWholeWindow) {
   quiet.note(0, false, false, false);
   quiet.applyTo(w);
   EXPECT_FALSE(w.live);
+}
+
+// The full-charge hold (LiveSleepPolicy.h): appended last, so a reader of the older fields
+// (soc mv ... heap blk) is undisturbed, and latched for the whole window like live.
+TEST(PowerLedger, HoldIsTheLastFieldAndLatches) {
+  WindowLatch latch;
+  latch.note(0, true, true, false, true, false);    // live, charging, Wi-Fi up
+  latch.note(0, false, false, false, true, true);   // the hold: Wi-Fi off, charger idle
+  latch.note(0, false, false, false, true, false);  // power back
+  Window w;
+  w.socPercent = 100;
+  latch.applyTo(w);
+  EXPECT_TRUE(w.hold);
+  EXPECT_TRUE(w.live);
+  char buf[LINE_CAP];
+  const size_t n = formatLine(buf, sizeof buf, w);
+  ASSERT_GT(n, 0u);
+  const std::string line(buf);
+  EXPECT_EQ(line.substr(line.size() - 8), " hold=1\n");
+  EXPECT_NE(line.find(" live=1 heap=0 blk=0 hold=1"), std::string::npos);
+  WindowLatch quiet;
+  quiet.note(0, false, false, false, true);  // live, never held
+  quiet.applyTo(w);
+  EXPECT_FALSE(w.hold);
 }

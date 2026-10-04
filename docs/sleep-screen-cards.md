@@ -203,8 +203,9 @@ the alerts' HTTP status; `-` = not asked, outside the US), `weather: failed <why
 cache stays), `weather: skipped <why>` (`off` is silent; `job-offline`, `no-wifi`,
 `device-network`, `no-clock`, `no-location`, `retry-wait`, `fresh`, `sleeping`).
 
-**On a wall charger the live screen ends at full charge** (the charger's STAT line drops; see
-below), so overnight the card keeps the forecast it last fetched. Its absolute times say so.
+**On a wall charger at full charge the live screen goes quiet** (the charger's STAT line drops:
+the full-charge hold, below, turns Wi-Fi off), so overnight the card keeps the forecast it last
+fetched. Its absolute times say so.
 
 **The cache.** `/.crosspoint/sleepcards/weather.dat`, written as `weather.tmp` and renamed over the
 old one under the render lock; at most 4 KB of versioned text (`W1`, `sleepcards/WeatherCache.h`)
@@ -280,9 +281,34 @@ joined. `src/util/LiveSleepPolicy.h` holds the decisions (host-tested in `test/l
   does after deep sleep.
 - **Unplug.** External power absent for 20 s without a break counts as unplugged: one last
   redraw (fresh time and battery), then today's deep sleep, and Auto Power Off counts from
-  there. At charge termination the STAT line may drop with the cable still in; on a wall
-  charger that reads as an unplug and ends in deep sleep, which is safe. A computer on the cable
-  keeps it live at 100 % (its SOF frames prove the power).
+  there - unless the battery was full when the power went (the full-charge hold, next). A
+  computer on the cable keeps it live at 100 % (its SOF frames prove the power), so there is no
+  hold on a computer.
+- **The full-charge hold.** The board has no cable-present line: a PINS run (2026-10-03) with
+  the cable out ~54 s saw only the charger STAT line (GPIO21) follow it, and none of the six free
+  pins. On a wall charger the charger stops at full and STAT drops with the cable still in, which
+  read as an unplug (the 2026-10-01 overnight log: live at 18:56, `sleep x=2` at 19:09 at 99 %,
+  cut by Auto Power Off at 19:38); kept on the charger at 94-98 % STAT stayed low for hours (the
+  charger restarts only below its recharge threshold). So when power has been absent the 20 s and
+  the gauge read at least 97 % (`HOLD_MIN_SOC`) at the moment it vanished, the screen holds
+  instead: the station keeper stops and the radio goes off through `RadioPower::off()` (the
+  driver torn down, not `RadioPower::stop()`, so the keeper can start it again in this boot,
+  exactly as at live entry), no NTP, location or weather; the screen is redrawn every
+  max(Charging Updates, 15 min) on the same card rules (the cycle keeps dealing, FAST/HALF as
+  live), and a card is redrawn at once so the footer loses its charging bolt; between redraws the
+  idle loop light-sleeps as on battery. Keys wake it exactly as live. It ends one of three ways:
+  external power back (STAT or a computer) makes it fully live again (the keeper rejoins, the
+  normal interval, the bolt back); the battery `HOLD_DROP_PCT` (3 %) below the SOC it started at
+  means it really was unplugged: the final redraw and today's deep sleep, Auto Power Off from
+  there; after `HOLD_MAX_MS` (24 h) it sleeps the same way, so a gauge that never moves cannot hold
+  forever. The gauge is read once a minute for those two. The accepted cost: unplugged right
+  at full, the reader spends about 3 % before it notices (counted from the reading when power
+  went, so more if the gauge crept up after that). Unproven on the wall charger: the hold assumes
+  the charger restarts before the battery is 3 % down; if it does not, the hold ends with the
+  cable still in (`holdend x=4`, then `sleep x=4`), and the overnight log's `holdend` soc/mv and
+  `hold=1` pwr lines say where the threshold has to go. `util/LiveSleepPolicy.h` holds the
+  thresholds and the decisions (test/live_sleep); the bench's `POWER fake absent` (dev builds,
+  live screen only) fakes the unplug on the bench cable, `POWER fake real` ends it.
 - **Plugged in while asleep.** Nothing wakes a deep-sleeping reader when a cable goes in, but
   when the Auto Power Off timer fires on the charger the rail is not cut: the reader boots
   straight into the live screen (or cuts it after all when the sleep screen cannot be live).
@@ -293,12 +319,16 @@ joined. `src/util/LiveSleepPolicy.h` holds the decisions (host-tested in `test/l
   Its scans list hidden networks too, so a hidden last network is tried by name when one is in
   range; a join names the scanned access point (fast scan on its channel). Between attempts the
   driver stays initialised (`WiFi.disconnect(false, true)`): the session has no restart to
-  clear the heap, so only `RadioPower::off()` at the wake or the unplug tears it down.
+  clear the heap, so only `RadioPower::off()` at the wake, the unplug or the full-charge hold tears
+  it down (the hold's end with power back starts a fresh driver).
   Every start goes through `RadioPower`; it holds the radio lock (full clock, no naps), which on
   the charger costs nothing that matters.
 - **Ledger.** `/sleep.log` gets `live` (x: 0 button, 1 timeout, 2 timer boot on the charger),
-  `livewake`, and `sleep` with x=2 (unplugged) or 3 (the bench's SLEEP deep) when it ends; the
-  5-minute `pwr` lines carry `live=` and the free heap / largest block. The ledger's rotation is
+  `livewake`, `hold` (x = the SOC when power went) and `holdend` (x: 0 power back, 4 the 3 %
+  drop, 5 the 24 h cap), and `sleep` with x=2 (unplugged), 3 (the bench's SLEEP deep), 4 (the
+  hold's drop) or 5 (the hold's cap) when it ends. A key (`livewake`) or the bench's SLEEP deep
+  (`sleep x=3`) also ends a hold, with no `holdend` line. The 5-minute `pwr` lines carry `live=`, the
+  free heap / largest block and, last, `hold=`. The ledger's rotation is
   checked at entry and hourly while live, so it keeps its 64 KB cap on a charger for days.
 
 ## How a card is built

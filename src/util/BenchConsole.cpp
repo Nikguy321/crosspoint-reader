@@ -377,14 +377,20 @@ void cmdState(const bool exclusive, const unsigned long lastActivityMs) {
   // The live sleep screen (charging): live = it is up, power = external power now (charger line
   // or this cable), next_s = seconds to the next redraw (-1: none scheduled), card / screen = what
   // it shows, redraws since it went live, wifi = the station keeper (off none scan join up wait),
-  // cycle = Card Cycle When Charging, every = Charging Updates in minutes.
+  // cycle = Card Cycle When Charging, every = Charging Updates in minutes; hold = the full-charge
+  // hold (charger idle at full: Wi-Fi off, naps), holdsoc = the SOC it started at (0 when not
+  // holding), hold_s = how long, fakepower = 1 while POWER fake absent hides the power.
   const auto live = SleepActivity::liveStatus();
-  reply("STATE live=%d power=%d next_s=%ld card=%s screen=%s redraws=%lu wifi=%s cycle=%u every=%u",
-        live.active ? 1 : 0, externalPowerPresent() ? 1 : 0,
-        live.active && live.nextRedrawInMs > 0 ? static_cast<long>((live.nextRedrawInMs + 999) / 1000) : -1L, live.card,
-        live.screen, static_cast<unsigned long>(live.redraws), StationKeeper::stateName(),
-        static_cast<unsigned>(SETTINGS.cardCycleWhenCharging),
-        static_cast<unsigned>(live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval)));
+  const auto hold = liveHoldStatus();
+  reply(
+      "STATE live=%d power=%d next_s=%ld card=%s screen=%s redraws=%lu wifi=%s cycle=%u every=%u hold=%d "
+      "holdsoc=%u hold_s=%lu fakepower=%d",
+      live.active ? 1 : 0, externalPowerPresent() ? 1 : 0,
+      live.active && live.nextRedrawInMs > 0 ? static_cast<long>((live.nextRedrawInMs + 999) / 1000) : -1L, live.card,
+      live.screen, static_cast<unsigned long>(live.redraws), StationKeeper::stateName(),
+      static_cast<unsigned>(SETTINGS.cardCycleWhenCharging),
+      static_cast<unsigned>(live_sleep::intervalMinutes(SETTINGS.chargingUpdateInterval)), hold.holding ? 1 : 0,
+      hold.startSoc, static_cast<unsigned long>(hold.heldMs / 1000), externalPowerFakedAbsent() ? 1 : 0);
   reply("OK STATE");
 }
 
@@ -1109,6 +1115,32 @@ void cmdWs(char* args, const bool exclusive) {
   }
 }
 
+// POWER [fake absent|fake real]: external power as live sleep reads it, or a fake absence so the
+// unplug and the full-charge hold run on the bench cable. "fake absent" only on the live screen
+// (elsewhere it would only turn the next SLEEP into a deep sleep and drop this port); a reboot, the
+// wake's included, clears it. holdable = the SOC now would hold (else the fake unplug deep-sleeps
+// 20 s later and the port drops).
+void cmdPower(const char* args) {
+  bench::PowerOp op = bench::PowerOp::Show;
+  if (!bench::parsePowerArgs(args, op)) {
+    reply("ERR POWER usage");
+    return;
+  }
+  if (op == bench::PowerOp::FakeAbsent) {
+    if (!liveSleepActive()) {
+      reply("ERR POWER notlive");
+      return;
+    }
+    setExternalPowerFakedAbsent(true);
+  } else if (op == bench::PowerOp::Real) {
+    setExternalPowerFakedAbsent(false);
+  }
+  const unsigned soc = powerManager.getBatteryPercentage();
+  reply("OK POWER fake=%s power=%d stat=%d host=%d soc=%u holdable=%d hold=%d",
+        externalPowerFakedAbsent() ? "absent" : "real", externalPowerPresent() ? 1 : 0, gpio.isUsbConnected() ? 1 : 0,
+        host.present() ? 1 : 0, soc, live_sleep::holdEligible(soc) ? 1 : 0, liveHoldStatus().holding ? 1 : 0);
+}
+
 // --- PINS: the USB/VBUS-detect pin hunt (X4 Pro) --------------------------------------------
 //
 // PINS [seconds] records the raw GPIO input registers for the window: a start snapshot, then
@@ -1484,6 +1516,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdWifiLast(args, exclusive);
   } else if (strcmp(verb, "WEATHER") == 0) {
     cmdWeather(args, exclusive);
+  } else if (strcmp(verb, "POWER") == 0) {
+    cmdPower(args);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {
     cmdLegacyScreenshot();
   } else {

@@ -58,6 +58,10 @@ class FakeDevice(threading.Thread):
         self.sleeps = []
         self.wifi_last = None
         self.weather_ops = []
+        self.power_ops = []
+        self.fake_absent = False
+        self.hold = False  # the full-charge hold (the fake device enters it at once, not after 20 s)
+        self.soc = 100
         self.act = "Home"
         self.ws_new = []
         self.pins_runs = []
@@ -289,6 +293,25 @@ class FakeDevice(threading.Thread):
                 self.emit("OK WEATHER fetch ok 200/200 1.2 s changed=1", noise=True)
             else:
                 self.emit("OK WEATHER clear")
+        elif verb == "POWER":
+            op = " ".join(rest.lower().split())
+            if op not in ("", "fake absent", "fake real", "real"):
+                self.emit("ERR POWER usage")
+                return
+            if op == "fake absent" and not self.live:
+                self.emit("ERR POWER notlive")
+                return
+            self.power_ops.append(op or "show")
+            if op == "fake absent":
+                self.fake_absent = True
+            elif op:
+                self.fake_absent = False
+                self.hold = False  # power back: fully live again
+            self.emit(f"OK POWER fake={'absent' if self.fake_absent else 'real'} "
+                      f"power={int(self.on_power and not self.fake_absent)} stat=1 host=1 soc={self.soc} "
+                      f"holdable={int(self.soc >= 97)} hold={int(self.hold)}", noise=True)
+            if self.fake_absent and self.soc >= 97:
+                self.hold = True  # what the reader does 20 s later
         elif verb == "WIFILAST":
             if not rest or len(rest.encode()) > 32:
                 self.emit("ERR WIFILAST usage")
@@ -297,9 +320,11 @@ class FakeDevice(threading.Thread):
             self.emit(f"OK WIFILAST saved={1 if rest == 'Saved Net' else 0} networks=2")
         elif verb == "STATE":
             self.emit("STATE act=Sleep depth=0 stack=-" if self.live else "STATE act=Home depth=0 stack=-")
-            self.emit(f"STATE live={int(self.live)} power={int(self.on_power)} next_s={94 if self.live else -1} "
-                      f"card=day screen=card redraws={self.redraws} wifi={'up' if self.live else 'off'} cycle=1 "
-                      "every=2", noise=True)
+            wifi = "up" if self.live and not self.hold else "off"
+            self.emit(f"STATE live={int(self.live)} power={int(self.on_power and not self.fake_absent)} "
+                      f"next_s={94 if self.live else -1} card=day screen=card redraws={self.redraws} wifi={wifi} "
+                      f"cycle=1 every=2 hold={int(self.hold)} holdsoc={self.soc if self.hold else 0} "
+                      f"hold_s={25 if self.hold else 0} fakepower={int(self.fake_absent)}", noise=True)
             self.emit("OK STATE")
         elif verb == "KEY":
             time.sleep(self.key_delay)
@@ -539,6 +564,37 @@ class BenchSelfTest(unittest.TestCase):
         with self.assertRaises(SystemExit):  # argparse refuses an unknown op before the device
             x4bench.main(["--port", self.dev.url, "weather", "refresh"], out=io.StringIO())
         self.assertEqual(self.dev.weather_ops, ["show", "fetch", "clear"])
+
+    def test_power_fake_absent_holds_and_real_resumes(self):
+        self.ser.close()
+        code, _ = self.cli("power", "fake", "absent")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # only on the live screen
+        code, out = self.cli("power")
+        self.assertEqual((code, out), (x4bench.EXIT_OK,
+                                       "fake=real power=1 stat=1 host=1 soc=100 holdable=1 hold=0\n"))
+        self.cli("sleep")
+        code, out = self.cli("power", "fake", "absent")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("fake=absent power=0", out)
+        code, out = self.cli("state")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("hold=1 holdsoc=100", out)
+        self.assertIn("wifi=off", out)
+        self.assertIn("fakepower=1", out)
+        code, out = self.cli("power", "FAKE", "Real")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertIn("fake=real power=1", out)
+        code, out = self.cli("state")
+        self.assertIn("hold=0 holdsoc=0", out)
+        self.assertIn("wifi=up", out)
+        code, _ = self.cli("power", "real")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        # A bad form never reaches the reader.
+        code, _ = self.cli("power", "absent")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, _ = self.cli("power", "fake", "absent", "now")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.assertEqual(self.dev.power_ops, ["show", "fake absent", "fake real", "real"])
 
     def test_wifilast_sets_the_last_network(self):
         self.ser.close()

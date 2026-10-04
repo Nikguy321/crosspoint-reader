@@ -850,6 +850,31 @@ TEST(BenchWeather, ShowFetchOrClear) {
   EXPECT_FALSE(parseWeatherArgs("fetc", op));
 }
 
+TEST(BenchPower, ShowFakeAbsentOrReal) {
+  PowerOp op = PowerOp::FakeAbsent;
+  EXPECT_TRUE(parsePowerArgs("", op));
+  EXPECT_EQ(op, PowerOp::Show);
+  EXPECT_TRUE(parsePowerArgs(nullptr, op));
+  EXPECT_EQ(op, PowerOp::Show);
+  EXPECT_TRUE(parsePowerArgs("fake absent", op));
+  EXPECT_EQ(op, PowerOp::FakeAbsent);
+  EXPECT_TRUE(parsePowerArgs("  FAKE   Absent ", op));
+  EXPECT_EQ(op, PowerOp::FakeAbsent);
+  EXPECT_TRUE(parsePowerArgs("fake real", op));
+  EXPECT_EQ(op, PowerOp::Real);
+  op = PowerOp::FakeAbsent;
+  EXPECT_TRUE(parsePowerArgs("real", op));
+  EXPECT_EQ(op, PowerOp::Real);
+  EXPECT_FALSE(parsePowerArgs("absent", op));  // only ever faked: "fake absent"
+  EXPECT_FALSE(parsePowerArgs("fake", op));
+  EXPECT_FALSE(parsePowerArgs("fake present", op));
+  EXPECT_FALSE(parsePowerArgs("fake absent now", op));
+  EXPECT_FALSE(parsePowerArgs("real fake", op));
+  EXPECT_FALSE(parsePowerArgs("fakefake absent", op));
+  EXPECT_FALSE(parsePowerArgs("fake absentabsent", op));
+  EXPECT_FALSE(parsePowerArgs("on", op));
+}
+
 TEST(BenchApp, AppsOrWordSearch) {
   AppTarget target = AppTarget::Apps;
   EXPECT_TRUE(parseAppArgs("wordsearch", target));

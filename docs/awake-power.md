@@ -98,7 +98,14 @@ Its `network/StationKeeper` starts the radio only through RadioPower (with a sca
 BSSID, `RadioPower::begin()`), never uses `RadioPower::stop()`, and holds the lock for as long as
 the screen is live: full clock and no naps on the charger, where the charger line blocks naps
 anyway. A key turns the radio off and restarts the reader; an unplug ends in deep sleep, whose
-path turns it off first. Nothing starts a radio at boot, except that a timer wake on the charger
+path turns it off first. The full-charge hold (the charger idle at full on a wall charger, which
+the board cannot tell from an unplug) turns the radio off with `RadioPower::off()` and releases
+the lock, so the hold's idle passes light-sleep as on battery between redraws at most every
+15 min: its cost should be close to the battery nap-idle draw plus those redraws rather than the
+live screen's Wi-Fi, but it is UNMEASURED; the nearest figure is the 2026-10-02 nap-idle pwr lines
+(Wi-Fi off, `ls` ~930, the light partly on), which lost roughly 1-2 % an hour. The overnight
+run's `hold=1` windows give the hold's own number. Power back starts the keeper again (a fresh driver, as at live entry); a
+3 % drop, or 24 h, ends it in deep sleep. Nothing starts a radio at boot, except that a timer wake on the charger
 boots into the live screen, whose keeper then joins.
 
 `scripts/check_radio_power.py` is also the ctest `check_radio_power`. It fails in any of these
@@ -123,7 +130,9 @@ unchanged. The wait keeps full clock while a radio is up.
 as dark or unplugged only if it was dark or unplugged all the way through. `mhz` is a snapshot taken
 when the line is written. `live=1` marks a window in which the live sleep screen was up (on the
 charger), and `heap` / `blk` are the free internal heap and its largest block when the line was
-written, to watch fragmentation over a long live session with Wi-Fi up. STATE reports `ls lsn lsw lsms lsblk mhz radio fls xtal flrun`:
+written, to watch fragmentation over a long live session with Wi-Fi up. `hold=1` (the last field)
+marks a window in which the live screen was in its full-charge hold: Wi-Fi off and naps allowed,
+so `ls`/`lsn` there are the hold's own (a computer on the cable still blocks them). STATE reports `ls lsn lsw lsms lsblk mhz radio fls xtal flrun`:
 
 - `fls=1`: a lit light keeps napping (`lsblk=light` only when it does not);
 - `xtal`: the IDF's live light-sleep crystal request count, 1 while lit at a nonzero duty, else 0;

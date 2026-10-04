@@ -14,13 +14,21 @@
 //   event  boot     x: bit 1 = the previous sleep entry aborted (never slept),
 //                      bit 2 = the SoC survived a rail cut (USB power kept it up)
 //          sleep    x: 1 = inactivity timeout, 0 = button / click; a live sleep
-//                      screen ending: 2 = unplugged, 3 = the bench's SLEEP deep
+//                      screen ending: 2 = unplugged, 3 = the bench's SLEEP deep,
+//                      4 = the full-charge hold saw the battery drop (unplugged),
+//                      5 = the hold's 24 h cap
 //          resleep  x: 1 = unverified (ghost) button wake, slept again
 //          cut      the auto power-off timer fired and the rail was dropped
 //          live     the live sleep screen on external power instead of deep sleep
 //                   (util/LiveSleepPolicy.h); x: 0 button, 1 timeout, 2 an auto
 //                   power-off timer wake on the charger (booted straight into it)
 //          livewake a key woke the live sleep screen (a restart follows)
+//          hold     the live screen's full-charge hold began (the charger went idle
+//                   at full: Wi-Fi off, quiet redraws); x = the SOC when power vanished
+//          holdend  the hold ended; x: 0 = power back (fully live again), 4 = the
+//                   battery dropped 3 % (a "sleep" x=4 follows), 5 = the 24 h cap
+//                   (a "sleep" x=5 follows); a key (livewake) or the bench's SLEEP
+//                   deep (sleep x=3) also ends a hold, with no holdend line
 //   rst    5 = deep-sleep wake, 1 = power-on (cold boot);  wake 7 = EXT1 button,
 //          4 = timer, 0 = none.  unix is 0 while the RTC is unset.
 //   sleep -> cut gap = the auto power-off timer;  cut -> boot with rst=1 = a real
@@ -41,7 +49,7 @@ constexpr bool shouldRotate(const size_t fileBytes) { return fileBytes > ROTATE_
 
 struct Entry {
   uint32_t unixTime = 0;    // 0 when the RTC is absent
-  const char* event = "";   // boot | sleep | resleep | cut | live | livewake
+  const char* event = "";   // boot | sleep | resleep | cut | live | livewake | hold | holdend
   uint32_t uptimeS = 0;     // seconds since this boot
   int resetReason = 0;      // esp_reset_reason(); 5 = deep-sleep wake
   int wakeCause = 0;        // the boot's wake cause; 3 = EXT1 button, 4 = timer, 0 = none

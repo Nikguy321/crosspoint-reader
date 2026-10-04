@@ -175,3 +175,78 @@ TEST(LiveSleep, WakeWaitsForTheKeysButNotForever) {
   EXPECT_TRUE(wakeNow(true, WAKE_RELEASE_WAIT_MS));  // held too long (a case, a bag): wake anyway
   EXPECT_LE(WAKE_RELEASE_WAIT_MS, 2000u);
 }
+
+// ---- the full-charge hold ----
+
+TEST(LiveSleep, DebounceSaysWhenPowerFirstWentAway) {
+  UnplugDebounce d;
+  d.start(0);
+  EXPECT_FALSE(d.absent());
+  d.note(true, 100);
+  EXPECT_FALSE(d.absent());
+  d.note(false, 200);  // the moment to read the gauge
+  EXPECT_TRUE(d.absent());
+  d.note(false, 30000);
+  EXPECT_TRUE(d.absent());
+  d.note(true, 30050);
+  EXPECT_FALSE(d.absent());
+}
+
+TEST(LiveSleep, HoldNeedsAFullBatteryWhenPowerVanished) {
+  EXPECT_EQ(HOLD_MIN_SOC, 97u);
+  EXPECT_TRUE(holdEligible(97));
+  EXPECT_TRUE(holdEligible(99));
+  EXPECT_TRUE(holdEligible(100));
+  EXPECT_FALSE(holdEligible(96));  // a real unplug part-charged: today's deep sleep
+  EXPECT_FALSE(holdEligible(50));
+  EXPECT_FALSE(holdEligible(0));  // a gauge that failed its first read
+}
+
+TEST(LiveSleep, PowerBackEndsTheHoldWhateverElse) {
+  EXPECT_EQ(holdExit(true, 100, 100, 0), HoldExit::PowerBack);
+  // The charger restarting below its recharge threshold: back to live, not to sleep.
+  EXPECT_EQ(holdExit(true, 90, 100, 0), HoldExit::PowerBack);
+  EXPECT_EQ(holdExit(true, 100, 100, HOLD_MAX_MS), HoldExit::PowerBack);
+  EXPECT_EQ(holdEndReason(HoldExit::PowerBack), 0);
+}
+
+TEST(LiveSleep, AThreePercentDropMeansItWasUnplugged) {
+  EXPECT_EQ(HOLD_DROP_PCT, 3u);
+  EXPECT_EQ(holdExit(false, 100, 100, 1000), HoldExit::Stay);
+  EXPECT_EQ(holdExit(false, 98, 100, 1000), HoldExit::Stay);
+  EXPECT_EQ(holdExit(false, 97, 100, 1000), HoldExit::Drop);
+  EXPECT_EQ(holdExit(false, 95, 97, 1000), HoldExit::Stay);
+  EXPECT_EQ(holdExit(false, 94, 97, 1000), HoldExit::Drop);
+  EXPECT_EQ(holdExit(false, 0, 99, 1000), HoldExit::Drop);  // a failed read: sleep, the safe side
+  // A gauge that ticks up (it settles after charging): still holding.
+  EXPECT_EQ(holdExit(false, 100, 98, 1000), HoldExit::Stay);
+  EXPECT_EQ(holdEndReason(HoldExit::Drop), 4);
+}
+
+TEST(LiveSleep, TheHoldEndsAfterADayWhateverTheGaugeSays) {
+  EXPECT_EQ(HOLD_MAX_MS, 24u * 60u * 60u * 1000u);
+  EXPECT_EQ(holdExit(false, 100, 100, HOLD_MAX_MS - 1), HoldExit::Stay);
+  EXPECT_EQ(holdExit(false, 100, 100, HOLD_MAX_MS), HoldExit::Cap);
+  // The drop is the more telling reason when both apply.
+  EXPECT_EQ(holdExit(false, 90, 100, HOLD_MAX_MS), HoldExit::Drop);
+  EXPECT_EQ(holdEndReason(HoldExit::Cap), 5);
+  EXPECT_EQ(holdEndReason(HoldExit::Stay), -1);
+}
+
+TEST(LiveSleep, HoldRedrawsEveryQuarterHourAtMost) {
+  EXPECT_EQ(HOLD_REDRAW_MIN_MINUTES, 15);
+  for (uint8_t i = 0; i < INTERVAL_COUNT; i++) EXPECT_EQ(holdRedrawMinutes(INTERVAL_MINUTES[i]), 15) << int(i);
+  EXPECT_EQ(holdRedrawMinutes(30), 30);  // a longer interval is kept
+  EXPECT_EQ(holdRedrawMinutes(0), 15);
+  const auto at = [](int h, int m, int s) { return static_cast<uint32_t>(h * 3600 + m * 60 + s); };
+  // On the quarter hours, 2 s past, whatever Charging Updates says.
+  EXPECT_EQ(holdRedrawDelayMs(true, at(9, 7, 0), 2), (8 * 60 + 2) * 1000u);
+  EXPECT_EQ(holdRedrawDelayMs(true, at(9, 15, 2), 1), 15 * 60 * 1000u);
+  EXPECT_EQ(holdRedrawDelayMs(true, at(23, 50, 0), 15), (10 * 60 + 2) * 1000u);  // past midnight
+  EXPECT_EQ(holdRedrawDelayMs(false, 0, 2), 15 * 60 * 1000u);                    // no clock: a plain interval
+  for (uint32_t t = 0; t < 86400; t += 11) {
+    const uint32_t ms = holdRedrawDelayMs(true, t, 2);
+    ASSERT_GT(ms, 0u) << t;
+    ASSERT_LE(ms, 15u * 60000u) << t;
+  }
+}
