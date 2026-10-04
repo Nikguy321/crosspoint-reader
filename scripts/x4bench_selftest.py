@@ -57,6 +57,7 @@ class FakeDevice(threading.Thread):
         self.redraw_lands = True  # False: REDRAW is accepted but the draw never comes
         self.sleeps = []
         self.wifi_last = None
+        self.weather_ops = []
         self.act = "Home"
         self.ws_new = []
         self.pins_runs = []
@@ -200,7 +201,7 @@ class FakeDevice(threading.Thread):
             self.emit("OK SHOT")
         elif verb == "CARD":
             if rest not in ("now_reading", "day", "calendar", "quote", "owner", "sky", "pictures", "shuffle",
-                            "default"):
+                            "weather", "default"):
                 self.emit("ERR CARD unknown")
                 return
             self.cards.append(rest)
@@ -273,6 +274,21 @@ class FakeDevice(threading.Thread):
             self.emit("STATE act=Home depth=0 stack=-")  # another command's line is ignored
             self.emit("PINS 1020 count pin 21 0")
             self.emit("PINS 1020 done")
+        elif verb == "WEATHER":
+            op = (rest or "show").lower()
+            if op not in ("show", "fetch", "clear"):
+                self.emit("ERR WEATHER usage")
+                return
+            self.weather_ops.append(op)
+            if op == "show":
+                self.emit("WEATHER on=1 units=us shuffle=1 sleep_mode_weather=0 clock=1 located=1", noise=True)
+                self.emit("WEATHER cache=1 fetched_utc=1793678700 age_s=2100 trusted=1 place=wifi-auto")
+                self.emit("WEATHER alerts=none asof_utc=1793678700 total=0 kept=0 recheck_failed=0")
+                self.emit("OK WEATHER show")
+            elif op == "fetch":
+                self.emit("OK WEATHER fetch ok 200/200 1.2 s changed=1", noise=True)
+            else:
+                self.emit("OK WEATHER clear")
         elif verb == "WIFILAST":
             if not rest or len(rest.encode()) > 32:
                 self.emit("ERR WIFILAST usage")
@@ -506,6 +522,23 @@ class BenchSelfTest(unittest.TestCase):
         self.assertIn("port dropped", out)
         self.assertIn("/pins.log", out)
         self.assertEqual(self.dev.pins_runs, [60])
+
+    def test_weather_show_fetch_clear(self):
+        self.ser.close()
+        code, out = self.cli("weather")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "on=1 units=us shuffle=1 sleep_mode_weather=0 clock=1 located=1")
+        self.assertIn("cache=1 fetched_utc=1793678700", out)
+        self.assertEqual(lines[-1], "show")
+        code, out = self.cli("weather", "fetch")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "fetch ok 200/200 1.2 s changed=1\n"))
+        code, out = self.cli("weather", "clear")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "clear\n"))
+        self.assertEqual(self.dev.weather_ops, ["show", "fetch", "clear"])
+        with self.assertRaises(SystemExit):  # argparse refuses an unknown op before the device
+            x4bench.main(["--port", self.dev.url, "weather", "refresh"], out=io.StringIO())
+        self.assertEqual(self.dev.weather_ops, ["show", "fetch", "clear"])
 
     def test_wifilast_sets_the_last_network(self):
         self.ser.close()

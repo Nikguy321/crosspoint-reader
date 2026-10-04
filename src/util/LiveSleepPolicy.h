@@ -13,10 +13,10 @@ namespace live_sleep {
 // termination with the cable still in) or a computer's USB SOF frames (a host proves VBUS).
 constexpr bool externalPower(const bool stat, const bool usbHost) { return stat || usbHost; }
 
-// CrossPointSettings::SLEEP_SCREEN_MODE values of the cards, NOW_READING .. SHUFFLE
+// CrossPointSettings::SLEEP_SCREEN_MODE values of the cards, NOW_READING .. WEATHER
 // (static_assert'ed against the enum in main.cpp; this header stays free of the settings store).
 constexpr uint8_t FIRST_CARD_MODE = 8;
-constexpr uint8_t LAST_CARD_MODE = 14;
+constexpr uint8_t LAST_CARD_MODE = 15;
 constexpr bool isCardMode(const uint8_t sleepMode) {
   return sleepMode >= FIRST_CARD_MODE && sleepMode <= LAST_CARD_MODE;
 }

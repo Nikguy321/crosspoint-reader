@@ -16,6 +16,7 @@
 #include "fontIds.h"
 #include "network/AutoLocate.h"
 #include "network/RadioPower.h"
+#include "network/WeatherFetch.h"
 
 void ClockSyncActivity::onEnter() {
   Activity::onEnter();
@@ -97,6 +98,12 @@ void ClockSyncActivity::loop() {
     if (state == SUCCESS && AutoLocate::due(true)) {
       requestUpdateAndWait();
       AutoLocate::run();
+    }
+    // Then the Weather card's forecast (its own opt-in; a cache over an hour old), for the
+    // location just refreshed.
+    if (state == SUCCESS && WeatherFetch::due(true)) {
+      requestUpdateAndWait();
+      WeatherFetch::run();
     }
     // The result screen needs no radio; a session this activity started ends here.
     if (shouldTearDownWifiOnExit) RadioPower::stop();

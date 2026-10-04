@@ -21,6 +21,7 @@
 #include "src/sleepcards/BrandScreen.h"
 #include "src/sleepcards/CardDraw.h"
 #include "src/sleepcards/CoverDraw.h"
+#include "src/sleepcards/WeatherCache.h"
 
 #ifndef CARD_PREVIEW_REPO_ROOT
 #error "CARD_PREVIEW_REPO_ROOT must point at the repository"
@@ -173,16 +174,27 @@ bool writePng(const std::string& path, const int w, const int h, const std::vect
 
 // ---- the fake SD card ------------------------------------------------------------------------------
 
+namespace {
+// The SD path to read: the Weather cache is whichever fixture the test picked.
+std::string mapped(const HostCardIo& io, const char* path) {
+  if (std::strcmp(path, weather::CACHE_PATH) == 0) {
+    if (io.weatherFixture.empty()) return fixturePath("/.crosspoint/sleepcards/none.dat");
+    return fixturePath(("/.crosspoint/sleepcards/" + io.weatherFixture).c_str());
+  }
+  return fixturePath(path);
+}
+}  // namespace
+
 int32_t HostCardIo::fileSize(const char* path) const {
   if (!path) return -1;
   std::error_code ec;
-  const auto size = std::filesystem::file_size(fixturePath(path), ec);
+  const auto size = std::filesystem::file_size(mapped(*this, path), ec);
   return ec ? -1 : static_cast<int32_t>(size);
 }
 
 int32_t HostCardIo::readFileAt(const char* path, const uint32_t offset, char* buf, const size_t cap) const {
   if (!path || !buf) return -1;
-  std::FILE* f = std::fopen(fixturePath(path).c_str(), "rb");
+  std::FILE* f = std::fopen(mapped(*this, path).c_str(), "rb");
   if (!f) return -1;
   int32_t got = -1;
   if (std::fseek(f, static_cast<long>(offset), SEEK_SET) == 0) got = static_cast<int32_t>(std::fread(buf, 1, cap, f));
@@ -278,6 +290,7 @@ CardContext sampleContext() {
   formatLocation(47.61, -122.33, ctx.settings.location, sizeof(ctx.settings.location));
   ctx.location.valid = parseLocation(ctx.settings.location, ctx.location.lat, ctx.location.lon);
   ctx.settings.shuffleMask = defaultShuffleMask();
+  ctx.settings.weatherOn = true;
   ctx.bookPath = "/Books/Moby-Dick.epub";
   ctx.fromReader = true;
   ctx.seed = 0x5EED1234u;

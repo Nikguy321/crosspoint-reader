@@ -202,8 +202,9 @@ TEST(SleepCardShuffle, StateRoundTrips) {
 }
 
 TEST(SleepCardShuffle, StateRejectsGarbage) {
-  const char* bad[] = {"",          "S2 1 0002",   "S1",      "S1 x 0",     "S1 8 0000", "S1 9 0000",  "S1 1 0200",
-                       "S1 1 0001", "S1 1 0002 x", "S1 -1 0", "S1 1 10000", "garbage\n", "S1 256 0002"};
+  // Ids past the last card (Weather = 9) and Shuffle itself (8) are never dealt.
+  const char* bad[] = {"",          "S2 1 0002", "S1",          "S1 x 0",  "S1 8 0000",  "S1 10 0000", "S1 1 0400",
+                       "S1 1 0100", "S1 1 0001", "S1 1 0002 x", "S1 -1 0", "S1 1 10000", "garbage\n",  "S1 256 0002"};
   for (const char* text : bad) {
     ShuffleState st{CardId::Day, 4};
     EXPECT_FALSE(parseState(text, std::strlen(text), st)) << text;

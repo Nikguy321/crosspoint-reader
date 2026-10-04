@@ -226,6 +226,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     sleepScreenValues[CrossPointSettings::OWNER] = StrId::STR_SLEEP_OWNER;
     sleepScreenValues[CrossPointSettings::SKY] = StrId::STR_SLEEP_SKY;
     sleepScreenValues[CrossPointSettings::SHUFFLE] = StrId::STR_SLEEP_SHUFFLE;
+    sleepScreenValues[CrossPointSettings::WEATHER] = StrId::STR_SLEEP_WEATHER;
     // The sleep-screen cards are X4 Pro only; elsewhere a stored card mode is out of range and
     // loads as the default.
     if (!BoardConfig::isX4Pro()) sleepScreenValues.resize(CrossPointSettings::CLASSIC_SLEEP_SCREEN_MODE_COUNT);
@@ -468,6 +469,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             .withNormalizer(&sleepcards::normalizeLocation),
         SettingInfo::Toggle(StrId::STR_AUTO_LOCATE, &CrossPointSettings::autoLocateOnSync, "autoLocateOnSync",
                             StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_WEATHER, &CrossPointSettings::weatherEnabled, "weatherEnabled",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Enum(StrId::STR_WEATHER_UNITS, &CrossPointSettings::weatherUnits,
+                          {StrId::STR_WEATHER_UNITS_METRIC, StrId::STR_WEATHER_UNITS_US}, "weatherUnits",
+                          StrId::STR_SLEEP_CARDS),
         SettingInfo::Enum(StrId::STR_HUNTING_SEASON, &CrossPointSettings::huntingSeason,
                           {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES}, "huntingSeason",
                           StrId::STR_SLEEP_CARDS),
@@ -506,6 +512,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Toggle(StrId::STR_SHUFFLE_OWNER, &CrossPointSettings::shuffleOwner, "shuffleOwner",
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_SKY, &CrossPointSettings::shuffleSky, "shuffleSky",
+                            StrId::STR_SLEEP_CARDS),
+        SettingInfo::Toggle(StrId::STR_SHUFFLE_WEATHER, &CrossPointSettings::shuffleWeather, "shuffleWeather",
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_SHUFFLE_PICTURES, &CrossPointSettings::shufflePictures, "shufflePictures",
                             StrId::STR_SLEEP_CARDS),

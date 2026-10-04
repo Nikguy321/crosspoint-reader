@@ -10,8 +10,6 @@
 #include <Memory.h>
 #include <WiFi.h>
 #include <esp_attr.h>
-#include <lwip/dns.h>
-#include <lwip/tcpip.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -56,31 +54,6 @@ policy::Situation now;  // what due() saw, for run() (points at the settings' ow
 void skipped(const char* why) { LOG_INF("GEO", "autolocate: skipped %s", why); }
 void failed(const char* why) { LOG_INF("GEO", "autolocate: failed %s", why); }
 
-// A late answer (after the wait gave up) lands here, never on a returned stack frame.
-volatile bool dnsDone = false;
-volatile bool dnsFound = false;
-void onDnsAnswer(const char*, const ip_addr_t* address, void*) {
-  dnsFound = address != nullptr;
-  dnsDone = true;
-}
-
-// The host's address into lwIP's cache within timeoutMs, so the request's own lookup finds it
-// there: the one lookup that is not otherwise bounded (the resolver retries for many seconds on
-// a network that does not reach the internet). False when it is not known in time.
-bool resolveWithin(const char* host, const uint32_t timeoutMs) {
-  dnsDone = false;
-  dnsFound = false;
-  ip_addr_t address;
-  LOCK_TCPIP_CORE();
-  const err_t err = dns_gethostbyname(host, &address, onDnsAnswer, nullptr);
-  UNLOCK_TCPIP_CORE();
-  if (err == ERR_OK) return true;  // cached already
-  if (err != ERR_INPROGRESS) return false;
-  const unsigned long started = millis();
-  while (!dnsDone && millis() - started < timeoutMs) delay(20);
-  return dnsDone && dnsFound;
-}
-
 // The lookup itself; returns the log word of a failure, nullptr when saved.
 const char* lookUpAndSave(const unsigned long started, bool& tooFew) {
   tooFew = false;
@@ -110,7 +83,7 @@ const char* lookUpAndSave(const unsigned long started, bool& tooFew) {
   unsigned long elapsed = millis() - started;
   if (elapsed + MIN_REQUEST_MS > BUDGET_MS) return "timeout";
   const uint32_t dnsMs = std::min<uint32_t>(DNS_MS, BUDGET_MS - MIN_REQUEST_MS - elapsed);
-  if (!resolveWithin(BEACONDB_HOST, dnsMs)) return "dns";
+  if (!GeolocateClient::resolveWithin(BEACONDB_HOST, dnsMs)) return "dns";
   resetTaskWatchdogIfSubscribed();
   elapsed = millis() - started;
   if (elapsed + MIN_REQUEST_MS > BUDGET_MS) return "timeout";

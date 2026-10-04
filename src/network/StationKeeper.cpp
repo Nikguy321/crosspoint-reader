@@ -16,8 +16,10 @@
 #include "CrossPointSettings.h"
 #include "WifiCredentialStore.h"
 #include "activities/RenderLock.h"
+#include "activities/boot_sleep/SleepActivity.h"
 #include "network/AutoLocate.h"
 #include "network/RadioPower.h"
+#include "network/WeatherFetch.h"
 #include "network/WifiJoinOrder.h"
 
 namespace StationKeeper {
@@ -32,6 +34,11 @@ constexpr uint32_t LONG_WAIT_MS = 10UL * 60UL * 1000UL;
 constexpr uint8_t ROUNDS_BEFORE_LONG_WAIT = 3;
 constexpr uint32_t NTP_EVERY_MS = 6UL * 60UL * 60UL * 1000UL;
 constexpr uint32_t NTP_RETRY_MS = 10UL * 60UL * 1000UL;
+// The Weather card's forecast (network/WeatherFetch, its own setting and gates): looked at every
+// WEATHER_CHECK_MS (it refreshes a cache over ~3 h old), WEATHER_RETRY_MS after a failed fetch.
+constexpr uint32_t WEATHER_CHECK_MS = 10UL * 60UL * 1000UL;
+constexpr uint32_t WEATHER_EVERY_MS = 3UL * 60UL * 60UL * 1000UL;
+constexpr uint32_t WEATHER_RETRY_MS = 30UL * 60UL * 1000UL;
 // Saved-network sightings kept from one scan (several access points of one network each count).
 constexpr size_t MAX_SIGHTINGS = 16;
 
@@ -61,6 +68,9 @@ bool ntpEver = false;
 uint32_t nextNtpAt = 0;
 bool ntpDue = false;
 bool locateDue = false;
+uint32_t nextWeatherAt = 0;
+bool weatherDue = false;
+bool weatherRedrawPending = false;  // a step changed the cache; the redraw waits for the last one
 char joining[33] = "";
 
 void enter(const State next) {
@@ -218,6 +228,43 @@ void syncClock() {
   // once-a-day rule decide).
   AutoLocate::rearm();
   locateDue = true;
+  // Then the weather, with the clock just set and the newest location.
+  weatherDue = true;
+}
+
+// One weather request (WeatherFetch::keeperStep). A fetch that changed the cache redraws a Weather
+// card on screen - or the logo a Weather card fell back to - with one clean HALF refresh once its
+// last request is done (the forecast and then the alerts: one flash, not two). Not while the cycle
+// deals on the charger: a redraw there deals the next card, and the next deal reads the new cache.
+void weatherStep() {
+  bool changed = false;
+  const WeatherFetch::KeeperStep step = WeatherFetch::keeperStep(changed);
+  weatherRedrawPending = weatherRedrawPending || changed;
+  const uint32_t now = millis();
+  switch (step) {
+    case WeatherFetch::KeeperStep::More:
+      weatherDue = true;  // the alerts, next tick
+      break;
+    case WeatherFetch::KeeperStep::Done:
+      weatherDue = false;
+      nextWeatherAt = now + WEATHER_EVERY_MS;
+      break;
+    case WeatherFetch::KeeperStep::Failed:
+      weatherDue = false;
+      nextWeatherAt = now + WEATHER_RETRY_MS;
+      break;
+    case WeatherFetch::KeeperStep::Nothing:
+      weatherDue = false;
+      nextWeatherAt = now + WEATHER_CHECK_MS;
+      break;
+  }
+  if (step == WeatherFetch::KeeperStep::More || !weatherRedrawPending) return;
+  weatherRedrawPending = false;
+  if (SETTINGS.cardCycleWhenCharging != 0) return;
+  const SleepActivity::LiveStatus live = SleepActivity::liveStatus();
+  if (std::strcmp(live.card, "weather") == 0 || std::strcmp(live.screen, "logo") == 0) {
+    SleepActivity::requestLiveRedraw(/*halfRefresh=*/true);
+  }
 }
 
 void watchLink() {
@@ -242,7 +289,15 @@ void watchLink() {
     if (AutoLocate::due(true)) AutoLocate::run();
     return;
   }
-  if (static_cast<int32_t>(now - nextNtpAt) >= 0) ntpDue = true;
+  if (weatherDue) {
+    weatherStep();
+    return;
+  }
+  if (static_cast<int32_t>(now - nextNtpAt) >= 0) {
+    ntpDue = true;
+  } else if (static_cast<int32_t>(now - nextWeatherAt) >= 0) {
+    weatherDue = true;
+  }
 }
 
 }  // namespace
@@ -255,6 +310,9 @@ void start() {
   failedRounds = 0;
   linkDown = false;
   locateDue = false;
+  weatherDue = false;
+  weatherRedrawPending = false;
+  nextWeatherAt = millis() + WEATHER_CHECK_MS;  // the first one rides the clock sync
   if (WIFI_STORE.getCredentialCount() == 0) {
     LOG_INF("KEEP", "no saved Wi-Fi network: the radio stays off");
     enter(State::NoNetworks);

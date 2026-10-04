@@ -9,7 +9,11 @@
 #include <esp_crt_bundle.h>
 #include <esp_heap_caps.h>
 #include <esp_http_client.h>
+#include <lwip/dns.h>
+#include <lwip/tcpip.h>
+#include <strings.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 
@@ -29,6 +33,34 @@ constexpr const char* USER_AGENT =
 int remainingMs(const unsigned long started, const uint32_t budgetMs) {
   const unsigned long elapsed = millis() - started;
   return elapsed >= budgetMs ? 0 : static_cast<int>(budgetMs - elapsed);
+}
+
+// A late answer (after the wait gave up) lands here, never on a returned stack frame. Each lookup
+// carries its own number as the callback argument: a late answer to an earlier lookup (another
+// host: AutoLocate, then the forecast, then the alerts) must not complete the current wait.
+volatile bool dnsDone = false;
+volatile bool dnsFound = false;
+volatile uint32_t dnsLookup = 0;
+void onDnsAnswer(const char*, const ip_addr_t* address, void* arg) {
+  if (static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg)) != dnsLookup) return;
+  dnsFound = address != nullptr;
+  dnsDone = true;
+}
+
+// Copies the Date response header for Options::dateOut (only that header is looked at).
+struct DateSink {
+  char* out;
+  size_t cap;
+};
+
+esp_err_t onHttpEvent(esp_http_client_event_t* event) {
+  if (event->event_id != HTTP_EVENT_ON_HEADER || event->user_data == nullptr || event->header_key == nullptr ||
+      event->header_value == nullptr || strcasecmp(event->header_key, "Date") != 0) {
+    return ESP_OK;
+  }
+  const auto* sink = static_cast<const DateSink*>(event->user_data);
+  std::snprintf(sink->out, sink->cap, "%s", event->header_value);
+  return ESP_OK;
 }
 
 struct ClientGuard {
@@ -53,6 +85,23 @@ size_t scanAccessPoints(geolocate::AccessPoint* out, const size_t cap, int16_t& 
   }
   WiFi.scanDelete();
   return count;
+}
+
+bool resolveWithin(const char* host, const uint32_t timeoutMs) {
+  ip_addr_t address;
+  LOCK_TCPIP_CORE();  // the answer callback runs on the TCP/IP task
+  const uint32_t lookup = dnsLookup + 1;
+  dnsLookup = lookup;
+  dnsDone = false;
+  dnsFound = false;
+  const err_t err =
+      dns_gethostbyname(host, &address, onDnsAnswer, reinterpret_cast<void*>(static_cast<uintptr_t>(lookup)));
+  UNLOCK_TCPIP_CORE();
+  if (err == ERR_OK) return true;  // cached already
+  if (err != ERR_INPROGRESS) return false;
+  const unsigned long started = millis();
+  while (!dnsDone && millis() - started < timeoutMs) delay(20);
+  return dnsDone && dnsFound;
 }
 
 bool enoughHeap() {
@@ -88,6 +137,12 @@ Result request(const char* url, const char* jsonBody, char* out, const size_t ca
   config.keep_alive_enable = false;
   config.buffer_size = 1024;  // response headers
   config.buffer_size_tx = 1024;
+  DateSink dateSink{options.dateOut, options.dateCap};
+  if (options.dateOut != nullptr && options.dateCap > 0) {
+    options.dateOut[0] = '\0';
+    config.event_handler = onHttpEvent;
+    config.user_data = &dateSink;
+  }
 
   ClientGuard guard{esp_http_client_init(&config)};
   if (!guard.client) {
@@ -95,7 +150,7 @@ Result request(const char* url, const char* jsonBody, char* out, const size_t ca
     return Result::NoMemory;
   }
   esp_http_client_handle_t client = guard.client;
-  esp_http_client_set_header(client, "Accept", "application/json");
+  esp_http_client_set_header(client, "Accept", options.accept != nullptr ? options.accept : "application/json");
   const size_t bodyLength = jsonBody ? std::strlen(jsonBody) : 0;
   if (jsonBody) esp_http_client_set_header(client, "Content-Type", "application/json");
 
@@ -140,6 +195,7 @@ Result request(const char* url, const char* jsonBody, char* out, const size_t ca
   status = esp_http_client_get_status_code(client);
   if (contentLength > static_cast<int64_t>(cap - 1)) {
     if (loud) LOG_ERR("GEO", "Response too large: %lld bytes", static_cast<long long>(contentLength));
+    length = static_cast<size_t>(contentLength);
     return Result::TooLarge;
   }
 
@@ -187,6 +243,8 @@ size_t scanAccessPoints(geolocate::AccessPoint*, size_t, int16_t& found) {
 }
 
 bool enoughHeap() { return false; }
+
+bool resolveWithin(const char*, uint32_t) { return false; }
 
 Result request(const char*, const char*, char* out, const size_t cap, size_t& length, int& status, const Options&) {
   length = 0;

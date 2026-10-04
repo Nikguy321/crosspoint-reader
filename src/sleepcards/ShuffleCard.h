@@ -15,7 +15,8 @@
 //
 // "Usable right now" is a cheap check made before choosing (see shuffleUsableMask): Owner needs a
 // name or a contact line, Now Reading an open book that is still on the card, Day / Calendar / Sky
-// a set clock; Quote always (its built-in set is the fallback). Pictures is taken as usable when
+// a set clock, Weather a forecast cache for here that is recent and not over (its header line
+// only); Quote always (its built-in set is the fallback). Pictures is taken as usable when
 // ticked (SleepActivity's picture frame falls back to the logo screen by itself). A card that
 // still declines when drawn can be skipped with pickShuffleCardExcluding().
 //
@@ -32,11 +33,12 @@ struct ShuffleState {
   uint16_t dealt = 0;          // cardBit() of every card shown in the current round
 };
 
-// The cards Shuffle may ever pick: Now Reading .. Pictures (never None or Shuffle itself).
+// The cards Shuffle may ever pick: every card but None and Shuffle itself (Now Reading .. Pictures,
+// then Weather).
 constexpr uint16_t pickableMask() {
   uint16_t mask = 0;
-  for (uint8_t i = static_cast<uint8_t>(CardId::NowReading); i <= static_cast<uint8_t>(CardId::Pictures); i++) {
-    mask |= cardBit(static_cast<CardId>(i));
+  for (uint8_t i = static_cast<uint8_t>(CardId::NowReading); i < static_cast<uint8_t>(CardId::Count); i++) {
+    if (static_cast<CardId>(i) != CardId::Shuffle) mask |= cardBit(static_cast<CardId>(i));
   }
   return mask;
 }

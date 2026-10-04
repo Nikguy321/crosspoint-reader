@@ -7,7 +7,7 @@
 //
 //   renderer()           the one renderer, portrait, fonts installed
 //   sampleContext()      2026-11-02 20:40 America/Los_Angeles (PST), Seattle's public
-//                        coordinates (47.61, -122.33), battery 73 %, a sample book
+//                        coordinates (47.61, -122.33), battery 73 %, a sample book, Weather on
 //   writeFramePng(path)  the framebuffer as the reader would show it (480x800 PNG)
 //   renderCardPng(id, ctx, name)  renderCard(), else the logo fallback, into
 //                        <repo>/build/cards/<name>.png; returns the compute time
@@ -38,6 +38,9 @@ class HostCardIo final : public CardIo {
   int loadBookmarks(CardSnippet* out, int max) const override;
 
   bool hasBook = true;  // false: behave like a reader with no open book
+  // The Weather cache the card reads (/.crosspoint/sleepcards/weather.dat) is this fixture of
+  // fixtures/.crosspoint/sleepcards/ (make_weather_fixtures.py); "" = no cache on the card.
+  std::string weatherFixture = "weather.dat";
 };
 
 GfxRenderer& renderer();

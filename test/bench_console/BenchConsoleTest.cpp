@@ -832,6 +832,24 @@ TEST(BenchWifiLast, SsidIsTheRestOfTheLine) {
   EXPECT_FALSE(isValidSsid("del\x7f"));
 }
 
+TEST(BenchWeather, ShowFetchOrClear) {
+  WeatherOp op = WeatherOp::Fetch;
+  EXPECT_TRUE(parseWeatherArgs("", op));
+  EXPECT_EQ(op, WeatherOp::Show);
+  EXPECT_TRUE(parseWeatherArgs(nullptr, op));
+  EXPECT_EQ(op, WeatherOp::Show);
+  EXPECT_TRUE(parseWeatherArgs(" FETCH ", op));
+  EXPECT_EQ(op, WeatherOp::Fetch);
+  EXPECT_TRUE(parseWeatherArgs("clear", op));
+  EXPECT_EQ(op, WeatherOp::Clear);
+  EXPECT_TRUE(parseWeatherArgs("Show", op));
+  EXPECT_EQ(op, WeatherOp::Show);
+  EXPECT_FALSE(parseWeatherArgs("fetch now", op));
+  EXPECT_FALSE(parseWeatherArgs("refresh", op));
+  EXPECT_FALSE(parseWeatherArgs("fetchfetch", op));
+  EXPECT_FALSE(parseWeatherArgs("fetc", op));
+}
+
 TEST(BenchApp, AppsOrWordSearch) {
   AppTarget target = AppTarget::Apps;
   EXPECT_TRUE(parseAppArgs("wordsearch", target));

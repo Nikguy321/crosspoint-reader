@@ -88,7 +88,8 @@ class KOReaderSyncActivity final : public Activity, private UiAppHost {
   bool smartSyncEnabled() const;
   void markAutoReturn();
   void completeAlreadySynced();
-  // A due AutoLocate run with the current result on screen; true when it ran (and drew it).
+  // A due AutoLocate run, then a due weather fetch, with the current result on screen; true when
+  // either ran (and drew it). Loop task only, with no render lock held (never from onExit).
   bool refreshLocationWhileShowing();
   void ensureEpubLoaded();
   void saveProgressAndReturn(int spineIndex, int page);

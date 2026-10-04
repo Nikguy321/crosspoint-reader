@@ -512,6 +512,7 @@ void releaseSdFontCachesForDecode(const GfxRenderer& renderer) {
 // The live sleep screen up now (one at a time: the sleep screen is the only activity).
 SleepActivity* liveInstance = nullptr;
 bool liveRedrawRequested = false;
+bool liveHalfRequested = false;  // the requested redraw shows new data (a new forecast): a clean pass
 
 }  // namespace
 
@@ -755,7 +756,7 @@ void SleepActivity::drawLive(const bool entry, const bool final) {
   const bool changed = entry || screen != lastScreen || shown != lastShown;
   bool half = true;
   if (screen != LiveScreen::Picture) {
-    half = entry || live_sleep::halfRefresh(changed, afterPicture, fastSinceHalf, final);
+    half = entry || liveHalfRequested || live_sleep::halfRefresh(changed, afterPicture, fastSinceHalf, final);
     if (screen == LiveScreen::Card) {
       renderer.displayBuffer(half ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
     } else {
@@ -763,6 +764,7 @@ void SleepActivity::drawLive(const bool entry, const bool final) {
     }
   }
   fastSinceHalf = half ? 0 : static_cast<uint8_t>(fastSinceHalf + 1);
+  liveHalfRequested = false;
   lastScreen = screen;
   lastShown = screen == LiveScreen::Picture ? CardId::Pictures : shown;
   redraws++;
@@ -795,8 +797,10 @@ SleepActivity::LiveStatus SleepActivity::liveStatus() {
   return status;
 }
 
-void SleepActivity::requestLiveRedraw() {
-  if (liveInstance != nullptr) liveRedrawRequested = true;
+void SleepActivity::requestLiveRedraw(const bool halfRefresh) {
+  if (liveInstance == nullptr) return;
+  liveRedrawRequested = true;
+  if (halfRefresh) liveHalfRequested = true;
 }
 
 void SleepActivity::finalLiveRedraw() {

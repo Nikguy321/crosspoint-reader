@@ -35,6 +35,9 @@ uint8_t quoteCategories(QuoteSource source);
 // file -> My quotes only, bookmarks -> Bookmarks only, both (or anything else) -> All.
 uint8_t migrateQuoteSource(uint8_t legacy);
 
+// Weather Units (CrossPointSettings::weatherUnits), persisted by index: append only.
+enum class WeatherUnits : uint8_t { Metric = 0, Us = 1, Count };
+
 struct MonthDay {
   uint8_t month = 1;  // 1..12
   uint8_t day = 1;    // 1..31 (clamped to the month's length where used)
@@ -54,6 +57,8 @@ struct SleepCardSettings {
   char ownerContact2[OWNER_LINE_CAP] = "";
   QuoteSource quoteSource = QuoteSource::All;
   uint16_t shuffleMask = 0;  // cardBit() of every card Shuffle may pick
+  bool weatherOn = false;    // the Weather opt-in: the card has a forecast to show only with it on
+  WeatherUnits weatherUnits = WeatherUnits::Metric;
 };
 
 // Default Shuffle picks: Now reading, Day, Calendar, Quote and Sky; not the

@@ -25,6 +25,7 @@
 #include "fontIds.h"
 #include "network/AutoLocate.h"
 #include "network/RadioPower.h"
+#include "network/WeatherFetch.h"
 #include "util/BookSyncHooks.h"
 
 namespace fui = freeink::ui;
@@ -117,7 +118,14 @@ void KOReaderSyncActivity::saveProgressAndReturn(int spineIndex, int page) {
   returnToReader();
 }
 
-void KOReaderSyncActivity::returnToReader() { BookSyncHooks::leaveSync(trigger, epubPath); }
+void KOReaderSyncActivity::returnToReader() {
+  // Paths that kept the station up (the compare screen, no remote progress, a remote place
+  // applied): a due location refresh and weather fetch run here, from loop() or a result handler
+  // with no render lock held - never in onExit(), which ActivityManager calls holding the render
+  // lock that the weather cache file needs (a non-recursive mutex: it would block forever).
+  if (wifiActivated && WiFi.status() == WL_CONNECTED) refreshLocationWhileShowing();
+  BookSyncHooks::leaveSync(trigger, epubPath);
+}
 
 bool KOReaderSyncActivity::smartSyncEnabled() const {
   return KOREADER_STORE.getSyncBehavior() == KOReaderSyncBehavior::SMART;
@@ -135,11 +143,24 @@ void KOReaderSyncActivity::completeAlreadySynced() {
 }
 
 bool KOReaderSyncActivity::refreshLocationWhileShowing() {
-  if (!AutoLocate::due(reachedServer)) return false;
-  requestUpdateAndWait();  // the result is on screen while it runs
-  epub.reset();            // not needed past the result; its heap is the TLS session's
-  AutoLocate::run();
-  return true;
+  // The location first, then the Weather card's forecast, judged against the location just saved
+  // (each with its own setting and gates; each answers once per boot).
+  bool shown = false;
+  const auto showResult = [&] {
+    if (shown) return;
+    shown = true;
+    requestUpdateAndWait();  // the result is on screen while they run
+    epub.reset();            // not needed past the result; its heap is the TLS session's
+  };
+  if (AutoLocate::due(reachedServer)) {
+    showResult();
+    AutoLocate::run();
+  }
+  if (WeatherFetch::due(reachedServer)) {
+    showResult();
+    WeatherFetch::run();
+  }
+  return shown;
 }
 
 void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
@@ -480,9 +501,10 @@ void KOReaderSyncActivity::onExit() {
   Activity::onExit();
 
   if (wifiActivated) {
-    // Paths that kept the station up (the compare screen, no remote progress, a remote place
-    // applied): a due location refresh on the way out, once the sync reached its server. The Epub
-    // is not needed any more and its heap is the TLS session's.
+    // An exit that skipped returnToReader() with the station up: a due location refresh on the way
+    // out, once the sync reached its server (AutoLocate takes no render lock, which is held here;
+    // the weather fetch does, so it never runs from onExit). The Epub is not needed any more and
+    // its heap is the TLS session's.
     if (WiFi.status() == WL_CONNECTED && AutoLocate::due(reachedServer)) {
       epub.reset();
       AutoLocate::run();

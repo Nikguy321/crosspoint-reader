@@ -153,6 +153,7 @@ constexpr uint8_t SLEEP_MODE_QUOTE = 11;
 constexpr uint8_t SLEEP_MODE_OWNER = 12;
 constexpr uint8_t SLEEP_MODE_SKY = 13;
 constexpr uint8_t SLEEP_MODE_SHUFFLE = 14;
+constexpr uint8_t SLEEP_MODE_WEATHER = 15;
 
 // The registry. cardForSleepMode maps a CrossPointSettings::SLEEP_SCREEN_MODE value to its
 // card (None for the classic modes); cardByName accepts the names above.
@@ -184,5 +185,6 @@ bool renderCalendarCard(const CardContext& ctx, GfxRenderer& renderer);
 bool renderQuoteCard(const CardContext& ctx, GfxRenderer& renderer);
 bool renderOwnerCard(const CardContext& ctx, GfxRenderer& renderer);
 bool renderSkyCard(const CardContext& ctx, GfxRenderer& renderer);
+bool renderWeatherCard(const CardContext& ctx, GfxRenderer& renderer);
 
 }  // namespace sleepcards

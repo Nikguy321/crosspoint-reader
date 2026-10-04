@@ -20,6 +20,7 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py sleep                # on this cable: the live sleep screen (charging)
   scripts/x4bench.py redraw               # the live sleep screen redraws now
   scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
+  scripts/x4bench.py weather              # the Weather card's cache (or: weather fetch|clear)
   scripts/x4bench.py app wordsearch       # open Word Search (or: app apps)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
@@ -97,7 +98,7 @@ Verbs
   CARD <name|default>      a sleep-screen card drawn exactly as the sleep screen
                            would draw it, shown WITHOUT sleeping: now_reading,
                            day, calendar, quote, owner, sky, pictures, shuffle,
-                           or default (the logo screen). OK CARD <name>
+                           weather, or default (the logo screen). OK CARD <name>
                            shown=<card> outcome=drawn|pictures|declined|logo
                            ms=<compute + draw> once it is on the panel; the
                            next key or tap returns to the screen below.
@@ -152,6 +153,27 @@ Verbs
                            next-best saved network can be tested where the
                            last one is out of range. OK WIFILAST saved=0|1
                            networks=<n>. Never shows a password.
+  WEATHER [show|fetch|clear]
+                           dev only: the Weather card's cache. show (the
+                           default): WEATHER on= units= shuffle=
+                           sleep_mode_weather= clock= located=, WEATHER last=
+                           <the last fetch's log line> attempt_age_s=, then
+                           WEATHER cache=0, or cache=1 fetched_utc= age_s=
+                           trusted= place= fixdate= dist_km= offset_s=,
+                           WEATHER current= temp_c10= code= hours= days=
+                           first_hour_utc= last_day_utc=, WEATHER alerts=
+                           asof_utc= total= kept= recheck_failed=, one
+                           WEATHER alert severity= ends_utc= event= per alert
+                           kept; then OK WEATHER show. No coordinates: the
+                           cache's distance from the saved location instead.
+                           fetch: the forecast and the alerts now, whatever
+                           the cache's age (Weather on, a set clock and a
+                           location still needed). It never starts the radio:
+                           only on a station already up (STATE wifi=up, the
+                           live sleep screen on this cable). OK WEATHER fetch
+                           ok 200/200 1.2 s changed=1 | failed <why> |
+                           skipped <why> (no-wifi, off, device-network ...).
+                           clear: the cache and the retry stamp removed.
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).
@@ -760,7 +782,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("remotedir")
     s.add_argument("--all", action="store_true", help="include dot files")
     s = sub.add_parser("card", help="show a sleep-screen card without sleeping (next key/tap returns)")
-    s.add_argument("name", help="now_reading day calendar quote owner sky pictures shuffle default")
+    s.add_argument("name", help="now_reading day calendar quote owner sky pictures shuffle weather default")
     s.add_argument("--shot", help="also save a screenshot of it here (PNG)")
     sub.add_parser("awake")
     s = sub.add_parser("lightsleep", help="idle light sleep on|off until the next boot")
@@ -772,6 +794,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("redraw", help="the live sleep screen redraws now")
     s = sub.add_parser("wifilast", help="dev: set the Wi-Fi list's last-connected network (fallback tests)")
     s.add_argument("ssid")
+    s = sub.add_parser("weather", help="dev: the Weather card's cache: show (default), fetch now, or clear")
+    s.add_argument("action", nargs="?", default="show", choices=("show", "fetch", "clear"))
     s = sub.add_parser("app", help="open the Apps list or Word Search")
     s.add_argument("name", choices=("apps", "wordsearch"))
     s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
@@ -891,6 +915,12 @@ def run(args, link: Link, out=sys.stdout) -> int:
         return run_pins(link, args.seconds, t, out)
     elif op == "wifilast":
         rest, _ = link.command(f"WIFILAST {check_arg(args.ssid)}", t or 10)
+        print(rest, file=out)
+    elif op == "weather":
+        # A fetch is two bounded HTTPS requests (14 s each at most) on the reader's loop.
+        rest, body = link.command(f"WEATHER {args.action}", t or (45 if args.action == "fetch" else 15))
+        for line in body:
+            print(line[8:] if line.startswith("WEATHER ") else line, file=out)
         print(rest, file=out)
     elif op == "put":
         data = read_local(args.local)

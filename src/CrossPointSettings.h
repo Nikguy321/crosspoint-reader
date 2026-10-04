@@ -34,6 +34,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     OWNER = 12,
     SKY = 13,
     SHUFFLE = 14,
+    WEATHER = 15,
     SLEEP_SCREEN_MODE_COUNT
   };
   // The modes every board offers; the cards above exist on the X4 Pro only.
@@ -439,6 +440,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t shuffleOwner = 0;
   uint8_t shuffleSky = 1;
   uint8_t shufflePictures = 0;
+  // Weather (network/WeatherFetch, the Weather card): opt-in, off unless turned on - it sends the
+  // location, rounded to about 1 km, to Open-Meteo and (US points) the National Weather Service.
+  uint8_t weatherEnabled = 0;
+  uint8_t weatherUnits = 0;  // sleepcards::WeatherUnits: Metric / US
+  uint8_t shuffleWeather = 0;
   // Sleep cards drawn white on black (sleepcards::cardsDark). Pictures and covers follow the Sleep
   // Screen Cover Filter instead; a reader that had that filter on Inverted is migrated in fromJson.
   uint8_t darkCards = 0;

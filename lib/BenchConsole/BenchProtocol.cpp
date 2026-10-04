@@ -343,6 +343,34 @@ bool tokenIs(const char* tok, const char* word) {
 }
 }  // namespace
 
+bool parseWeatherArgs(const char* args, WeatherOp& out) {
+  if (args == nullptr) args = "";
+  while (isSpace(*args)) ++args;
+  char word[8] = {};
+  size_t n = 0;
+  while (args[n] != '\0' && !isSpace(args[n])) {
+    if (n + 1 >= sizeof(word)) return false;
+    word[n] = args[n];
+    ++n;
+  }
+  for (const char* rest = args + n; *rest != '\0'; ++rest) {
+    if (!isSpace(*rest)) return false;
+  }
+  if (n == 0 || tokenIs(word, "show")) {
+    out = WeatherOp::Show;
+    return true;
+  }
+  if (tokenIs(word, "fetch")) {
+    out = WeatherOp::Fetch;
+    return true;
+  }
+  if (tokenIs(word, "clear")) {
+    out = WeatherOp::Clear;
+    return true;
+  }
+  return false;
+}
+
 bool parseAppArgs(const char* args, AppTarget& out) {
   if (args == nullptr) return false;
   while (isSpace(*args)) ++args;

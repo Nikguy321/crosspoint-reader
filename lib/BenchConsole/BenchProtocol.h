@@ -85,6 +85,11 @@ bool isValidSsid(const char* ssid);
 enum class AppTarget : uint8_t { Apps, WordSearch };
 bool parseAppArgs(const char* args, AppTarget& out);
 
+// WEATHER [show|fetch|clear]: the Weather card's cache summarised (the default), a fetch now on a
+// station already up, or the cache and its retry stamp removed (case ignored).
+enum class WeatherOp : uint8_t { Show, Fetch, Clear };
+bool parseWeatherArgs(const char* args, WeatherOp& out);
+
 // WS                                         the puzzle on screen, dumped
 // WS new <seed> [easy|medium|hard] [key]     a deterministic new puzzle; the key (a built-in
 //                                            theme or "file:<name>.words") is the rest of the

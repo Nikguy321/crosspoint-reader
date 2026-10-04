@@ -5,8 +5,9 @@
 
 #include "GeolocateProtocol.h"
 
-// The HTTPS half of "Locate me": one bounded request to a location service. X4 Pro only; on other
-// boards request() refuses (Transport) and no TLS code is linked for it.
+// The HTTPS half of "Locate me" and of the Weather card's fetch (network/WeatherFetch): one bounded
+// request to a service. X4 Pro only; on other boards request() refuses (Transport) and no TLS code
+// is linked for it.
 //
 // Runs on esp_http_client with the ESP-IDF certificate bundle (esp_crt_bundle_attach, the
 // Mozilla root set compiled into the framework): the server's chain AND its host name are
@@ -36,14 +37,20 @@ enum class Result : uint8_t {
   Ok,         // a complete response (any HTTP status) is in out
   NoMemory,   // not enough internal heap for a TLS session
   Transport,  // DNS, connect, TLS (incl. certificate), timeout or a cut-off body
-  TooLarge,   // the body is longer than the buffer
+  TooLarge,   // the body is longer than the buffer (length = its declared size, or what was read)
 };
 
 struct Options {
   uint32_t connectTimeoutMs = CONNECT_TIMEOUT_MS;
   uint32_t requestTimeoutMs = REQUEST_TIMEOUT_MS;
-  // No error lines: a caller in the background (AutoLocate) logs its own one-line outcome.
+  // No error lines: a caller in the background (AutoLocate, WeatherFetch) logs its own one-line
+  // outcome.
   bool quiet = false;
+  // The Accept header (the weather alerts service answers application/geo+json).
+  const char* accept = "application/json";
+  // When not nullptr: the response's Date header ("Sat, 03 Oct 2026 22:40:22 GMT"), "" without one.
+  char* dateOut = nullptr;
+  size_t dateCap = 0;
 };
 
 // A blocking station scan on the joined radio (through RadioPower, which never starts it here):
@@ -51,12 +58,18 @@ struct Options {
 // own results are freed before it returns.
 size_t scanAccessPoints(geolocate::AccessPoint* out, size_t cap, int16_t& found);
 
+// The host's address into lwIP's cache within timeoutMs, so the request's own lookup finds it
+// there: the one step that is not otherwise bounded (the resolver retries for many seconds on a
+// network that does not reach the internet). False when it is not known in time. Loop task only.
+bool resolveWithin(const char* host, uint32_t timeoutMs);
+
 // Enough internal heap for one request (the check request() starts with): a caller can test it
 // before the work that leads up to a request (AutoLocate's scan).
 bool enoughHeap();
 
 // POST jsonBody (when not nullptr) or GET url. The body lands in out, NUL-terminated (cap bytes
-// including the terminator); status is the HTTP status code.
+// including the terminator; a cap over 4 KB is allocated in PSRAM by the caller's malloc); status is
+// the HTTP status code.
 Result request(const char* url, const char* jsonBody, char* out, size_t cap, size_t& length, int& status,
                const Options& options = Options{});
 

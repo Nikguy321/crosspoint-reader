@@ -8,7 +8,8 @@
 //   scan (RadioPower) -> the join order of network/WifiJoinOrder.h (never the book-sync peer's
 //   or hub's hotspot: no internet behind them) -> join with the scan's channel and BSSID ->
 //   online: the clock from NTP on the first join and every 6 h (whatever "synced once" says),
-//   then Update Location When Syncing as after "Sync clock now" -> watch the link. A lost link
+//   then Update Location When Syncing as after "Sync clock now", then the Weather card's forecast
+//   (network/WeatherFetch: one request per tick, a cache over ~3 h old) -> watch the link. A lost link
 //   or a round with nothing joined waits 2 min and scans again; after 3 such rounds in a row,
 //   10 min.
 // Every start goes through RadioPower; main.cpp turns the radio off (RadioPower::off()) when

@@ -40,6 +40,7 @@
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
 #include "network/StationKeeper.h"
+#include "network/WeatherFetch.h"
 #include "sleepcards/SleepCard.h"
 #include "util/HomeButtonInput.h"
 #include "util/LiveSleepPolicy.h"
@@ -1351,6 +1352,36 @@ void cmdWifiLast(const char* ssid, const bool exclusive) {
   reply("OK WIFILAST saved=%d networks=%u", saved ? 1 : 0, static_cast<unsigned>(WIFI_STORE.getCredentialCount()));
 }
 
+// WEATHER [show|fetch|clear]: the Weather card's cache (network/WeatherFetch). fetch never starts
+// the radio: it needs a station already up (the live sleep screen's keeper, wifi=up in STATE).
+void cmdWeather(const char* args, const bool exclusive) {
+  bench::WeatherOp op = bench::WeatherOp::Show;
+  if (!bench::parseWeatherArgs(args, op)) {
+    reply("ERR WEATHER usage");
+    return;
+  }
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR WEATHER board");
+    return;
+  }
+  if (!fileVerbAllowed("WEATHER", exclusive)) return;
+  switch (op) {
+    case bench::WeatherOp::Show:
+      WeatherFetch::benchShow([](void*, const char* text) { reply("WEATHER %s", text); }, nullptr);
+      reply("OK WEATHER show");
+      return;
+    case bench::WeatherOp::Fetch: {
+      char outcome[96];
+      WeatherFetch::benchFetch(outcome, sizeof(outcome));
+      reply("OK WEATHER fetch %s", outcome);
+      return;
+    }
+    case bench::WeatherOp::Clear:
+      reply(WeatherFetch::benchClear() ? "OK WEATHER clear" : "ERR WEATHER clear");
+      return;
+  }
+}
+
 void cmdLegacyScreenshot() {
   const uint32_t bufferSize = display.getBufferSize();
   logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
@@ -1451,6 +1482,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdPins(args, exclusive);
   } else if (strcmp(verb, "WIFILAST") == 0) {
     cmdWifiLast(args, exclusive);
+  } else if (strcmp(verb, "WEATHER") == 0) {
+    cmdWeather(args, exclusive);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {
     cmdLegacyScreenshot();
   } else {

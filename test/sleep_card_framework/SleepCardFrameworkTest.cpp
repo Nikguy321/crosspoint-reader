@@ -188,6 +188,7 @@ TEST(SleepCardSettings, ShuffleDefaults) {
   EXPECT_FALSE(shuffleIncludes(m, CardId::Owner));
   EXPECT_FALSE(shuffleIncludes(m, CardId::Pictures));
   EXPECT_FALSE(shuffleIncludes(m, CardId::Shuffle));
+  EXPECT_FALSE(shuffleIncludes(m, CardId::Weather));  // it needs the network opt-in
 }
 
 // Nothing personal ships as a default.
@@ -197,6 +198,8 @@ TEST(SleepCardSettings, DefaultsCarryNothingPersonal) {
   EXPECT_STREQ(s.ownerName, "");
   EXPECT_STREQ(s.ownerContact1, "");
   EXPECT_STREQ(s.ownerContact2, "");
+  EXPECT_FALSE(s.weatherOn);  // nothing is sent unless turned on
+  EXPECT_EQ(s.weatherUnits, WeatherUnits::Metric);
   EXPECT_EQ(s.huntMode, HuntMode::Off);
 }
 
@@ -250,8 +253,11 @@ TEST(SleepCardRegistry, ModesNamesAndIds) {
   EXPECT_EQ(cardForSleepMode(SLEEP_MODE_NOW_READING), CardId::NowReading);
   EXPECT_EQ(cardForSleepMode(SLEEP_MODE_SKY), CardId::Sky);
   EXPECT_EQ(cardForSleepMode(SLEEP_MODE_SHUFFLE), CardId::Shuffle);
-  EXPECT_EQ(cardForSleepMode(15), CardId::None);
-  for (const char* name : {"now_reading", "day", "calendar", "quote", "owner", "sky", "pictures", "shuffle"}) {
+  EXPECT_EQ(cardForSleepMode(SLEEP_MODE_WEATHER), CardId::Weather);
+  EXPECT_EQ(SLEEP_MODE_WEATHER, 15);
+  EXPECT_EQ(cardForSleepMode(16), CardId::None);
+  for (const char* name :
+       {"now_reading", "day", "calendar", "quote", "owner", "sky", "pictures", "shuffle", "weather"}) {
     const CardId id = cardByName(name);
     ASSERT_NE(id, CardId::None) << name;
     EXPECT_STREQ(cardName(id), name);
@@ -262,6 +268,10 @@ TEST(SleepCardRegistry, ModesNamesAndIds) {
   EXPECT_EQ(cardInfo(CardId::Pictures)->render, nullptr);
   EXPECT_EQ(cardInfo(CardId::Shuffle)->render, nullptr);
   EXPECT_NE(cardInfo(CardId::Day)->render, nullptr);
+  EXPECT_NE(cardInfo(CardId::Weather)->render, nullptr);
+  // Appended: the ids index the shuffle mask and shuffle.dat.
+  EXPECT_EQ(static_cast<int>(CardId::Weather), 9);
+  EXPECT_EQ(static_cast<int>(CardId::Count), 10);
 }
 
 // ---- footer ----------------------------------------------------------------------------------------

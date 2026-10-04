@@ -44,7 +44,8 @@ TEST(SleepCardPreview, LogoScreen) {
 }
 
 TEST(SleepCardPreview, EveryCardRendersWithinBudget) {
-  const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote, CardId::Owner, CardId::Sky};
+  const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote,
+                          CardId::Owner,      CardId::Sky, CardId::Weather};
   for (const CardId id : cards) {
     bool declined = false;
     CardContext ctx = preview::sampleContext();
@@ -66,7 +67,8 @@ TEST(SleepCardPreview, EveryCardRendersWithinBudget) {
 // Dark Cards: every card white on black -> build/cards/dark_<name>.png. The page turns
 // black; the moon and the book cover keep their tones.
 TEST(SleepCardPreview, DarkCards) {
-  const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote, CardId::Owner, CardId::Sky};
+  const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote,
+                          CardId::Owner,      CardId::Sky, CardId::Weather};
   const uint32_t size = display.getBufferSize();
   for (const CardId id : cards) {
     CardContext ctx = preview::sampleContext();
@@ -90,7 +92,9 @@ TEST(SleepCardPreview, DarkCards) {
       inkBits += __builtin_popcount(static_cast<uint8_t>(~fb[i]));
     }
     EXPECT_GT(inkBits, size * 8 / 2) << cardName(id) << ": the page should be black";
-    if (id == CardId::Quote || id == CardId::Owner) EXPECT_EQ(same, 0u) << cardName(id) << " has no pictures";
+    if (id == CardId::Quote || id == CardId::Owner || id == CardId::Weather) {
+      EXPECT_EQ(same, 0u) << cardName(id) << " has no pictures";
+    }
     if (id == CardId::NowReading || id == CardId::Day || id == CardId::Calendar || id == CardId::Sky) {
       EXPECT_GT(same, 0u) << cardName(id) << ": its cover or moon should keep its tones";
     }
@@ -131,7 +135,7 @@ TEST(SleepCardPreview, DarkMoonKeepsItsTones) {
 // Without a location, sun and moon times cannot be computed; cards must still render (or decline)
 // quickly and never crash.
 TEST(SleepCardPreview, CardsWithoutLocation) {
-  for (const CardId id : {CardId::Day, CardId::Calendar, CardId::Sky}) {
+  for (const CardId id : {CardId::Day, CardId::Calendar, CardId::Sky, CardId::Weather}) {
     const std::string name = std::string(cardName(id)) + "_nolocation";
     const double ms = preview::renderCardPng(id, preview::sampleContextNoLocation(), name);
     EXPECT_LT(ms, BUDGET_MS) << name;
@@ -140,7 +144,7 @@ TEST(SleepCardPreview, CardsWithoutLocation) {
 
 // Without a trustworthy clock every card that shows a date must decline.
 TEST(SleepCardPreview, CardsWithoutTime) {
-  for (const CardId id : {CardId::Day, CardId::Calendar, CardId::Sky}) {
+  for (const CardId id : {CardId::Day, CardId::Calendar, CardId::Sky, CardId::Weather}) {
     CardContext ctx = preview::sampleContext();
     ctx.timeValid = false;
     ctx.utcNow = 0;
@@ -158,7 +162,7 @@ TEST(SleepCardPreview, FallbacksWithoutLocationOrBook) {
   ctx.fromReader = false;
   preview::hostIo().hasBook = false;
   const CardId cards[] = {CardId::NowReading, CardId::Day, CardId::Calendar, CardId::Quote,
-                          CardId::Owner,      CardId::Sky, CardId::Shuffle};
+                          CardId::Owner,      CardId::Sky, CardId::Weather,  CardId::Shuffle};
   for (const CardId id : cards) {
     GfxRenderer& r = preview::renderer();
     const auto start = std::chrono::steady_clock::now();
@@ -176,6 +180,55 @@ TEST(SleepCardPreview, FallbacksWithoutLocationOrBook) {
   CardId shown = CardId::None;
   EXPECT_FALSE(renderCardOrShuffle(CardId::NowReading, ctx, preview::renderer(), shown));
   preview::hostIo().hasBook = true;
+}
+
+// The Weather card in each of its states -> build/cards/weather_<variant>.png (fixtures from
+// fixtures/make_weather_fixtures.py, around the sample moment at Seattle's public point).
+TEST(SleepCardPreview, WeatherVariants) {
+  struct Variant {
+    const char* name;
+    const char* fixture;
+    WeatherUnits units;
+    bool dark;
+    bool twelveHour;
+  };
+  const Variant variants[] = {
+      {"weather_fresh", "weather.dat", WeatherUnits::Metric, false, false},
+      {"weather_alert", "weather_alert.dat", WeatherUnits::Metric, false, false},
+      {"weather_usonly", "weather_usonly.dat", WeatherUnits::Metric, false, false},
+      {"weather_notchecked", "weather_notchecked.dat", WeatherUnits::Metric, false, false},
+      {"weather_toomany", "weather_toomany.dat", WeatherUnits::Metric, false, false},
+      {"weather_us_units", "weather_alert.dat", WeatherUnits::Us, false, true},
+      {"weather_dark", "weather_alert.dat", WeatherUnits::Us, true, true},
+      {"weather_cooling", "weather_cooling.dat", WeatherUnits::Us, false, true},
+      {"weather_lapsed", "weather_lapsed.dat", WeatherUnits::Us, false, true},
+  };
+  for (const Variant& v : variants) {
+    preview::hostIo().weatherFixture = v.fixture;
+    CardContext ctx = preview::sampleContext();
+    ctx.settings.weatherUnits = v.units;
+    ctx.dark = v.dark;
+    ctx.clock12h = v.twelveHour;
+    bool declined = false;
+    const double ms = preview::renderCardPng(CardId::Weather, ctx, v.name, &declined);
+    std::printf("  %-20s %s in %.2f ms -> build/cards/%s.png\n", v.name, declined ? "declined" : "drawn", ms, v.name);
+    EXPECT_FALSE(declined) << v.name;
+    EXPECT_LT(ms, BUDGET_MS) << v.name;
+  }
+  // Nothing true to show: no cache, Weather off, or a forecast for a place 10 km away.
+  preview::hostIo().weatherFixture = "";
+  bool declined = false;
+  preview::renderCardPng(CardId::Weather, preview::sampleContext(), "weather_nocache", &declined);
+  EXPECT_TRUE(declined);
+  preview::hostIo().weatherFixture = "weather.dat";
+  CardContext off = preview::sampleContext();
+  off.settings.weatherOn = false;
+  preview::renderCardPng(CardId::Weather, off, "weather_off", &declined);
+  EXPECT_TRUE(declined);
+  CardContext moved = preview::sampleContext();
+  moved.location.lat += 0.09;
+  preview::renderCardPng(CardId::Weather, moved, "weather_moved", &declined);
+  EXPECT_TRUE(declined);
 }
 
 // A sheet of the shared drawing helpers (src/sleepcards/CardDraw.h), for card authors.

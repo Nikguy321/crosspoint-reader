@@ -16,6 +16,8 @@ Pro. CrossPoint's own README follows further down.
   - Quote: 37 built-in public-domain quotes, your own `/quotes.txt` and your bookmarks.
   - Owner: return-if-found details.
   - Sky: the moon and the planets tonight.
+  - Weather (opt-in): NWS alerts, the conditions now, the next 24 hours and the next days from Open-Meteo, fetched
+    only while Wi-Fi is already up (on the charger, or during a clock or book sync); every time on it is absolute.
   - Shuffle: a different card each sleep.
 
   An X4 Pro logo replaces the CrossPoint one, and the cards can be white on black.

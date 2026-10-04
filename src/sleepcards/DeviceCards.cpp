@@ -32,7 +32,8 @@ namespace sleepcards {
 static_assert(CrossPointSettings::NOW_READING == SLEEP_MODE_NOW_READING && CrossPointSettings::DAY == SLEEP_MODE_DAY &&
                   CrossPointSettings::CALENDAR == SLEEP_MODE_CALENDAR &&
                   CrossPointSettings::QUOTE == SLEEP_MODE_QUOTE && CrossPointSettings::OWNER == SLEEP_MODE_OWNER &&
-                  CrossPointSettings::SKY == SLEEP_MODE_SKY && CrossPointSettings::SHUFFLE == SLEEP_MODE_SHUFFLE,
+                  CrossPointSettings::SKY == SLEEP_MODE_SKY && CrossPointSettings::SHUFFLE == SLEEP_MODE_SHUFFLE &&
+                  CrossPointSettings::WEATHER == SLEEP_MODE_WEATHER,
               "sleep card modes out of step with CrossPointSettings::SLEEP_SCREEN_MODE");
 
 namespace {
@@ -240,11 +241,15 @@ SleepCardSettings snapshotSettings() {
   } shuffle[] = {{SETTINGS.shuffleNowReading, CardId::NowReading}, {SETTINGS.shuffleDay, CardId::Day},
                  {SETTINGS.shuffleCalendar, CardId::Calendar},     {SETTINGS.shuffleQuote, CardId::Quote},
                  {SETTINGS.shuffleOwner, CardId::Owner},           {SETTINGS.shuffleSky, CardId::Sky},
-                 {SETTINGS.shufflePictures, CardId::Pictures}};
+                 {SETTINGS.shufflePictures, CardId::Pictures},     {SETTINGS.shuffleWeather, CardId::Weather}};
   s.shuffleMask = 0;
   for (const auto& entry : shuffle) {
     if (entry.value) s.shuffleMask |= cardBit(entry.id);
   }
+  s.weatherOn = SETTINGS.weatherEnabled != 0;
+  s.weatherUnits = SETTINGS.weatherUnits < static_cast<uint8_t>(WeatherUnits::Count)
+                       ? static_cast<WeatherUnits>(SETTINGS.weatherUnits)
+                       : WeatherUnits::Metric;
   return s;
 }
 

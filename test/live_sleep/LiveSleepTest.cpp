@@ -13,6 +13,7 @@ constexpr uint8_t QUICK_RESUME = 6;
 constexpr uint8_t TRANSPARENT_CUSTOM = 7;
 constexpr uint8_t NOW_READING = 8;
 constexpr uint8_t SHUFFLE = 14;
+constexpr uint8_t WEATHER = 15;
 }  // namespace
 
 TEST(LiveSleep, ExternalPowerIsTheChargerLineOrAComputer) {
@@ -22,10 +23,11 @@ TEST(LiveSleep, ExternalPowerIsTheChargerLineOrAComputer) {
   EXPECT_TRUE(externalPower(true, true));
 }
 
-TEST(LiveSleep, CardModesAreNowReadingThroughShuffle) {
+TEST(LiveSleep, CardModesAreNowReadingThroughWeather) {
   for (uint8_t mode = 0; mode < 20; mode++) {
-    EXPECT_EQ(isCardMode(mode), mode >= NOW_READING && mode <= SHUFFLE) << int(mode);
+    EXPECT_EQ(isCardMode(mode), mode >= NOW_READING && mode <= WEATHER) << int(mode);
   }
+  EXPECT_TRUE(liveEligible(true, true, SHUFFLE, false));
 }
 
 TEST(LiveSleep, LiveOnlyOnTheX4ProOnPowerWithACardOrTheCycle) {

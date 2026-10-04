@@ -32,8 +32,10 @@ class SleepActivity final : public Activity {
     uint32_t redraws = 0;         // since entry
   };
   static LiveStatus liveStatus();
-  // Redraw at the next loop() pass (bench REDRAW, a bench SLEEP on the live screen).
-  static void requestLiveRedraw();
+  // Redraw at the next loop() pass (bench REDRAW, a bench SLEEP on the live screen, a new forecast
+  // for the Weather card). halfRefresh: a clean HALF pass even for the same card - its data changed
+  // (a black alert band or dithered bars would ghost under FAST).
+  static void requestLiveRedraw(bool halfRefresh = false);
   // The last redraw before deep sleep: the card on screen again with a fresh time and battery
   // (nothing for a picture or the logo, which show neither).
   static void finalLiveRedraw();

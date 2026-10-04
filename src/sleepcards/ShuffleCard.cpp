@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include "WeatherCard.h"
+
 namespace sleepcards {
 namespace shuffle {
 namespace {
@@ -128,6 +130,7 @@ uint16_t shuffleUsableMask(const CardContext& ctx, const uint16_t mask) {
     keep(CardId::NowReading, ctx.bookPath != nullptr && ctx.bookPath[0] != '\0' && ctx.io->fileSize(ctx.bookPath) >= 0);
   }
   if (shuffleIncludes(mask, CardId::Quote)) keep(CardId::Quote, quoteUsable(ctx));
+  if (shuffleIncludes(mask, CardId::Weather)) keep(CardId::Weather, weathercard::cacheLooksUsable(ctx));
   return usable;
 }
 

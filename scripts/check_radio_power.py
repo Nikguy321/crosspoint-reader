@@ -39,6 +39,17 @@ So this fails on:
             parseIpWhoisResponse / FixSource::Ip / IP_ACCURACY, and every GeolocateClient::request
             in it is passed BEACONDB_URL, which is beaconDB's geolocate endpoint. Mutated too.
 
+  WEATHER   the Weather card's fetch (src/network/WeatherFetch.cpp) rides a station already up and
+            sends the location only to the two weather services: the file names no radio start or
+            scan (RadioPower::mode/begin/softAP/scanNetworks, scanAccessPoints, WiFi.*), spells no
+            URL of its own ("://" in no literal), passes GeolocateClient::request only its `url`
+            parameter, and fills the url buffer (url.get()) only through weather::buildForecastUrl /
+            buildAlertsUrl or hands it to get(); those builders (WeatherProtocol.cpp) start from
+            OPEN_METEO_URL / NWS_ALERTS_URL, which WeatherProtocol.h defines as the two endpoints.
+            And no onExit() under src/ names WeatherFetch: ActivityManager calls onExit holding the
+            render lock (a non-recursive mutex) that the weather cache file takes, so a fetch there
+            blocks the loop forever. Mutated too.
+
 Comments and string literals are blanked first. A self-test runs first, so a pattern that has
 quietly stopped matching fails loudly.
 
@@ -354,6 +365,89 @@ def autolocate_failures(text: str):
     return fails
 
 
+WEATHER = ROOT / "src" / "network" / "WeatherFetch.cpp"
+WEATHER_PROTOCOL_H = ROOT / "src" / "network" / "WeatherProtocol.h"
+WEATHER_PROTOCOL_CPP = ROOT / "src" / "network" / "WeatherProtocol.cpp"
+WEATHER_RADIO = re.compile(
+    r"\bRadioPower\s*::\s*(?:mode|begin|softAP|scanNetworks)\s*\(|\bscanAccessPoints\s*\(|"
+    r"\bWiFi\s*\.\s*(?:mode|begin|softAP|scanNetworks|reconnect|enableSTA|config)\s*\(")
+WEATHER_URL_DEFS = [
+    'constexpr const char* OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";',
+    'constexpr const char* NWS_ALERTS_URL = "https://api.weather.gov/alerts/active";',
+]
+URL_IN_LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*://')
+
+
+def callee_of(code: str, pos: int):
+    """The name of the call whose argument list holds pos (the nearest unclosed '(' before it)."""
+    depth = 0
+    for j in range(pos - 1, -1, -1):
+        c = code[j]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            if depth == 0:
+                m = re.search(r"([A-Za-z_][\w:]*)\s*$", code[:j])
+                return m.group(1) if m else ""
+            depth -= 1
+    return ""
+
+
+def weather_failures(fetch: str, protocol_h: str, protocol_cpp: str):
+    """WeatherFetch.cpp never starts the radio and sends only to the two weather endpoints."""
+    rel = "src/network/WeatherFetch.cpp"
+    fails = []
+    code = strip_code(fetch)
+    for m in WEATHER_RADIO.finditer(code):
+        fails.append(f"{rel}:{code.count(chr(10), 0, m.start()) + 1}: starts or scans the radio "
+                     "(the weather rides a station already up)")
+    if URL_IN_LITERAL.search(fetch):
+        fails.append(f"{rel}: spells a URL of its own (only WeatherProtocol's builders make them)")
+    urls = re.findall(r"GeolocateClient\s*::\s*request\s*\(\s*([^,\s)]+)", code)
+    if not urls or any(u != "url" for u in urls):
+        fails.append(f"{rel}: a GeolocateClient::request not passed its url parameter ({', '.join(urls) or 'none'})")
+    uses = list(re.finditer(r"\burl\s*\.\s*get\s*\(\s*\)", code))
+    callees = [callee_of(code, m.start()) for m in uses]
+    allowed = {"weather::buildForecastUrl", "weather::buildAlertsUrl", "get"}
+    for m, callee in zip(uses, callees):
+        if callee not in allowed:
+            fails.append(f"{rel}:{code.count(chr(10), 0, m.start()) + 1}: the url buffer goes to {callee or '?'}() "
+                         "(only the weather URL builders fill it)")
+    if "weather::buildForecastUrl" not in callees or "weather::buildAlertsUrl" not in callees:
+        fails.append(f"{rel}: the url buffer is not built by weather::buildForecastUrl and buildAlertsUrl")
+    for d in WEATHER_URL_DEFS:
+        if not re.search(r"^" + re.escape(d) + r"$", protocol_h, re.M):
+            fails.append(f"src/network/WeatherProtocol.h: missing the endpoint {d}")
+    pcode = strip_code(protocol_cpp)
+    for fn, const in (("buildForecastUrl", "OPEN_METEO_URL"), ("buildAlertsUrl", "NWS_ALERTS_URL")):
+        body = function_body(pcode, fn)
+        if body is None or not re.search(r"snprintf\s*\(\s*out\s*,\s*cap\s*,\s*[^,]*,\s*" + const + r"\b", body):
+            fails.append(f"src/network/WeatherProtocol.cpp: {fn}() must start its URL from {const}")
+    if URL_IN_LITERAL.search(protocol_cpp):
+        fails.append("src/network/WeatherProtocol.cpp: spells a URL of its own (the endpoints are the header's)")
+    return fails
+
+
+ON_EXIT = re.compile(r"\bonExit\s*\(\s*\)[^;{}()]*\{")
+KOSYNC = ROOT / "src" / "activities" / "reader" / "KOReaderSyncActivity.cpp"
+
+
+def on_exit_weather_failures(sources):
+    """No onExit() body names WeatherFetch (onExit runs under the render lock the cache takes)."""
+    fails = []
+    for rel, text in sources:
+        if "WeatherFetch" not in text:
+            continue
+        code = strip_code(text)
+        for m in ON_EXIT.finditer(code):
+            close = match_close(code, m.end() - 1)
+            body = code[m.end():close if close >= 0 else len(code)]
+            if re.search(r"\bWeatherFetch\s*::", body):
+                fails.append(f"{rel}:{code.count(chr(10), 0, m.start()) + 1}: onExit() reaches WeatherFetch "
+                             "(it runs holding the render lock the weather cache file takes)")
+    return fails
+
+
 def self_test():
     must_hit = [
         "WiFi.mode(WIFI_STA);", "WiFi.mode (WIFI_AP);", "WiFi.mode(m);", "WiFi.begin(ssid, pw);",
@@ -471,6 +565,9 @@ def main() -> int:
                 continue
             rel = path.relative_to(ROOT).as_posix()
             text = path.read_text(encoding="utf-8", errors="replace")
+            for f in on_exit_weather_failures([(rel, text)]):
+                print(f)
+                failed = True
             for line, what in findings(text, rel):
                 if path == OWNER and not any(what == w for _, w, _ in RESTRICTED):
                     continue  # the owner's starts are checked by the contracts
@@ -503,6 +600,56 @@ def main() -> int:
             print(f"mutation NOT caught: {desc}")
             failed = True
 
+    wfetch = WEATHER.read_text(encoding="utf-8")
+    wh = WEATHER_PROTOCOL_H.read_text(encoding="utf-8")
+    wcpp = WEATHER_PROTOCOL_CPP.read_text(encoding="utf-8")
+    for f in weather_failures(wfetch, wh, wcpp):
+        print(f)
+        failed = True
+    weather_muts = [
+        ("weather requests a URL of its own",
+         wfetch.replace("get(url.get(), FORECAST_HOST,", 'get("http://api.open-meteo.com/v1/forecast", FORECAST_HOST,', 1),
+         wh, wcpp),
+        ("weather starts the radio",
+         wfetch.replace("  forecastStatus = 0;\n", "  forecastStatus = 0;\n  RadioPower::begin(nullptr, nullptr, 0, nullptr);\n", 1),
+         wh, wcpp),
+        ("weather scans for access points",
+         wfetch.replace("  forecastStatus = 0;\n", "  forecastStatus = 0;\n  GeolocateClient::scanAccessPoints(nullptr, 0, n);\n", 1),
+         wh, wcpp),
+        ("weather fills the url from something else",
+         wfetch.replace("weather::buildForecastUrl(here.lat, here.lon, url.get(), weather::URL_CAP) == 0",
+                        "std::snprintf(url.get(), weather::URL_CAP, \"%s\", SETTINGS.sleepCardLocation) <= 0", 1),
+         wh, wcpp),
+        ("weather passes the client another url",
+         wfetch.replace("GeolocateClient::request(url, nullptr,", "GeolocateClient::request(host, nullptr,", 1), wh, wcpp),
+        ("the forecast endpoint changed",
+         wfetch, wh.replace('OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"',
+                            'OPEN_METEO_URL = "http://api.open-meteo.com/v1/forecast"', 1), wcpp),
+        ("the alerts endpoint changed",
+         wfetch, wh.replace('NWS_ALERTS_URL = "https://api.weather.gov/alerts/active"',
+                            'NWS_ALERTS_URL = "https://example.com/alerts"', 1), wcpp),
+        ("a builder ignores its endpoint",
+         wfetch, wh, wcpp.replace("OPEN_METEO_URL, roundCoordinate(lat)", "\"https://example.com/\", roundCoordinate(lat)", 1)),
+    ]
+    # The onExit rule (every source was checked in the scan above): mutated on the sync screen.
+    kosync = KOSYNC.read_text(encoding="utf-8")
+    kosync_rel = "src/activities/reader/KOReaderSyncActivity.cpp"
+    exit_mut = kosync.replace("  Activity::onExit();\n", "  Activity::onExit();\n  WeatherFetch::run();\n", 1)
+    if exit_mut == kosync:
+        print("mutation did not apply (the source changed; update the check): weather fetched from onExit")
+        failed = True
+    elif not on_exit_weather_failures([(kosync_rel, exit_mut)]):
+        print("mutation NOT caught: weather fetched from onExit")
+        failed = True
+
+    for desc, f1, f2, f3 in weather_muts:
+        if (f1, f2, f3) == (wfetch, wh, wcpp):
+            print(f"mutation did not apply (the source changed; update the check): {desc}")
+            failed = True
+        elif not weather_failures(f1, f2, f3):
+            print(f"mutation NOT caught: {desc}")
+            failed = True
+
     muts = mutations(owner, power, policy)
     for desc, o, p, y in muts:
         if (o, p, y) == (owner, power, policy):
@@ -514,7 +661,7 @@ def main() -> int:
 
     if failed:
         return 1
-    print(f"check_radio_power: OK ({len(muts) + len(auto_muts)} mutations caught)")
+    print(f"check_radio_power: OK ({len(muts) + len(auto_muts) + len(weather_muts) + 1} mutations caught)")
     return 0
 
 

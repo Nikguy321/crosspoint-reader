@@ -17,7 +17,8 @@ enum class CardId : uint8_t {
   Sky = 6,
   Pictures = 7,
   Shuffle = 8,
-  Count = 9,
+  Weather = 9,
+  Count = 10,
 };
 
 constexpr uint16_t cardBit(const CardId id) { return static_cast<uint16_t>(1u << static_cast<uint8_t>(id)); }

@@ -23,6 +23,7 @@ constexpr CardInfo CARDS[] = {
     {CardId::Sky, "sky", &renderSkyCard},
     {CardId::Pictures, "pictures", nullptr},
     {CardId::Shuffle, "shuffle", nullptr},
+    {CardId::Weather, "weather", &renderWeatherCard},
 };
 
 }  // namespace
@@ -50,6 +51,8 @@ CardId cardForSleepMode(const uint8_t sleepScreenMode) {
       return CardId::Sky;
     case SLEEP_MODE_SHUFFLE:
       return CardId::Shuffle;
+    case SLEEP_MODE_WEATHER:
+      return CardId::Weather;
     default:
       return CardId::None;
   }

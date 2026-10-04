@@ -2,8 +2,8 @@
 
 On the X4 Pro the Sleep Screen setting offers, besides the classic screens, a set of
 cards: **Now Reading**, **Day Card**, **Month Calendar**, **Quote**, **Owner Card**,
-**Tonight's Sky** and **Shuffle** (a different ticked card each sleep; it may also pick
-the picture frame, which is the existing Custom screen). Their options live in
+**Tonight's Sky**, **Weather** and **Shuffle** (a different ticked card each sleep; it may also
+pick the picture frame, which is the existing Custom screen). Their options live in
 Settings > Display > **Sleep Screen Cards**. The Dark and Light screens, the boot screen
 and every card's fallback show the X4 Pro mark. Other boards keep the CrossPoint screens
 and do not list the cards.
@@ -24,13 +24,15 @@ battery carries a lightning bolt. On the charger the sleep screen stays live and
 | (under Location) | `sleepCardLocationFix` | where the location came from, shown as the Location row's second line ("From Wi-Fi, ±80 m, Sep 29", "From Wi-Fi (auto), ±80 m, Sep 29", "From internet address, city level, Sep 29", "Typed in, Sep 29"). Stored as `wifi 80 2026-09-29 47.6205,-122.3493` (source `typed` / `wifi` / `ip` / `wifi-auto`, accuracy in m, date saved, the location it describes): a location changed anywhere else reads as typed in, and one confirmed unchanged on the keyboard keeps its record. An internal key: saved in `settings.json` but not shown on the web settings page. |
 | Locate Me | - | finds the location from the internet; see below |
 | Update Location When Syncing | `autoLocateOnSync` | Off by default. While a book sync or Sync clock now already has Wi-Fi up, refreshes a location not saved today from nearby Wi-Fi (beaconDB only; replaces a typed location), at most once a day; see below |
+| Weather | `weatherEnabled` | Off by default: the opt-in for the Weather card. Sends the location, rounded to about 1 km, to Open-Meteo and, for US points, the National Weather Service, only while Wi-Fi is already up for something else; see Weather below |
+| Weather Units | `weatherUnits` | Metric (°C, km/h, hPa) or US (°F, mph, inHg); the cache is metric, so a change needs no new fetch |
 | Hunting Season | `huntingSeason` | Off / On / Between Dates |
 | Season Start / End | `huntStartMonth` `huntStartDay` `huntEndMonth` `huntEndDay` | typed as month-day (`10-01`); a season may run past New Year |
 | Legal Light | `legalLightRule` | sunrise - 30 min .. sunset + 30 min, or civil twilight; always rounded inward to the minute |
 | Owner Name, Owner Contact 1/2 | `ownerName` `ownerContact1` `ownerContact2` | typed on the reader; nothing is preset |
 | Quote Source | `quoteSources` | which categories feed the Quote card: All (default), Built-in + My Quotes, My Quotes + Bookmarks, Built-in + Bookmarks, Built-in Only, My Quotes Only, Bookmarks Only (stored by that index). Replaces the old `quoteSource` key, migrated once on load: quotes file -> My Quotes Only, bookmarks -> Bookmarks Only, both -> All |
 | Dark Cards | `darkCards` | Off by default. The cards and the logo a card falls back to, white on black; pictures and covers follow the Sleep Screen Cover Filter instead. See "White on black" below |
-| Shuffle: ... | `shuffleNowReading` ... `shufflePictures` | default on: Now Reading, Day, Calendar, Quote, Sky |
+| Shuffle: ... | `shuffleNowReading` ... `shuffleWeather`, `shufflePictures` | default on: Now Reading, Day, Calendar, Quote, Sky (Weather off: it needs the opt-in) |
 | Card Cycle When Charging | `cardCycleWhenCharging` | Off by default. On the charger the live sleep screen deals a new Shuffle card at each update, whatever the Sleep Screen setting; see Live sleep on the charger |
 | Charging Updates | `chargingUpdateInterval` | how often the live sleep screen redraws: Every 1 / 2 (default) / 5 / 10 / 15 min (stored by that index) |
 
@@ -158,6 +160,93 @@ gets one line per sync and nothing about the place: `autolocate: saved`, `autolo
 `no-fix`, `too-vague`, `timeout`, `save`). ESP-IDF's own error lines (esp-tls, HTTP_CLIENT) can
 add a line on a connect failure; they name the host, never a place or a network.
 
+## Weather
+
+The **Weather** card (Sleep Screen > Weather, or Shuffle: Weather) shows the forecast the reader
+last fetched for the saved Location: NWS alerts first, then the conditions now, the next 24
+hours, the next days, and when and for where the forecast was fetched. It needs **Weather** on
+(off by default), a set clock and a Location.
+
+**What is sent, and to whom.** Two GETs, each with the location rounded to 0.01 degree (about
+1 km): Open-Meteo's forecast (`api.open-meteo.com/v1/forecast`: current conditions, 48 hours of
+temperature, rain chance, weather code and wind, 7 days; free, no key, CC BY 4.0 - the card says
+"Weather: Open-Meteo.com (CC BY 4.0)") and, for a point inside a rough US box, the National
+Weather Service's active alerts (`api.weather.gov/alerts/active?point=...&status=actual`, public
+domain). The requests carry the reader's User-Agent with this repository's URL and no personal
+detail; no elevation is sent (the reader has no ground elevation for the place). Open-Meteo keeps
+request coordinates in its server logs for up to 90 days. Both go through `GeolocateClient`
+(esp_http_client with the ESP-IDF certificate bundle: the chain and the host name are verified).
+Both servers send a Let's Encrypt chain that reaches ISRG Root X1 through a cross-signed "Root
+YR"; the bundle has X1 but not Root YR, so the day a server drops the cross-sign the fetch fails
+(it says `failed unreachable`) until Root YR is added to the bundle.
+
+**When it fetches.** Never from a card render, and never by starting the radio
+(`network/WeatherFetch`, held to that by `scripts/check_radio_power.py`'s WEATHER contract): only
+while Wi-Fi is already up for another job, and never on the book-sync peer's or hub's hotspot.
+
+- The live sleep screen on the charger: `StationKeeper`, after its clock sync and Update Location
+  When Syncing, refreshes a cache over ~3 h old, one HTTPS request per keeper step (the forecast
+  on one, the alerts on the next) so keys and the unplug are read in between; 30 min after a
+  failed try. A new forecast (with its alerts, once both requests are done) redraws a Weather
+  card on screen (or the logo it fell back to) with one clean HALF refresh. With Card Cycle When
+  Charging on it does not: the next deal reads the new cache.
+- Sync clock now, and a book sync that reached its server: after the location refresh, when the
+  cache is over an hour old or for a place more than ~5 km from the Location.
+- The bench console's `WEATHER fetch` (below).
+
+Every attempt is stamped before its request in RTC memory, which survives the silent reboot after
+each sync and deep sleep, so no automatic attempt follows another within 10 minutes (30 on the
+charger). Each request is bounded like Update Location When Syncing (DNS 3 s, 14 s in all). One
+log line per fetch and nothing about the place: `weather: ok 200/200 1.2 s` (the forecast's and
+the alerts' HTTP status; `-` = not asked, outside the US), `weather: failed <why>` (`no-memory`,
+`dns`, `unreachable`, `timeout`, `http <code>`, `parse`, `too-large`, `no-clock`, `save`; the old
+cache stays), `weather: skipped <why>` (`off` is silent; `job-offline`, `no-wifi`,
+`device-network`, `no-clock`, `no-location`, `retry-wait`, `fresh`, `sleeping`).
+
+**On a wall charger the live screen ends at full charge** (the charger's STAT line drops; see
+below), so overnight the card keeps the forecast it last fetched. Its absolute times say so.
+
+**The cache.** `/.crosspoint/sleepcards/weather.dat`, written as `weather.tmp` and renamed over the
+old one under the render lock; at most 4 KB of versioned text (`W1`, `sleepcards/WeatherCache.h`)
+in SI units: the fetch time and whether the clock had been set from the internet (and agreed with
+the server's Date), the rounded point and where the Location came from, the location's UTC offset,
+the current conditions, 48 hours, 7 days, and the alerts with their own status and time. A
+forecast replaces it only once its answer parsed (a captive portal's HTML never does). The alerts
+keep five states: none in force at a check, a list (the three most severe kept, with the count),
+"US only" (outside the box, or the service's 400 "out of bounds"), too many to read (the answer
+was over 256 KB: "Alerts: 16+"), and not checked; a failed check keeps the last answer and marks
+it not rechecked. A damaged file reads as no cache.
+
+**What the card promises.** A sleep card stays on the glass for days, so:
+
+- every time is absolute: "Forecast from 7:10 AM Thu", "No alerts at 7:10 AM Thu (NWS)", "until
+  4:00 PM Wed" - never "3 h ago";
+- "NOW" is Open-Meteo's current conditions only within an hour of the fetch; after that the block
+  says "FORECAST FOR 21:00" and shows that hour's forecast (with no wind direction: the hourly
+  series has none);
+- the 24-hour strip starts at the hour covering the moment the card is drawn (hours already past
+  are dropped), with the draw time marked;
+- days are labelled by the date of their middle (Open-Meteo's day starts are the place's
+  midnights) in the reader's own zone, so a reader on another zone than the place still pairs
+  each high and low with the right date; when the place's offset at the fetch differs from the
+  reader's, the card says "Local time there is UTC-6 - check the clock setting" (it never changes
+  a clock);
+- "No alerts" is said only after a check that found none, with its time; an alert is hidden once
+  it has ended (`ends`, or `expires` when the alert gives no end). Only the 3 most severe are kept,
+  so "have ended" is said only when every alert in force at the check was among them; otherwise
+  "Alerts at 8:05 PM Mon: 2 may still apply", and "+N more" never counts one known to be over;
+- the strip's rain bars sit on the hour they describe (Open-Meteo gives each hour's chance for the
+  hour before its time) and each temperature on its own hour's tick;
+- wind is where it comes FROM ("from SSW 21 km/h, gusts 37"; the day rows' column says "Wind
+  from"); the drawn arrow points downwind, where scent goes;
+- the place line says where the Location came from ("Wi-Fi fix Nov 2", "typed location", "IP
+  location (city level)").
+
+It declines (the logo, or Shuffle's next card) without Weather on, a set clock, a Location or a
+readable cache, when the forecast is over 36 h old or stamped in the future, for a place more than
+~5 km from the Location, or once its last day is over. Shuffle deals it only when the cache's
+first line (one small read) says it would draw.
+
 ## Live sleep on the charger
 
 On external power the sleep screen does not deep-sleep: it stays up and is redrawn, so the
@@ -200,7 +289,7 @@ joined. `src/util/LiveSleepPolicy.h` holds the decisions (host-tested in `test/l
 - **Wi-Fi.** `StationKeeper` scans, joins the last network if it is in view, else the next-best
   saved one (`network/WifiJoinOrder.h`; never the book-sync peer's or hub's hotspot), syncs the
   clock from NTP on the first join and every 6 h, then runs Update Location When Syncing when
-  that is on. A lost link waits 2 min and scans again; three failed rounds in a row, 10 min.
+  that is on, then the Weather card's fetch (see Weather). A lost link waits 2 min and scans again; three failed rounds in a row, 10 min.
   Its scans list hidden networks too, so a hidden last network is tried by name when one is in
   range; a join names the scanned access point (fast scan on its channel). Between attempts the
   driver stays initialised (`WiFi.disconnect(false, true)`): the session has no restart to
@@ -221,8 +310,9 @@ joined. `src/util/LiveSleepPolicy.h` holds the decisions (host-tested in `test/l
   areas a picture kept (`draw::keepTonesRect`/`keepTonesDisc`: `drawMoon` keeps its disc
   inside the ring, Now Reading its cover).
 - One file pair per card: `NowReadingCard`, `DayCard`, `CalendarCard`, `QuoteCard`,
-  `OwnerCard`, `SkyCard`, `ShuffleCard` (`pickShuffleCard()`; `renderCardOrShuffle()` moves on
-  to the next ticked card when Shuffle's pick declines).
+  `OwnerCard`, `SkyCard`, `WeatherCard` (with `WeatherCache`, its file), `ShuffleCard`
+  (`pickShuffleCard()`; `renderCardOrShuffle()` moves on to the next ticked card when Shuffle's
+  pick declines).
 - Shared helpers: `CardDraw.h` (circles, ellipses, dithered greys, the moon, progress
   bars, magnified text, the big pre-drawn digits, wrapping, the footer with its battery
   outline), `CardTime.h` (dates, DST day boundaries, clock strings), `CardText.h` (month
@@ -262,6 +352,11 @@ slower than a desktop); the budget itself is measured on the reader: the bench r
   that have something not shown last time; when none of them has an entry, My quotes fill in,
   then the built-in set, so the card never falls back to the logo screen.
 - **Owner**: the three Owner rows, typed on the reader.
+- **Weather**: `/.crosspoint/sleepcards/weather.dat` (one read of at most 4 KB), the RTC, the
+  Location and Weather Units; see Weather above. Its pure parts are host-tested in
+  `test/weather_protocol` (the URLs, both parsers on scrubbed captures from public points, the
+  alert states, the fetch policy, the cache codec) and `test/sleep_card_weather` (what it shows:
+  daily labels across a DST change and a zone mismatch, now vs forecast, declines, units).
 
 ## The built-in quotes
 
@@ -326,11 +421,18 @@ open build/cards/*.png
 The sample moment is 2026-11-02 20:40 in America/Los_Angeles at Seattle's public
 city-centre coordinates, battery 73 %, a public-domain sample book. `_helpers.png` is a
 sheet of the drawing helpers; `logo.png` the fallback screen; `fallback_<card>.png` each
-card (and Shuffle) with no location set and no book open.
+card (and Shuffle) with no location set and no book open. `weather_<state>.png` is the Weather
+card from the caches in `test/sleep_card_preview/fixtures/.crosspoint/sleepcards/` (written by
+`make_weather_fixtures.py` beside them): `fresh`, `alert`, `usonly`, `notchecked`, `toomany`,
+`us_units`, `dark`, `cooling` (the high beside the now marker; a later alert's 12-hour range with
+"+1 more") and `lapsed` (the kept alerts over, two not kept).
 
 On the reader (x4pro dev build, USB attached):
 
 ```sh
 python3 scripts/x4bench.py card day --shot /tmp/day.png
 python3 scripts/x4bench.py key up      # back to where it was
+python3 scripts/x4bench.py weather            # the Weather cache, summarised (no coordinates)
+python3 scripts/x4bench.py weather fetch      # a fetch now: only on a station already up (STATE wifi=up)
+python3 scripts/x4bench.py weather clear      # remove the cache and the retry stamp
 ```

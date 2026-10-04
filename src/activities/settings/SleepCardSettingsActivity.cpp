@@ -31,6 +31,8 @@ enum Row : uint8_t {
   LOCATION,
   LOCATE_ME,
   AUTO_LOCATE,
+  WEATHER,
+  WEATHER_UNITS,
   HUNTING,
   SEASON_START,
   SEASON_END,
@@ -46,32 +48,21 @@ enum Row : uint8_t {
   SHUFFLE_QUOTE,
   SHUFFLE_OWNER,
   SHUFFLE_SKY,
+  SHUFFLE_WEATHER,  // before Pictures: buildScreen walks SHUFFLE_NOW_READING..SHUFFLE_PICTURES
   SHUFFLE_PICTURES,
   CARD_CYCLE_CHARGING,
   CHARGING_UPDATES,
 };
 
-const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {StrId::STR_LOCATION,
-                                                                StrId::STR_LOCATE_ME,
-                                                                StrId::STR_AUTO_LOCATE,
-                                                                StrId::STR_HUNTING_SEASON,
-                                                                StrId::STR_SEASON_START,
-                                                                StrId::STR_SEASON_END,
-                                                                StrId::STR_LEGAL_LIGHT,
-                                                                StrId::STR_OWNER_NAME,
-                                                                StrId::STR_OWNER_CONTACT_1,
-                                                                StrId::STR_OWNER_CONTACT_2,
-                                                                StrId::STR_QUOTE_SOURCE,
-                                                                StrId::STR_DARK_CARDS,
-                                                                StrId::STR_SHUFFLE_NOW_READING,
-                                                                StrId::STR_SHUFFLE_DAY,
-                                                                StrId::STR_SHUFFLE_CALENDAR,
-                                                                StrId::STR_SHUFFLE_QUOTE,
-                                                                StrId::STR_SHUFFLE_OWNER,
-                                                                StrId::STR_SHUFFLE_SKY,
-                                                                StrId::STR_SHUFFLE_PICTURES,
-                                                                StrId::STR_CARD_CYCLE_CHARGING,
-                                                                StrId::STR_CHARGING_UPDATES};
+const StrId menuNames[SleepCardSettingsActivity::MENU_ITEMS] = {
+    StrId::STR_LOCATION,         StrId::STR_LOCATE_ME,           StrId::STR_AUTO_LOCATE,
+    StrId::STR_WEATHER,          StrId::STR_WEATHER_UNITS,       StrId::STR_HUNTING_SEASON,
+    StrId::STR_SEASON_START,     StrId::STR_SEASON_END,          StrId::STR_LEGAL_LIGHT,
+    StrId::STR_OWNER_NAME,       StrId::STR_OWNER_CONTACT_1,     StrId::STR_OWNER_CONTACT_2,
+    StrId::STR_QUOTE_SOURCE,     StrId::STR_DARK_CARDS,          StrId::STR_SHUFFLE_NOW_READING,
+    StrId::STR_SHUFFLE_DAY,      StrId::STR_SHUFFLE_CALENDAR,    StrId::STR_SHUFFLE_QUOTE,
+    StrId::STR_SHUFFLE_OWNER,    StrId::STR_SHUFFLE_SKY,         StrId::STR_SHUFFLE_WEATHER,
+    StrId::STR_SHUFFLE_PICTURES, StrId::STR_CARD_CYCLE_CHARGING, StrId::STR_CHARGING_UPDATES};
 
 uint8_t CrossPointSettings::* shuffleField(const int row) {
   switch (row) {
@@ -87,6 +78,8 @@ uint8_t CrossPointSettings::* shuffleField(const int row) {
       return &CrossPointSettings::shuffleOwner;
     case SHUFFLE_SKY:
       return &CrossPointSettings::shuffleSky;
+    case SHUFFLE_WEATHER:
+      return &CrossPointSettings::shuffleWeather;
     case SHUFFLE_PICTURES:
       return &CrossPointSettings::shufflePictures;
     default:
@@ -274,6 +267,13 @@ void SleepCardSettingsActivity::activateIndex(const int index) {
     case AUTO_LOCATE:
       SETTINGS.autoLocateOnSync = SETTINGS.autoLocateOnSync ? 0 : 1;
       break;
+    case WEATHER:
+      SETTINGS.weatherEnabled = SETTINGS.weatherEnabled ? 0 : 1;
+      break;
+    case WEATHER_UNITS:
+      SETTINGS.weatherUnits =
+          static_cast<uint8_t>((SETTINGS.weatherUnits + 1) % static_cast<uint8_t>(sleepcards::WeatherUnits::Count));
+      break;
     case DARK_CARDS:
       SETTINGS.darkCards = SETTINGS.darkCards ? 0 : 1;
       break;
@@ -304,6 +304,9 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
 
   static constexpr StrId HUNT_LABELS[] = {StrId::STR_STATE_OFF, StrId::STR_STATE_ON, StrId::STR_BETWEEN_DATES};
   static constexpr StrId LEGAL_LABELS[] = {StrId::STR_LEGAL_LIGHT_30_MIN, StrId::STR_LEGAL_LIGHT_CIVIL};
+  // In sleepcards::WeatherUnits order.
+  static constexpr StrId UNITS_LABELS[] = {StrId::STR_WEATHER_UNITS_METRIC, StrId::STR_WEATHER_UNITS_US};
+  static_assert(std::size(UNITS_LABELS) == static_cast<size_t>(sleepcards::WeatherUnits::Count));
   // In sleepcards::QuoteSource order.
   static constexpr StrId QUOTE_LABELS[] = {StrId::STR_QUOTE_SOURCE_ALL,
                                            StrId::STR_QUOTE_SOURCE_BUILT_IN_MINE,
@@ -331,6 +334,9 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   rowValues_[AUTO_LOCATE] = SETTINGS.autoLocateOnSync ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
   // What turning it on sends, and to whom.
   rowItems_[AUTO_LOCATE].subtitle = tr(STR_AUTO_LOCATE_HINT);
+  rowValues_[WEATHER] = SETTINGS.weatherEnabled ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+  rowItems_[WEATHER].subtitle = tr(STR_WEATHER_HINT);  // what turning it on sends, and to whom
+  rowValues_[WEATHER_UNITS] = pick(UNITS_LABELS, std::size(UNITS_LABELS), SETTINGS.weatherUnits);
   rowValues_[HUNTING] = pick(HUNT_LABELS, std::size(HUNT_LABELS), SETTINGS.huntingSeason);
   rowValues_[SEASON_START] = monthDayLabel(SETTINGS.huntStartMonth, SETTINGS.huntStartDay);
   rowValues_[SEASON_END] = monthDayLabel(SETTINGS.huntEndMonth, SETTINGS.huntEndDay);
@@ -365,6 +371,9 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   props.valueInset = 8;               // air between the value and the row edge
   props.labelText = screen.theme().smallText;
   props.labelText.maxLines = 2;
+  // The hints wrap (the Weather one names both services that receive the location).
+  props.subtitleText = screen.theme().smallText;
+  props.subtitleText.maxLines = 3;
   syncListViewport(screen, props);
   screen.list(props);
 }
