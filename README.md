@@ -37,6 +37,10 @@ Pro. CrossPoint's own README follows further down.
   [scripts/crossword/README.md](scripts/crossword/README.md)), and your own `.ipuz` / `.puz` files in
   `/Puzzles/Crossword/` (ipuz is a trademark of Puzzazz, Inc., used with permission); progress is kept per puzzle
   and across sleep.
+- **Sudoku** (touch readers): classic 9x9 puzzles made on the reader, each with one solution, graded Easy / Medium /
+  Hard / Expert by the hardest step a person needs, and numbered (Medium 14 is the same puzzle on every reader);
+  square-first entry plus a digit lock, pencil marks, undo, live clash marks, checks, reveals and logic hints; the
+  puzzle is kept across sleep.
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.

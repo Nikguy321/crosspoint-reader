@@ -433,6 +433,10 @@ bool parseAppArgs(const char* args, AppTarget& out) {
     out = AppTarget::Crossword;
     return true;
   }
+  if (tokenIs(word, "sudoku")) {
+    out = AppTarget::Sudoku;
+    return true;
+  }
   return false;
 }
 
@@ -520,6 +524,88 @@ bool parseCwArgs(char* args, CwArgs& out) {
     return false;
   }
   if (nextToken(args, tok)) return false;
+  out.op = op;
+  return true;
+}
+
+namespace {
+
+bool suTier(const char* tok, int8_t& out) {
+  static constexpr const char* TIERS[] = {"easy", "medium", "hard", "expert"};
+  for (int8_t i = 0; i < 4; ++i) {
+    if (tokenIs(tok, TIERS[i])) {
+      out = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+// A 1-9 token (a row, a column or a digit).
+bool suOneToNine(const char* tok, int8_t& out) {
+  uint32_t v = 0;
+  if (!parseU32(tok, v) || v < 1 || v > 9) return false;
+  out = static_cast<int8_t>(v);
+  return true;
+}
+
+// A seed: decimal, or hex after 0x.
+bool suSeed(const char* tok, uint32_t& out) {
+  if (tok[0] == '0' && (tok[1] == 'x' || tok[1] == 'X')) return parseHex32(tok + 2, out);
+  return parseU32(tok, out);
+}
+
+}  // namespace
+
+bool parseSuArgs(char* args, SuArgs& out) {
+  out = SuArgs{};
+  if (args == nullptr) return true;
+  char* tok = nullptr;
+  if (!nextToken(args, tok)) return true;  // SU: the dump
+  char* a = nullptr;
+  char* b = nullptr;
+  char* c = nullptr;
+  if (tokenIs(tok, "new") || tokenIs(tok, "seed") || tokenIs(tok, "gen")) {
+    const SuOp op = tokenIs(tok, "new") ? SuOp::New : tokenIs(tok, "seed") ? SuOp::Seed : SuOp::Gen;
+    if (!nextToken(args, a) || !nextToken(args, b) || nextToken(args, c)) return false;
+    if (!suTier(a, out.tier)) return false;
+    if (op == SuOp::New ? (!parseU32(b, out.value) || out.value == 0) : !suSeed(b, out.value)) return false;
+    out.op = op;
+    return true;
+  }
+  if (tokenIs(tok, "put") || tokenIs(tok, "note") || tokenIs(tok, "erase")) {
+    const SuOp op = tokenIs(tok, "put") ? SuOp::Put : tokenIs(tok, "note") ? SuOp::Note : SuOp::Erase;
+    if (!nextToken(args, a) || !nextToken(args, b)) return false;
+    if (!suOneToNine(a, out.row) || !suOneToNine(b, out.col)) return false;
+    if (op != SuOp::Erase && (!nextToken(args, c) || !suOneToNine(c, out.digit))) return false;
+    if (nextToken(args, c)) return false;
+    out.row = static_cast<int8_t>(out.row - 1);
+    out.col = static_cast<int8_t>(out.col - 1);
+    out.op = op;
+    return true;
+  }
+  if (tokenIs(tok, "check") || tokenIs(tok, "reveal")) {
+    const SuOp op = tokenIs(tok, "check") ? SuOp::Check : SuOp::Reveal;
+    if (nextToken(args, a)) {
+      if (tokenIs(a, "square")) {
+        out.scope = 0;
+      } else if (!tokenIs(a, "puzzle")) {
+        return false;
+      }
+      if (nextToken(args, b)) return false;
+    }
+    out.op = op;
+    return true;
+  }
+  SuOp op = SuOp::Dump;
+  if (tokenIs(tok, "hint")) {
+    op = SuOp::Hint;
+  } else if (tokenIs(tok, "solve")) {
+    op = SuOp::Solve;
+  } else {
+    return false;
+  }
+  if (nextToken(args, a)) return false;
   out.op = op;
   return true;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-// Drawing helpers the Apps games share (Word Search, Crossword): capital letters centred on their
+// Drawing helpers the Apps games share (Word Search, Crossword, Sudoku): capital letters centred on their
 // own ink, and the rounded text button. Free functions over GfxRenderer and the built-in fonts,
 // so the host preview tests draw the same pixels as the device.
 
@@ -24,6 +24,9 @@ int capTopFor(const GfxRenderer& r, int fontId, EpdFontFamily::Style style, int 
 // cell stops short of the letter instead of running through it.
 void drawLetterOnBaseline(GfxRenderer& r, int fontId, int ascender, char letter, int cx, int baseline, bool black,
                           bool halo);
+// The same in another style (Sudoku: givens bold, the player's digits regular).
+void drawLetterOnBaseline(GfxRenderer& r, int fontId, int ascender, char letter, int cx, int baseline, bool black,
+                          bool halo, EpdFontFamily::Style style);
 
 // The same with the capitals centred vertically on cy (capH = capHeight of the font).
 void drawLetter(GfxRenderer& r, int fontId, int capH, int ascender, char letter, int cx, int cy, bool black, bool halo);

@@ -40,6 +40,7 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
     - [3.9 Apps](#39-apps)
       - [Word Search](#word-search)
       - [Crossword](#crossword)
+      - [Sudoku](#sudoku)
   - [4. Reading Mode](#4-reading-mode)
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
@@ -644,7 +645,7 @@ See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation detai
 ### 3.9 Apps
 
 **Apps** on the Home screen (a row in the list styles, a tab in Cover Grid) lists the games: **Word Search**, and on
-readers with a touch screen **Crossword**. Back from Apps returns to Home. Each game remembers where you were: put the
+readers with a touch screen **Crossword** and **Sudoku**. Back from Apps returns to Home. Each game remembers where you were: put the
 reader to sleep in the middle of one and it comes back to the same game on wake.
 
 #### Word Search
@@ -742,6 +743,63 @@ you finish, every check or reveal, and when you leave; reopening a puzzle carrie
 changes, its old progress is dropped. The game reopens after sleep, on the live sleep screen's wake, and after Auto
 Power Off or a restart; if the puzzle you were playing has been deleted from the card, it starts the next unsolved
 built-in puzzle instead. The time counts only while the puzzle is on screen.
+
+#### Sudoku
+
+**Sudoku** is the classic 9 x 9 puzzle: fill every row, column and 3 x 3 box with the digits 1 to 9. It is played on
+its own keys, so it is listed only on readers with a touch screen (the X4 Pro). The reader makes every puzzle itself,
+each with exactly one solution, in four difficulties: **Easy**, **Medium**, **Hard** and **Expert**. A difficulty is set
+by the hardest step a person needs (Easy: only "this is the one place for a 7" and "only a 7 fits here"; Medium: pairs
+and pointing; Hard: X-wings, swordfish, XY-wings and the like; Expert: a guess that has to be followed through).
+Puzzles are numbered within each difficulty ("Medium 14"), and the same number is the same puzzle on every reader with
+this firmware. The first puzzle is Easy 1.
+
+The screen, top to bottom: the back arrow; the grid; a status line ("Medium 14 - 41 to go", or a message); the digit
+keys 1 to 9, each with how many of that digit are still to place (a digit placed nine times is greyed); then
+**Notes**, **Erase**, **Undo** and **Menu**. The puzzle's own digits are bold; yours are plain.
+
+- **Placing:** tap a square (a heavy frame marks it), then a digit. Every square showing the same digit gets a thin
+  ring. Writing the digit a square already shows changes nothing; a different digit replaces yours. The puzzle's own
+  digits never change.
+- **Many of one digit:** tap a digit with no square selected, or hold any digit for a moment, and it stays down (the
+  key turns black): now every square you tap gets that digit. Tap the black key again to let it go, or another digit
+  to switch. **Erase** can be held down the same way, to clear square after square.
+- **Notes:** tap **Notes** (it turns black) and the digits put small pencil marks in the square instead; tap again for
+  digits. Small marks of the selected digit show white on black. Placing a digit removes it from the marks in its row,
+  column and box (**Remove notes when placing** in the menu turns that off). **Fill all notes** in the menu marks every
+  digit that could go in each empty square.
+- **Erase** clears your digit, or, on a square with no digit, its marks.
+- **Undo** takes back the last change (a placement and the marks it removed go back together); there is no redo, and
+  the undo history does not survive sleep.
+- **Clashes:** a digit of yours that a square in the same row, column or box also shows gets a short bar under it at
+  once, and the status line says where ("Two 7s in row 1"). Clashes are never counted against you.
+- **By keys (X4 Pro):** a short press of the left key is Undo, of the right key Notes. Hold the right key for a hint
+  (on the solved banner: a new puzzle), the left key for the menu (it opens when you let go). Hold the **Home** key
+  for the menu too (a short Home press still goes Home).
+- **Leaving:** the back arrow in the header, or a swipe in from the left edge, returns to Apps.
+
+**Hint** (in the menu, or hold the right key): if one of your digits is wrong, it goes to that square and says **This
+square is wrong** (and marks it). Otherwise it finds the next square that can be filled by logic from the digits on the
+grid (your marks are ignored), moves there and says why: **Only 7 fits here (box 2)**, or which step it needs first
+(**Needs an X-wing on 7s first**; on Expert puzzles it may say **No step short of a trial**). Hint again on the same
+square fills it in. A hint unlocks a locked key, so the next digit you tap goes into its square. A hint never writes a
+wrong digit.
+
+When the last square is right, a banner shows the time it took, the puzzle, and how many hints, checks and reveals
+you used, with a **New puzzle** button.
+
+**The menu:** **Hint** (with the time so far and the counts); **Check square / Check puzzle** marks wrong digits with a
+slash (never fixing them; empty squares are not marked); **Reveal square / Reveal puzzle** writes in the answer, with a
+small black corner, and that square is then fixed (revealing the whole puzzle solves it); **Fill all notes**; **New
+puzzle** (the next number of the chosen difficulty; while a puzzle is under way the row asks **Tap again for a new
+puzzle**); **Difficulty** (Easy, Medium, Hard, Expert, for the next new puzzle); **Remove notes when placing** (on or
+off); **Back to puzzle**.
+
+**Saving:** the puzzle, your digits, marks, marks from checks and reveals, the time and the counts are saved when you
+pause for two seconds, when you open the menu, when you solve it and when you leave. The game reopens after sleep, on
+the live sleep screen's wake, and after Auto Power Off or a restart. The time counts only while the puzzle is on
+screen. A firmware update never changes a puzzle you are playing (the save keeps the grid itself, not just its
+number). Solved puzzles are listed in `/.crosspoint/sudoku/solved.txt`.
 
 ---
 

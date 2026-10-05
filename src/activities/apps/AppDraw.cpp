@@ -34,7 +34,12 @@ int capTopFor(const GfxRenderer& r, const int fontId, const EpdFontFamily::Style
 
 void drawLetterOnBaseline(GfxRenderer& r, const int fontId, const int ascender, const char letter, const int cx,
                           const int baseline, const bool black, const bool halo) {
-  const EpdGlyph* g = glyphFor(r, fontId, static_cast<unsigned char>(letter), EpdFontFamily::BOLD);
+  drawLetterOnBaseline(r, fontId, ascender, letter, cx, baseline, black, halo, EpdFontFamily::BOLD);
+}
+
+void drawLetterOnBaseline(GfxRenderer& r, const int fontId, const int ascender, const char letter, const int cx,
+                          const int baseline, const bool black, const bool halo, const EpdFontFamily::Style style) {
+  const EpdGlyph* g = glyphFor(r, fontId, static_cast<unsigned char>(letter), style);
   if (!g) return;
   const char text[2] = {letter, '\0'};
   // Centre the ink horizontally on its own bounding box.
@@ -43,11 +48,11 @@ void drawLetterOnBaseline(GfxRenderer& r, const int fontId, const int ascender, 
   if (halo) {
     for (int oy = -1; oy <= 1; oy++) {
       for (int ox = -1; ox <= 1; ox++) {
-        if (ox != 0 || oy != 0) r.drawText(fontId, x + ox, y + oy, text, !black, EpdFontFamily::BOLD);
+        if (ox != 0 || oy != 0) r.drawText(fontId, x + ox, y + oy, text, !black, style);
       }
     }
   }
-  r.drawText(fontId, x, y, text, black, EpdFontFamily::BOLD);
+  r.drawText(fontId, x, y, text, black, style);
 }
 
 void drawLetter(GfxRenderer& r, const int fontId, const int capH, const int ascender, const char letter, const int cx,

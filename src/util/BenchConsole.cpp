@@ -23,6 +23,7 @@
 #include <MD5Builder.h>
 #include <Memory.h>
 #include <PowerPolicy.h>
+#include <Sudoku.h>
 #include <WordSearch.h>
 #include <driver/gpio.h>
 #include <soc/gpio_reg.h>
@@ -38,6 +39,7 @@
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
 #include "activities/apps/CrosswordActivity.h"
+#include "activities/apps/SudokuActivity.h"
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
@@ -1006,8 +1008,8 @@ void cmdCard(char* args, const bool exclusive) {
   pend.passes = 0;
 }
 
-// APP apps|wordsearch|crossword: the Apps list or a game, as their Home row / list row opens
-// them. The reply waits until the switch has happened.
+// APP apps|wordsearch|crossword|sudoku: the Apps list or a game, as their Home row / list row
+// opens them. The reply waits until the switch has happened.
 void cmdApp(const char* args, const bool exclusive) {
   bench::AppTarget target = bench::AppTarget::Apps;
   if (!bench::parseAppArgs(args, target)) {
@@ -1029,6 +1031,9 @@ void cmdApp(const char* args, const bool exclusive) {
   } else if (target == bench::AppTarget::Crossword) {
     activityManager.goToCrossword();
     snprintf(pathBuf, sizeof(pathBuf), "%s", CrosswordActivity::NAME);
+  } else if (target == bench::AppTarget::Sudoku) {
+    activityManager.goToSudoku();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", SudokuActivity::NAME);
   } else {
     activityManager.goToWordSearch();
     snprintf(pathBuf, sizeof(pathBuf), "%s", WordSearchActivity::NAME);
@@ -1257,6 +1262,154 @@ void cmdCw(char* args, const bool exclusive) {
   }
   dumpCrossword(*game);
   reply("OK CW%s", op);
+}
+
+// The sudoku as the game holds it: the state line, one SU row per grid row (its givens, then the
+// other digits it shows: the player's and revealed ones; '.' empty), the prefs.
+void dumpSudoku(const SudokuActivity& game) {
+  const sd::Model& m = *game.benchModel();
+  const sd::Game& g = m.game;
+  int givens = 0;
+  int notes = 0;
+  int wrong = 0;
+  int revealed = 0;
+  for (int i = 0; i < sd::CELLS; i++) {
+    givens += g.givens[i] != 0;
+    notes += sd::popcount9(g.notes[i]);
+    wrong += sd::isWrongMarked(g, i);
+    revealed += sd::isRevealed(g, i);
+  }
+  char cursor[8] = "-";
+  if (g.cursor < sd::CELLS) snprintf(cursor, sizeof(cursor), "%d,%d", g.cursor / 9 + 1, g.cursor % 9 + 1);
+  char lock[8] = "-";
+  if (g.lock == sd::LOCK_ERASE) {
+    snprintf(lock, sizeof(lock), "erase");
+  } else if (g.lock != sd::LOCK_NONE) {
+    snprintf(lock, sizeof(lock), "%u", static_cast<unsigned>(g.lock));
+  }
+  reply(
+      "SU tier=%s number=%lu seed=%08lx fnv=%08lx givens=%d filled=%d/81 notes=%d cursor=%s mode=%s lock=%s "
+      "clashes=%d wrong=%d revealed=%d solved=%d elapsed=%lu checks=%u hints=%u reveals=%u undo=%d",
+      sd::tierKey(g.tier), static_cast<unsigned long>(g.number), static_cast<unsigned long>(g.seed),
+      static_cast<unsigned long>(g.fnv), givens, sd::CELLS - sd::emptyCount(g), notes, cursor,
+      g.notesMode ? "notes" : "digits", lock, sd::clashCount(g), wrong, revealed, g.solved ? 1 : 0,
+      static_cast<unsigned long>(g.solved ? g.elapsed : game.benchElapsedSeconds()), static_cast<unsigned>(g.checks),
+      static_cast<unsigned>(g.hints), static_cast<unsigned>(g.reveals), m.undo.groups());
+  for (int r = 0; r < 9; r++) {
+    char given[10];
+    char entry[10];
+    for (int c = 0; c < 9; c++) {
+      const int i = r * 9 + c;
+      given[c] = g.givens[i] ? static_cast<char>('0' + g.givens[i]) : '.';
+      entry[c] = !g.givens[i] && g.value[i] ? static_cast<char>('0' + g.value[i]) : '.';
+    }
+    given[9] = '\0';
+    entry[9] = '\0';
+    reply("SU row %d %s %s", r + 1, given, entry);
+  }
+  const sd::Prefs& p = game.benchPrefs();
+  reply("SU prefs tier=%s next=%lu,%lu,%lu,%lu removenotes=%d", sd::tierKey(p.tier),
+        static_cast<unsigned long>(p.next[0]), static_cast<unsigned long>(p.next[1]),
+        static_cast<unsigned long>(p.next[2]), static_cast<unsigned long>(p.next[3]), p.removeNotes ? 1 : 0);
+}
+
+// SU gen <tier> <seed>: one generation off-screen, timed at the full clock (the game generates
+// under the same Lock); the MHz is read before and after.
+void suGen(const int tier, const uint32_t seed) {
+  sd::Generated gen;
+  HalPowerManager::Lock power;
+  const uint32_t mhzBefore = getCpuFrequencyMhz();
+  const unsigned long start = micros();
+  const bool ok = sd::generate(seed, tier, gen);
+  const unsigned long us = micros() - start;
+  const uint32_t mhzAfter = getCpuFrequencyMhz();
+  if (!ok) {
+    reply("ERR SU gen none");
+    return;
+  }
+  reply("SU gen tier=%s seed=%08lx real=%s exact=%d tries=%u givens=%d fnv=%08lx hardest=%s", sd::tierKey(tier),
+        static_cast<unsigned long>(seed), sd::tierKey(gen.tier), gen.exact ? 1 : 0, static_cast<unsigned>(gen.tries),
+        gen.givenCount(), static_cast<unsigned long>(sd::givensFnv(gen.givens)), sd::techName(gen.grade.hardest));
+  reply("OK SU gen ms=%lu.%03lu mhz=%lu/%lu", us / 1000, us % 1000, static_cast<unsigned long>(mhzBefore),
+        static_cast<unsigned long>(mhzAfter));
+}
+
+// SU [new <tier> <n>|seed <tier> <seed>|put r c d|note r c d|erase r c|hint|check|reveal
+// [square|puzzle]|solve|gen <tier> <seed>]: the action through the game's own model, then the
+// dump. Sudoku must be on screen (APP sudoku) for everything but gen.
+void cmdSu(char* args, const bool exclusive) {
+  bench::SuArgs su;
+  if (!bench::parseSuArgs(args, su)) {
+    reply("ERR SU usage");
+    return;
+  }
+  if (su.op == bench::SuOp::Gen) {
+    suGen(su.tier, su.value);
+    return;
+  }
+  auto* game = strcmp(activityManager.benchCurrentName(), SudokuActivity::NAME) == 0
+                   ? static_cast<SudokuActivity*>(activityManager.benchCurrentActivity())
+                   : nullptr;
+  if (!game || !game->benchModel()) {
+    reply("ERR SU notopen act=%s", activityManager.benchCurrentName());
+    return;
+  }
+  // Everything but the dump can write the card (the puzzle, the solved list).
+  if (su.op != bench::SuOp::Dump && storageBusy(exclusive)) {
+    reply("ERR SU busy");
+    return;
+  }
+  const int cell = su.row * 9 + su.col;
+  const char* op = "";
+  switch (su.op) {
+    case bench::SuOp::New:
+      if (!game->benchStart(su.tier, su.value, sd::puzzleSeed(su.tier, su.value))) {
+        reply("ERR SU new");
+        return;
+      }
+      op = " new";
+      break;
+    case bench::SuOp::Seed:
+      if (!game->benchStart(su.tier, 0, su.value)) {
+        reply("ERR SU seed");
+        return;
+      }
+      op = " seed";
+      break;
+    case bench::SuOp::Put:
+      game->benchPut(cell, su.digit);
+      op = " put";
+      break;
+    case bench::SuOp::Note:
+      game->benchNote(cell, su.digit);
+      op = " note";
+      break;
+    case bench::SuOp::Erase:
+      game->benchErase(cell);
+      op = " erase";
+      break;
+    case bench::SuOp::Hint:
+      game->benchHint();
+      op = " hint";
+      break;
+    case bench::SuOp::Check:
+      game->benchCheck(su.scope == 0 ? sd::Scope::Square : sd::Scope::Puzzle);
+      op = " check";
+      break;
+    case bench::SuOp::Reveal:
+      game->benchReveal(su.scope == 0 ? sd::Scope::Square : sd::Scope::Puzzle);
+      op = " reveal";
+      break;
+    case bench::SuOp::Solve:
+      game->benchSolve();
+      op = " solve";
+      break;
+    case bench::SuOp::Dump:
+    case bench::SuOp::Gen:
+      break;
+  }
+  dumpSudoku(*game);
+  reply("OK SU%s", op);
 }
 
 // POWER [fake absent|fake real]: external power as live sleep reads it, or a fake absence so the
@@ -1656,6 +1809,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdWs(args, exclusive);
   } else if (strcmp(verb, "CW") == 0) {
     cmdCw(args, exclusive);
+  } else if (strcmp(verb, "SU") == 0) {
+    cmdSu(args, exclusive);
   } else if (strcmp(verb, "PINS") == 0) {
     cmdPins(args, exclusive);
   } else if (strcmp(verb, "WIFILAST") == 0) {

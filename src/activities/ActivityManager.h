@@ -98,6 +98,7 @@ class ActivityManager {
   void goToApps();
   void goToWordSearch();
   void goToCrossword();
+  void goToSudoku();
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   // live: the live sleep screen (charging, X4 Pro), which stays up and is redrawn; popup = show
   // "Entering sleep" first (not at a boot straight into the live screen).

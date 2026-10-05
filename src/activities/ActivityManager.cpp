@@ -14,6 +14,7 @@
 #include "OpdsServerStore.h"
 #include "apps/AppsActivity.h"
 #include "apps/CrosswordActivity.h"
+#include "apps/SudokuActivity.h"
 #include "apps/WordSearchActivity.h"
 #include "boot_sleep/BootActivity.h"
 #include "boot_sleep/SleepActivity.h"
@@ -127,7 +128,8 @@ void ActivityManager::loop() {
     if (mappedInput.hasTouch() &&
         (currentActivity->name == "Home" || currentActivity->name == "FileBrowser" ||
          currentActivity->name == "Settings" || currentActivity->name == "NetworkModeSelection" ||
-         currentActivity->name == "Apps" || currentActivity->name.rfind("Crossword", 0) == 0)) {
+         currentActivity->name == "Apps" || currentActivity->name.rfind("Crossword", 0) == 0 ||
+         currentActivity->name.rfind("Sudoku", 0) == 0)) {
       int tx = 0;
       int ty = 0;
       // The header back button shares this band; its taps stay Back.
@@ -329,6 +331,15 @@ void ActivityManager::goToCrossword() {
   replaceActivity(std::move(activity));
 }
 
+void ActivityManager::goToSudoku() {
+  auto activity = makeUniqueNoThrow<SudokuActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: sudoku activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+}
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -384,9 +395,9 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem, bool cleanInitialRefr
     } else if (activityName == "CrossPointWebServer") {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
     } else if (activityName == "Apps" || activityName.rfind("WordSearch", 0) == 0 ||
-               activityName.rfind("Crossword", 0) == 0) {
+               activityName.rfind("Crossword", 0) == 0 || activityName.rfind("Sudoku", 0) == 0) {
       // The Apps list and every game screen (Word Search: game, menu, theme picker; Crossword:
-      // game, menu, clue list, picker).
+      // game, menu, clue list, picker; Sudoku: game, menu).
       initialMenuItem = HomeMenuItem::APPS;
     } else if (activityName == "Settings") {
       initialMenuItem = HomeMenuItem::SETTINGS_MENU;

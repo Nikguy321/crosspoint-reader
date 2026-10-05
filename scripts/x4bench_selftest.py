@@ -65,6 +65,7 @@ class FakeDevice(threading.Thread):
         self.act = "Home"
         self.ws_new = []
         self.cw_ops = []
+        self.su_ops = []
         self.pins_runs = []
         self.pins_drop = False  # True: the cable goes mid-run
         self.fb = b""
@@ -238,7 +239,7 @@ class FakeDevice(threading.Thread):
             if self.redraw_lands:
                 self.redraws += 1
         elif verb == "APP":
-            names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword"}
+            names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword", "sudoku": "Sudoku"}
             if rest.lower() not in names:
                 self.emit("ERR APP usage")
                 return
@@ -291,6 +292,39 @@ class FakeDevice(threading.Thread):
                 self.emit(f"CW row {row}")
             self.emit("CW clue 1A Simple shelter in the woods", noise=True)
             self.emit(f"OK CW {op}".rstrip())
+        elif verb == "SU":
+            words = rest.lower().split()
+            op = words[0] if words else ""
+            if op not in ("", "new", "seed", "put", "note", "erase", "hint", "check", "reveal", "solve", "gen"):
+                self.emit("ERR SU usage")
+                return
+            tiers = ("easy", "medium", "hard", "expert")
+            if op in ("new", "seed", "gen") and (len(words) != 3 or words[1] not in tiers):
+                self.emit("ERR SU usage")
+                return
+            if op in ("put", "note") and (len(words) != 4 or not all(w in "123456789" and len(w) == 1
+                                                                    for w in words[1:])):
+                self.emit("ERR SU usage")
+                return
+            if op == "gen":
+                self.su_ops.append(rest)
+                self.emit(f"SU gen tier={words[1]} seed=000004d2 real={words[1]} exact=1 tries=9 givens=28 "
+                          "fnv=94927fb0 hardest=Trial", noise=True)
+                self.emit("OK SU gen ms=84.512 mhz=240/240")
+                return
+            if self.act != "Sudoku":
+                self.emit(f"ERR SU notopen act={self.act}")
+                return
+            if op:
+                self.su_ops.append(rest)
+            solved = op == "solve"
+            self.emit(f"SU tier=medium number=14 seed=1a2b3c4d fnv=7db44385 givens=28 filled={81 if solved else 29}/81 "
+                      f"notes=0 cursor=1,3 mode=digits lock=- clashes=0 wrong=0 revealed=0 solved={1 if solved else 0} "
+                      "elapsed=12 checks=0 hints=0 reveals=0 undo=1")
+            for r in range(1, 10):
+                self.emit(f"SU row {r} 5.3..7... ..7......" if r == 1 else f"SU row {r} ......... .........")
+            self.emit("SU prefs tier=medium next=1,15,1,1 removenotes=1", noise=True)
+            self.emit(f"OK SU {op}".rstrip())
         elif verb == "PINS":
             seconds = rest or "60"
             if not seconds.isdigit() or not 1 <= int(seconds) <= 180:
@@ -581,6 +615,35 @@ class BenchSelfTest(unittest.TestCase):
         code, _ = self.cli("cw", "open", "/Puzzles/Crossword/x.jpz")
         self.assertEqual(code, x4bench.EXIT_ERR)
         code, _ = self.cli("cw", "fill")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_app_and_sudoku(self):
+        self.ser.close()
+        code, out = self.cli("su", "gen", "expert", "1234")  # works on any screen
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("gen tier=expert seed=000004d2 real=expert"))
+        self.assertEqual(lines[-1], "OK SU gen ms=84.512 mhz=240/240")
+        code, _ = self.cli("su")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # not open yet
+        code, out = self.cli("app", "sudoku")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=Sudoku\n"))
+        code, out = self.cli("su", "new", "medium", "14")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("tier=medium number=14"))
+        self.assertEqual(lines[1], "row 1 5.3..7... ..7......")
+        self.assertEqual(len([l for l in lines if l.startswith("row ")]), 9)
+        self.assertEqual(lines[10], "prefs tier=medium next=1,15,1,1 removenotes=1")
+        self.assertEqual(lines[-1], "OK SU new")
+        code, out = self.cli("su", "put", "1", "3", "7")
+        self.assertEqual(out.splitlines()[-1], "OK SU put")
+        code, out = self.cli("su", "solve")
+        self.assertIn("solved=1", out.splitlines()[0])
+        self.assertEqual(self.dev.su_ops, ["gen expert 1234", "new medium 14", "put 1 3 7", "solve"])
+        code, _ = self.cli("su", "put", "1", "3")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, _ = self.cli("su", "fill")
         self.assertEqual(code, x4bench.EXIT_ERR)
 
     def test_pins_streams_until_done(self):

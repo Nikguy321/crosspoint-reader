@@ -893,6 +893,120 @@ TEST(BenchApp, AppsOrWordSearch) {
   EXPECT_FALSE(parseAppArgs("cross word", target));
   EXPECT_FALSE(parseAppArgs("apps now", target));
   EXPECT_FALSE(parseAppArgs("wordsearchwordsearch", target));
+  EXPECT_TRUE(parseAppArgs(" Sudoku ", target));
+  EXPECT_EQ(target, AppTarget::Sudoku);
+  EXPECT_FALSE(parseAppArgs("sudoku now", target));
+}
+
+namespace {
+SuArgs parseSu(const char* text, bool& ok) {
+  char buf[96];
+  std::snprintf(buf, sizeof(buf), "%s", text);
+  SuArgs args;
+  ok = parseSuArgs(buf, args);
+  return args;
+}
+}  // namespace
+
+TEST(BenchSu, DumpHintSolve) {
+  bool ok = false;
+  EXPECT_EQ(parseSu("", ok).op, SuOp::Dump);
+  EXPECT_TRUE(ok);
+  SuArgs empty;
+  EXPECT_TRUE(parseSuArgs(nullptr, empty));
+  EXPECT_EQ(empty.op, SuOp::Dump);
+  EXPECT_EQ(parseSu(" HINT ", ok).op, SuOp::Hint);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(parseSu("solve", ok).op, SuOp::Solve);
+  EXPECT_TRUE(ok);
+  parseSu("solve now", ok);
+  EXPECT_FALSE(ok);
+  parseSu("fill", ok);
+  EXPECT_FALSE(ok);
+}
+
+TEST(BenchSu, NewSeedAndGenTakeATier) {
+  bool ok = false;
+  SuArgs a = parseSu("new medium 14", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::New);
+  EXPECT_EQ(a.tier, 1);
+  EXPECT_EQ(a.value, 14u);
+  a = parseSu("NEW Expert 1", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.tier, 3);
+  parseSu("new medium 0", ok);  // numbers start at 1
+  EXPECT_FALSE(ok);
+  parseSu("new extreme 3", ok);
+  EXPECT_FALSE(ok);
+  parseSu("new easy", ok);
+  EXPECT_FALSE(ok);
+  parseSu("new easy 1 2", ok);
+  EXPECT_FALSE(ok);
+  a = parseSu("seed hard 0x7D59D8BA", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Seed);
+  EXPECT_EQ(a.tier, 2);
+  EXPECT_EQ(a.value, 0x7D59D8BAu);
+  a = parseSu("seed easy 0", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.value, 0u);
+  a = parseSu("gen expert 1234", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Gen);
+  EXPECT_EQ(a.tier, 3);
+  EXPECT_EQ(a.value, 1234u);
+  parseSu("gen expert 0x123456789", ok);  // more than 32 bits
+  EXPECT_FALSE(ok);
+  parseSu("gen expert -1", ok);
+  EXPECT_FALSE(ok);
+}
+
+TEST(BenchSu, SquaresAreOneBasedOnTheWire) {
+  bool ok = false;
+  SuArgs a = parseSu("put 1 9 7", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Put);
+  EXPECT_EQ(a.row, 0);
+  EXPECT_EQ(a.col, 8);
+  EXPECT_EQ(a.digit, 7);
+  a = parseSu("note 9 1 1", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Note);
+  EXPECT_EQ(a.row, 8);
+  EXPECT_EQ(a.col, 0);
+  a = parseSu("erase 5 5", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Erase);
+  EXPECT_EQ(a.row, 4);
+  EXPECT_EQ(a.digit, 0);
+  for (const char* bad : {"put 0 1 1", "put 1 10 1", "put 1 1 0", "put 1 1", "note 1 1 10", "erase 1", "erase 1 1 1",
+                          "put a 1 1", "put 1 1 1 1"}) {
+    parseSu(bad, ok);
+    EXPECT_FALSE(ok) << bad;
+  }
+}
+
+TEST(BenchSu, CheckAndRevealScopes) {
+  bool ok = false;
+  SuArgs a = parseSu("check", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Check);
+  EXPECT_EQ(a.scope, 1);
+  a = parseSu("check square", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.scope, 0);
+  a = parseSu("reveal PUZZLE", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, SuOp::Reveal);
+  EXPECT_EQ(a.scope, 1);
+  a = parseSu("reveal square", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.scope, 0);
+  parseSu("check word", ok);
+  EXPECT_FALSE(ok);
+  parseSu("reveal square now", ok);
+  EXPECT_FALSE(ok);
 }
 
 TEST(BenchCw, DumpListSolve) {

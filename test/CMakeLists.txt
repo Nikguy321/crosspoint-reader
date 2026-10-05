@@ -100,6 +100,9 @@ add_subdirectory(word_search_preview)
 # Crossword: the pure half (parsers, play rules, layout, saves, built-ins), then its drawing.
 add_subdirectory(crossword)
 add_subdirectory(crossword_preview)
+# Sudoku: the pure half (engine, play rules, undo, saves, layout, touch), then its drawing.
+add_subdirectory(sudoku)
+add_subdirectory(sudoku_preview)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)

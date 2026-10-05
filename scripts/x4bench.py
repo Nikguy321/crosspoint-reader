@@ -21,11 +21,14 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py redraw               # the live sleep screen redraws now
   scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
   scripts/x4bench.py weather              # the Weather card's cache (or: weather fetch|clear)
-  scripts/x4bench.py app wordsearch       # open Word Search (or: app apps / app crossword)
+  scripts/x4bench.py app wordsearch       # open Word Search (or: app apps / crossword / sudoku)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
   scripts/x4bench.py cw open builtin:mini-001     # Crossword: open a puzzle, then the dump
   scripts/x4bench.py cw type HUT          # type through the keyboard's handler ('-' = Del)
+  scripts/x4bench.py su new medium 14     # Sudoku: numbered puzzle 14 of Medium, then the dump
+  scripts/x4bench.py su put 1 3 7         # a 7 in row 1, column 3 (1-based)
+  scripts/x4bench.py su gen expert 1234   # time one generation (any screen): ms and MHz
   scripts/x4bench.py pins 60              # USB-detect pin hunt: pull the cable mid-run
   scripts/x4bench.py power fake absent    # live screen: act unplugged (the full-charge hold)
   scripts/x4bench.py power fake real      # ... and back (or just: power, to read it)
@@ -124,7 +127,7 @@ Verbs
                            ERR REDRAW notlive otherwise. The draw lands on a
                            later loop pass: "x4bench.py redraw" waits for
                            STATE redraws= to pass that count.
-  APP apps|wordsearch|crossword
+  APP apps|wordsearch|crossword|sudoku
                            open the Apps list or a game the way their rows
                            do (a replace): OK APP act=<name> once it is up.
   WS                       the Word Search puzzle on screen (ERR WS notopen
@@ -172,6 +175,41 @@ Verbs
                            centres x 30 + 46.6 n; row 2 from x 53; row 3: Menu
                            x 42, Z..M from x 100, Del x 438); "<" (31,592),
                            ">" (449,592), the clue text (240,592).
+  SU                       the Sudoku on screen (ERR SU notopen otherwise):
+                           SU tier= number= seed=<8 hex> fnv=<8 hex> givens=
+                           filled=n/81 notes=<marks> cursor=r,c|- mode=digits|
+                           notes lock=-|1-9|erase clashes= wrong=<squares a
+                           check or hint marked> revealed= solved=0|1
+                           elapsed=<s> checks= hints= reveals= undo=<steps>,
+                           one SU row <r> <givens> <other digits> per row
+                           ('.' empty; rows and columns 1-9), SU prefs tier=
+                           next=<easy>,<medium>,<hard>,<expert> removenotes=,
+                           then OK SU.
+  SU new <tier> <n>        numbered puzzle n of a tier (easy, medium, hard,
+                           expert), generated now as New puzzle does (the
+                           prefs' counters stay); the dump, then OK SU new.
+  SU seed <tier> <seed>    a puzzle from a raw seed (decimal or 0x hex),
+                           number 0; OK SU seed.
+  SU put <r> <c> <d>       a digit (1-based row, column; 1-9) through the
+                           game's model (the cursor moves there); OK SU put.
+  SU note <r> <c> <d>      toggles a pencil mark; OK SU note.
+  SU erase <r> <c>         the square's digit, else its notes; OK SU erase.
+  SU hint                  as the menu's Hint; OK SU hint.
+  SU check|reveal [square|puzzle]
+                           as the menu rows (default puzzle; square = the
+                           cursor's); OK SU check / OK SU reveal.
+  SU solve                 writes every missing or wrong digit (completion
+                           tests); OK SU solve.
+  SU gen <tier> <seed>     generates off-screen on any screen, holding the
+                           full-clock lock as the game does: SU gen tier=
+                           seed= real=<tier> exact= tries= givens= fnv=
+                           hardest=<technique>, then OK SU gen ms=<ms.us>
+                           mhz=<before>/<after>.
+                           Taps: square r,c at x 37 + 50 (c-1) + (c-1)//3 * 2,
+                           y 143 + 50 (r-1) + (r-1)//3 * 2; digit key d at the
+                           same x as column d, y 658; Notes (65,753), Erase
+                           (182,753), Undo (298,753), Menu (415,753); the
+                           solved banner's New puzzle (240,744).
   PINS [seconds]           X4 Pro USB/VBUS-detect hunt, 1-180 s (default 60):
                            OK PINS seconds= probe=<pins> log=/pins.log, then
                            "PINS <ms> pin <n> <0|1>" lines (a start snapshot,
@@ -846,11 +884,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", nargs="?", default="show", choices=("show", "fetch", "clear"))
     s = sub.add_parser("power", help="dev: read external power, or 'fake absent' / 'fake real' (live screen)")
     s.add_argument("words", nargs="*", metavar="fake absent|fake real")
-    s = sub.add_parser("app", help="open the Apps list, Word Search or Crossword")
-    s.add_argument("name", choices=("apps", "wordsearch", "crossword"))
+    s = sub.add_parser("app", help="open the Apps list, Word Search, Crossword or Sudoku")
+    s.add_argument("name", choices=("apps", "wordsearch", "crossword", "sudoku"))
     s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
     s.add_argument("args", nargs=argparse.REMAINDER)
     s = sub.add_parser("cw", help="Crossword: dump, or open/type/cursor/check/reveal/solve/list (see the top)")
+    s.add_argument("args", nargs=argparse.REMAINDER)
+    s = sub.add_parser("su", help="Sudoku: dump, or new/seed/put/note/erase/hint/check/reveal/solve/gen (see the top)")
     s.add_argument("args", nargs=argparse.REMAINDER)
     s = sub.add_parser("pins", help="X4 Pro USB-detect pin hunt (pull the cable mid-run)")
     s.add_argument("seconds", nargs="?", type=int, default=60)
@@ -975,6 +1015,12 @@ def run(args, link: Link, out=sys.stdout) -> int:
         for line in body:
             print(line[3:] if line.startswith("CW ") else line, file=out)
         print(f"OK CW {rest}".rstrip(), file=out)
+    elif op == "su":
+        text = " ".join(["SU", *args.args]).strip()
+        rest, body = link.command(text, t or 30)
+        for line in body:
+            print(line[3:] if line.startswith("SU ") else line, file=out)
+        print(f"OK SU {rest}".rstrip(), file=out)
     elif op == "pins":
         return run_pins(link, args.seconds, t, out)
     elif op == "wifilast":

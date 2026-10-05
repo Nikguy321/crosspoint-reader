@@ -81,8 +81,8 @@ bool parseSleepArgs(const char* args, SleepKind& out);
 constexpr size_t SSID_MAX_BYTES = 32;
 bool isValidSsid(const char* ssid);
 
-// APP apps|wordsearch|crossword: open the Apps list or a game (case ignored).
-enum class AppTarget : uint8_t { Apps, WordSearch, Crossword };
+// APP apps|wordsearch|crossword|sudoku: open the Apps list or a game (case ignored).
+enum class AppTarget : uint8_t { Apps, WordSearch, Crossword, Sudoku };
 bool parseAppArgs(const char* args, AppTarget& out);
 
 // WEATHER [show|fetch|clear]: the Weather card's cache summarised (the default), a fetch now on a
@@ -132,6 +132,29 @@ struct CwArgs {
   uint8_t scope = 0;  // Check / Reveal: 0 letter, 1 word, 2 puzzle (cw::Scope)
 };
 bool parseCwArgs(char* args, CwArgs& out);
+
+// SU                              the sudoku on screen, dumped
+// SU new <tier> <n>                numbered puzzle n of a tier, as New puzzle makes it (the prefs'
+//                                  counters are left alone)
+// SU seed <tier> <seed>            a puzzle from a raw seed (decimal, or hex with 0x), number 0
+// SU put <r> <c> <d>               a digit (rows, columns 1-9; digits 1-9) through the model
+// SU note <r> <c> <d>              toggles a pencil mark
+// SU erase <r> <c>                 the square's digit, else its notes
+// SU hint | SU solve               a hint as the menu row; every missing or wrong digit written
+// SU check|reveal [square|puzzle]  as the menu rows (default puzzle)
+// SU gen <tier> <seed>             generates off-screen (on any screen): the time and the clock
+// Tiers: easy medium hard expert (case ignored). Parses in place.
+enum class SuOp : uint8_t { Dump, New, Seed, Put, Note, Erase, Hint, Check, Reveal, Solve, Gen };
+struct SuArgs {
+  SuOp op = SuOp::Dump;
+  int8_t tier = -1;    // New, Seed, Gen: 0 easy .. 3 expert
+  uint32_t value = 0;  // New: the number (>= 1); Seed, Gen: the seed
+  int8_t row = -1;     // Put, Note, Erase: 0..8 (the wire's 1..9 less one)
+  int8_t col = -1;
+  int8_t digit = 0;   // Put, Note: 1..9
+  uint8_t scope = 1;  // Check, Reveal: 0 square, 1 puzzle (sd::Scope)
+};
+bool parseSuArgs(char* args, SuArgs& out);
 
 // PINS [seconds]: the USB/VBUS-detect pin hunt (default 60, 1..180).
 constexpr uint32_t PINS_DEFAULT_SECONDS = 60;

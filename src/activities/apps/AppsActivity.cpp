@@ -24,6 +24,15 @@ AppsActivity::AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInpu
     apps_[appCount_] = App::Crossword;
     rowItems_[appCount_++] = crossword;
   }
+  // Sudoku is played on its on-screen keys: touch boards only.
+  if (mappedInput.hasTouch()) {
+    fui::ListItem sudoku;
+    sudoku.label = tr(STR_SUDOKU);
+    sudoku.subtitle = tr(STR_SUDOKU_DESC);
+    sudoku.icon = fui::bitmapFromIcon(icon_sudoku_32);
+    apps_[appCount_] = App::Sudoku;
+    rowItems_[appCount_++] = sudoku;
+  }
   for (int i = 0; i < appCount_; i++) rowItems_[i].actionValue = static_cast<int16_t>(i);
 }
 
@@ -58,6 +67,9 @@ void AppsActivity::activateIndex(const int index) {
       return;
     case App::Crossword:
       activityManager.goToCrossword();
+      return;
+    case App::Sudoku:
+      activityManager.goToSudoku();
       return;
   }
 }

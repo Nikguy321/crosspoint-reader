@@ -627,3 +627,58 @@ a new file name:
 ```
 <fnv8hex> <source key>
 ```
+
+## Sudoku
+
+Sudoku ships no puzzles: the reader generates each one (`lib/Sudoku/SdEngine`). Numbered puzzle `n` of a tier is seeded
+with FNV-1a 32 of the text `sudoku <tier> <n>` (`sudoku medium 14`; tiers `easy`, `medium`, `hard`, `expert`), and a
+puzzle's identity is FNV-1a 32 over its 81 givens (bytes 0-9, row by row). The save keeps the givens and the solution,
+never just the seed, so a firmware whose generator changed never alters a puzzle in progress.
+
+### Save files (`/.crosspoint/sudoku/`)
+
+Written tmp -> remove -> rename; when a main file is missing, the `.tmp` beside it (a power cut between the last two
+steps) is read instead. The solved list is appended to. Anything that does not parse and validate completely is no save:
+a fresh puzzle (or default prefs).
+
+`puzzle.dat` (about 720 bytes), the puzzle being played:
+
+```
+SD1
+tier easy|medium|hard|expert
+number <u32>                      (0 for a bench seed)
+seed <8 hex digits>
+fnv <8 hex digits>                (of the givens)
+givens <81: '.' or 1-9>           (row by row)
+solution <81: 1-9>
+entries <81: '.' or 1-9>          (the player's and revealed digits; '.' on the givens)
+notes <243 hex digits>            (3 a square: a 9-bit mask, digit d at bit d - 1)
+flags <81: '.', 'w' wrong, 'r' revealed>
+cursor <0-80> | -
+mode <notes 0|1> <lock 0-9 | e>   (lock: 0 none, a digit, or e for Erase)
+elapsed <seconds>
+counts <checks> <hints> <reveals>
+solved 0|1
+end
+```
+
+On load the whole game is checked: the solution is a complete valid grid, the givens are part of it and have exactly
+that one solution, the fnv matches, notes only on empty squares, `r` only on a right non-given digit, `w` only on a
+wrong one, and `solved` exactly when every square matches. The undo history is not saved.
+
+`prefs.txt`:
+
+```
+SP1
+tier easy|medium|hard|expert      (the tier New puzzle makes)
+next <easy> <medium> <hard> <expert>   (the next number of each, >= 1)
+removenotes 0|1
+end
+```
+
+`solved.txt`, one line per solved puzzle, oldest first, at most 1000 (the oldest are dropped when the list is
+rewritten); a puzzle finished with reveals is listed with them:
+
+```
+<fnv8hex> <tier> <number> <seconds> <checks> <hints> <reveals>
+```
