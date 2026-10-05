@@ -1,0 +1,71 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 16",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, 4, "#", 5, 6, 7, 8],
+  [9, 0, 0, 0, "#", 10, 0, 0, 0],
+  [11, 0, 0, 0, "#", 12, 0, 0, 0],
+  [13, 0, 0, "#", 14, 0, 0, 0, 0],
+  ["#", "#", 15, 16, 0, 0, 0, "#", "#"],
+  [17, 18, 0, 0, 0, "#", 19, 20, 21],
+  [22, 0, 0, 0, "#", 23, 0, 0, 0],
+  [24, 0, 0, 0, "#", 25, 0, 0, 0],
+  [26, 0, 0, 0, "#", 27, 0, 0, 0]
+ ],
+ "solution": [
+  ["S", "W", "A", "B", "#", "S", "W", "A", "T"],
+  ["L", "A", "C", "Y", "#", "O", "H", "I", "O"],
+  ["O", "N", "C", "E", "#", "N", "O", "D", "S"],
+  ["B", "E", "E", "#", "T", "A", "L", "E", "S"],
+  ["#", "#", "S", "H", "O", "R", "E", "#", "#"],
+  ["E", "N", "S", "U", "E", "#", "S", "I", "T"],
+  ["L", "A", "I", "N", "#", "D", "O", "T", "E"],
+  ["K", "N", "O", "T", "#", "O", "M", "E", "N"],
+  ["S", "A", "N", "S", "#", "G", "E", "M", "S"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Mop, as a ship's deck"],
+   [5, "Slap at, as a fly"],
+   [9, "Like a fancy doily"],
+   [10, "State whose capital is Columbus"],
+   [11, "___ upon a time"],
+   [12, "Silent yeses"],
+   [13, "Spelling ___"],
+   [14, "Stories"],
+   [15, "Land along a lake"],
+   [17, "Follow as a result"],
+   [19, "Take a seat"],
+   [22, "Had ___ down for a nap"],
+   [23, "Lavish affection (on)"],
+   [24, "Tangle in a shoelace"],
+   [25, "Black cat, to the superstitious"],
+   [26, "Without, in French"],
+   [27, "Precious stones"]
+  ],
+  "Down": [
+   [1, "Messy person"],
+   [2, "Shrink, as the moon"],
+   [3, "Coming to the throne"],
+   [4, "Free pass in a tournament round"],
+   [5, "Echo-based locating system on ships"],
+   [6, "Good for body and mind"],
+   [7, "Helper on a staff"],
+   [8, "Throw gently"],
+   [14, "Front tip of a shoe"],
+   [16, "Searches (for)"],
+   [17, "Antlered beasts of the Rockies"],
+   [18, "Grandma, to a toddler"],
+   [20, "Single article for sale"],
+   [21, "Top scores on a 1-to-10 scale"],
+   [23, "Pet that fetches"]
+  ]
+ }
+}

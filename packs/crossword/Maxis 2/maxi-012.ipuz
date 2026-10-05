@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 12",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, "#", 11, 0, 0, 0],
+  [12, 0, 0, 0, 13, 0, 0, 0, 0],
+  ["#", "#", "#", 14, 0, 0, "#", "#", "#"],
+  [15, 16, 17, 0, 0, 0, 18, 19, 20],
+  [21, 0, 0, 0, "#", 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "M", "O", "M", "#", "A", "P", "P", "S"],
+  ["R", "I", "P", "E", "#", "G", "L", "E", "E"],
+  ["A", "C", "E", "D", "#", "R", "U", "L", "E"],
+  ["M", "A", "N", "I", "F", "E", "S", "T", "S"],
+  ["#", "#", "#", "T", "I", "E", "#", "#", "#"],
+  ["P", "A", "L", "A", "T", "A", "B", "L", "E"],
+  ["E", "X", "I", "T", "#", "B", "O", "I", "L"],
+  ["E", "L", "S", "E", "#", "L", "O", "C", "K"],
+  ["L", "E", "T", "S", "#", "E", "K", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Ma"],
+   [4, "Phone programs"],
+   [8, "Ready to eat, as fruit"],
+   [9, "Great delight"],
+   [10, "Got a perfect score on"],
+   [11, "Govern"],
+   [12, "Shows clearly"],
+   [14, "Fasten with a knot"],
+   [15, "Acceptable to the taste"],
+   [21, "Way out"],
+   [22, "Heat until bubbling"],
+   [23, "Otherwise"],
+   [24, "Secure with a key"],
+   [25, "Permits"],
+   [26, "___ out a win (barely succeed)"]
+  ],
+  "Down": [
+   [1, "Shiny mineral that splits into thin sheets"],
+   [2, "Unwrap, as a gift"],
+   [3, "Sits quietly in deep thought"],
+   [4, "Easy to get along with"],
+   [5, "Addition sign"],
+   [6, "Animal skin with fur"],
+   [7, "Spots"],
+   [8, "Male sheep"],
+   [13, "In good shape"],
+   [15, "Banana skin"],
+   [16, "Rod that wheels turn on"],
+   [17, "To-do ___"],
+   [18, "Novel, for one"],
+   [19, "Tiny pests in hair"],
+   [20, "Big deer of the West"]
+  ]
+ }
+}

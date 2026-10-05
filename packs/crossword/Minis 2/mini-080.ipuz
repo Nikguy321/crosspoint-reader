@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 80",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  [1, 2, 3, 4, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0]
+ ],
+ "solution": [
+  ["L", "A", "R", "C", "H"],
+  ["O", "P", "E", "R", "A"],
+  ["N", "A", "V", "E", "L"],
+  ["G", "R", "U", "E", "L"],
+  ["S", "T", "E", "P", "S"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Conifer that sheds its needles each fall"],
+   [6, "Drama that is sung, not spoken"],
+   [7, "Seedless orange variety"],
+   [8, "Thin, watery porridge"],
+   [9, "Staircase parts"]
+  ],
+  "Down": [
+   [1, "Yearns (for)"],
+   [2, "In separate places"],
+   [3, "Stage show of skits and songs"],
+   [4, "Move at a snail's pace"],
+   [5, "Corridors"]
+  ]
+ }
+}

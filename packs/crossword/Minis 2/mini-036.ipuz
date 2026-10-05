@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 36",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "L", "A", "Y"],
+  ["#", "M", "U", "L", "E"],
+  ["R", "E", "C", "A", "P"],
+  ["A", "S", "K", "S", "#"],
+  ["W", "H", "Y", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Set down gently"],
+   [4, "Stubborn pack animal"],
+   [5, "Brief summary"],
+   [6, "Inquires"],
+   [7, "For what reason?"]
+  ],
+  "Down": [
+   [1, "Fortunate"],
+   [2, "Sad to say"],
+   [3, "Casual yes"],
+   [4, "Screen door material"],
+   [5, "Uncooked"]
+  ]
+ }
+}

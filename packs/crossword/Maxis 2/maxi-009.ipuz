@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 9",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, "#", 11, 0, 0, 0],
+  [12, 0, 0, 0, 13, 0, 0, 0, 0],
+  ["#", "#", "#", 14, 0, 0, "#", "#", "#"],
+  [15, 16, 17, 0, 0, 0, 18, 19, 20],
+  [21, 0, 0, 0, "#", 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "S", "I", "P", "#", "O", "G", "R", "E"],
+  ["F", "A", "C", "E", "#", "P", "L", "A", "Y"],
+  ["E", "V", "E", "N", "#", "T", "O", "T", "E"],
+  ["D", "E", "S", "C", "R", "I", "B", "E", "S"],
+  ["#", "#", "#", "H", "I", "M", "#", "#", "#"],
+  ["A", "R", "M", "A", "D", "I", "L", "L", "O"],
+  ["L", "E", "A", "N", "#", "S", "O", "I", "L"],
+  ["S", "A", "L", "T", "#", "T", "O", "L", "D"],
+  ["O", "P", "T", "S", "#", "S", "P", "Y", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Small taste of a drink"],
+   [4, "Big, scary storybook creature"],
+   [8, "Front of a clock"],
+   [9, "Show at the theater"],
+   [10, "Tied, as a score"],
+   [11, "Lug around"],
+   [12, "Tells what something is like"],
+   [14, "That guy"],
+   [15, "Mammal with a bony shell"],
+   [21, "Not fatty, as meat"],
+   [22, "Dirt in a flowerpot"],
+   [23, "It's sprinkled on icy sidewalks"],
+   [24, "Informed"],
+   [25, "Makes a choice"],
+   [26, "Watch in secret"]
+  ],
+  "Down": [
+   [1, "Put money aside"],
+   [2, "Frosts, as a cake"],
+   [3, "Strong likings"],
+   [4, "Glass-half-full types"],
+   [5, "Blob of goo"],
+   [6, "Give stars to, as a movie"],
+   [7, "Potato spots"],
+   [8, "Gave a meal to"],
+   [13, "Free (of)"],
+   [15, "Besides"],
+   [16, "Bring in, as wheat"],
+   [17, "Thick soda fountain shake"],
+   [18, "Roller coaster circle"],
+   [19, "Easter flower"],
+   [20, "Up in years"]
+  ]
+ }
+}

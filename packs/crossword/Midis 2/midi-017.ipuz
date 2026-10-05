@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 17",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "L", "A", "S", "H", "#"],
+  ["#", "T", "I", "L", "L", "E", "R"],
+  ["D", "E", "C", "L", "A", "R", "E"],
+  ["A", "X", "E", "#", "S", "O", "D"],
+  ["R", "A", "N", "C", "H", "E", "S"],
+  ["E", "N", "S", "U", "E", "S", "#"],
+  ["#", "S", "E", "E", "D", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Hair coated with mascara"],
+   [5, "Lever that steers a small boat"],
+   [7, "Announce officially"],
+   [8, "Lumberjack's chopper"],
+   [9, "Lawn grass sold in rolls"],
+   [10, "Big cattle farms"],
+   [12, "Follows as a result"],
+   [13, "Tiny start of a plant"]
+  ],
+  "Down": [
+   [1, "Official permit to drive or fish"],
+   [2, "Each and every one"],
+   [3, "Cut sharply, as prices"],
+   [4, "Brave rescuers"],
+   [5, "People from Dallas or Houston"],
+   [6, "Scarlet and crimson"],
+   [7, "Have the nerve"],
+   [11, "Pool stick"]
+  ]
+ }
+}

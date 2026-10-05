@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 29",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, 4],
+  ["#", 5, 6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  [13, 0, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "F", "I", "A", "T"],
+  ["#", "T", "W", "I", "N", "G", "E"],
+  ["S", "H", "O", "R", "T", "E", "N"],
+  ["P", "I", "N", "#", "A", "N", "D"],
+  ["I", "N", "D", "I", "C", "T", "S"],
+  ["E", "L", "E", "C", "T", "S", "#"],
+  ["L", "Y", "R", "E", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Official decree"],
+   [5, "Sudden sharp pang"],
+   [7, "Trim, as pants that are too long"],
+   [8, "Bowling target"],
+   [9, "Bread ___ butter"],
+   [10, "Formally charges with a crime"],
+   [12, "Votes into office"],
+   [13, "Harp-like instrument of ancient Greece"]
+  ],
+  "Down": [
+   [1, "Evergreen tree with flat needles"],
+   [2, "Undamaged"],
+   [3, "Representatives for actors or writers"],
+   [4, "Looks after"],
+   [5, "In a sparse way"],
+   [6, "Awe"],
+   [7, "Salesperson's pitch"],
+   [11, "Hockey surface"]
+  ]
+ }
+}

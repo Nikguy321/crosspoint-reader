@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 73",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "T", "A", "R", "T"],
+  ["D", "I", "V", "E", "R"],
+  ["R", "A", "I", "S", "E"],
+  ["I", "R", "A", "T", "E"],
+  ["P", "A", "N", "S", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Small fruit-filled pastry"],
+   [5, "Swimmer who leaps off a high board"],
+   [6, "Bump in pay"],
+   [7, "Seeing red"],
+   [8, "Skillets and woks"]
+  ],
+  "Down": [
+   [1, "Sparkly headpiece for a princess"],
+   [2, "Having to do with birds"],
+   [3, "Takes a break"],
+   [4, "Spruce or cedar"],
+   [5, "Sound from a leaky faucet"]
+  ]
+ }
+}

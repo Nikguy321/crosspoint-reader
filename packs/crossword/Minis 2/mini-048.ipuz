@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 48",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "E", "L", "M"],
+  ["I", "G", "L", "O", "O"],
+  ["R", "A", "B", "I", "D"],
+  ["O", "Z", "O", "N", "E"],
+  ["N", "E", "W", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Tall shade tree with toothed leaves"],
+   [4, "Dome made of snow blocks"],
+   [6, "Wildly enthusiastic, as a fan"],
+   [7, "Form of oxygen with three atoms per molecule"],
+   [8, "Fresh out of the box"]
+  ],
+  "Down": [
+   [1, "Joint in the middle of the arm"],
+   [2, "Pork cut for roasting"],
+   [3, "Method, as of transportation"],
+   [4, "Mineral in spinach and red meat"],
+   [5, "Look long and steadily"]
+  ]
+ }
+}

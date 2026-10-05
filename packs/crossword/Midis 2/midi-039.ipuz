@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 39",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  [5, 6, 0, 0, 0, 0, "#"],
+  [7, 0, 0, 0, 0, 0, 8],
+  [9, 0, 0, "#", 10, 0, 0],
+  [11, 0, 0, 12, 0, 0, 0],
+  ["#", 13, 0, 0, 0, 0, 0],
+  ["#", 14, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "C", "O", "A", "T", "#"],
+  ["S", "L", "O", "W", "E", "R", "#"],
+  ["L", "I", "T", "E", "R", "A", "L"],
+  ["A", "P", "E", "#", "A", "C", "E"],
+  ["P", "I", "R", "A", "T", "E", "S"],
+  ["#", "D", "I", "G", "E", "S", "T"],
+  ["#", "S", "E", "E", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Layer of paint"],
+   [5, "Not as fast"],
+   [7, "Word-for-word, as a translation"],
+   [9, "Mimic"],
+   [10, "Serve that can't be returned"],
+   [11, "Ship raiders of old"],
+   [13, "Break down, as food"],
+   [14, "Notices"]
+  ],
+  "Down": [
+   [1, "Close-knit circle of friends"],
+   [2, "Need to pay back"],
+   [3, "Pokes holes in, as a lawn"],
+   [4, "Copies using see-through paper"],
+   [5, "Hockey's ___ shot"],
+   [6, "Fats, to a biologist"],
+   [8, "For fear that"],
+   [12, "Bronze ___"]
+  ]
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 36",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "G", "A", "P", "S", "#"],
+  ["#", "S", "E", "C", "R", "E", "T"],
+  ["A", "U", "S", "T", "E", "R", "E"],
+  ["J", "E", "T", "#", "D", "E", "N"],
+  ["A", "D", "A", "M", "A", "N", "T"],
+  ["R", "E", "L", "A", "T", "E", "#"],
+  ["#", "S", "T", "Y", "E", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Holes in a fence"],
+   [5, "Something kept hidden"],
+   [7, "Stern and plain"],
+   [8, "Jumbo ___"],
+   [9, "Bear's winter home"],
+   [10, "Firmly unyielding"],
+   [12, "Tell, as a story"],
+   [13, "Eyelid bump"]
+  ],
+  "Down": [
+   [1, "Whole that's more than its parts"],
+   [2, "Perform on stage"],
+   [3, "Come before in time"],
+   [4, "Tranquil"],
+   [5, "Soft leathers with a napped finish"],
+   [6, "Circus big top, e.g."],
+   [7, "Slightly open, as a door"],
+   [11, "Month before June"]
+  ]
+ }
+}

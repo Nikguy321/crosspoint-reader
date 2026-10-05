@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 54",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "B", "I", "N"],
+  ["C", "E", "L", "L", "O"],
+  ["O", "V", "A", "L", "S"],
+  ["M", "E", "S", "S", "Y"],
+  ["A", "R", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Recycling container"],
+   [4, "Bowed instrument held between the knees"],
+   [6, "Egg shapes"],
+   [7, "Untidy"],
+   [8, "Painting or sculpture"]
+  ],
+  "Down": [
+   [1, "\"___ off!\" (rocket launch cry)"],
+   [2, "Ailments"],
+   [3, "Too curious about others' business"],
+   [4, "Long, deep unconscious state"],
+   [5, "\"Happily ___ after\""]
+  ]
+ }
+}

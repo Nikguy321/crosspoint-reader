@@ -1,12 +1,15 @@
 // Word Search's pure half on the host: PRNG, generator, themes, theme files, selection,
-// layout and the save codec. The drawing and its real-font checks are in
-// test/word_search_preview.
+// layout, the save codec and the downloadable theme packs (packs/wordsearch). The drawing and
+// its real-font checks are in test/word_search_preview.
 #include <gtest/gtest.h>
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -1136,4 +1139,110 @@ TEST(WordSearchSave, RecentThemesAndRandomPick) {
   const std::string_view few[] = {"b", "c"};
   EXPECT_GE(pickRandomTheme(rng, few, 2, p), 0);
   EXPECT_EQ(pickRandomTheme(rng, few, 0, p), -1);
+}
+
+// ---- the downloadable theme packs (packs/wordsearch/*.words) --------------------------------------
+
+namespace {
+
+struct PackTheme {
+  std::string name;  // "dog-breeds.words"
+  std::string text;
+};
+
+std::vector<PackTheme> packThemes() {
+  namespace fs = std::filesystem;
+  std::vector<PackTheme> out;
+  const fs::path root(WORD_SEARCH_PACKS);
+  if (!fs::is_directory(root)) return out;
+  for (const auto& file : fs::directory_iterator(root)) {
+    const std::string name = file.path().filename().string();
+    if (!file.is_regular_file() || name.size() <= std::strlen(THEME_EXT) ||
+        name.compare(name.size() - std::strlen(THEME_EXT), std::string::npos, THEME_EXT) != 0) {
+      continue;
+    }
+    std::ifstream in(file.path(), std::ios::binary);
+    std::stringstream s;
+    s << in.rdbuf();
+    out.push_back({name, s.str()});
+  }
+  std::sort(out.begin(), out.end(), [](const PackTheme& a, const PackTheme& b) { return a.name < b.name; });
+  return out;
+}
+
+// The lines a theme file means as words: neither blank nor a '#' comment, after the title.
+std::vector<std::string> wordLines(const std::string& text) {
+  std::vector<std::string> lines;
+  std::stringstream s(text);
+  std::string line;
+  bool title = false;
+  while (std::getline(s, line)) {
+    if (!line.empty() && line.back() == '\r') line.pop_back();
+    if (line.find_first_not_of(" \t") == std::string::npos || line[0] == '#') continue;
+    if (!title) {
+      title = true;
+      continue;
+    }
+    lines.push_back(line);
+  }
+  return lines;
+}
+
+}  // namespace
+
+TEST(WordSearchPacks, EveryPackThemeParsesWhole) {
+  const std::vector<PackTheme> themes = packThemes();
+  ASSERT_FALSE(themes.empty()) << "no theme files under " << WORD_SEARCH_PACKS;
+  EXPECT_LE(themes.size(), MAX_THEME_FILES) << "the reader lists at most this many theme files";
+  std::set<std::string> titles;
+  for (size_t i = 0; i < builtinThemeCount(); i++) titles.insert(builtinTheme(i).title);
+  for (const PackTheme& t : themes) {
+    SCOPED_TRACE(t.name);
+    EXPECT_LE(t.text.size(), MAX_FILE_BYTES);
+    char key[MAX_THEME_KEY + 1];
+    EXPECT_TRUE(makeFileThemeKey(t.name.c_str(), key, sizeof(key)));
+    char title[MAX_TITLE_LEN + 1];
+    ASSERT_TRUE(readThemeTitle(t.text.data(), t.text.size(), title, sizeof(title)));
+
+    std::string storage = t.text;
+    ThemeWords theme;
+    ASSERT_TRUE(parseThemeFile(storage.data(), storage.size(), theme));
+    EXPECT_STREQ(theme.title, title);
+    EXPECT_TRUE(titles.insert(theme.title).second) << "a title already used: " << theme.title;
+    // Every word line is kept (none skipped as unusable), and no two words share grid letters.
+    const std::vector<std::string> lines = wordLines(t.text);
+    EXPECT_EQ(theme.words.size(), lines.size()) << "a word line was skipped as unusable";
+    EXPECT_GE(theme.words.size(), 30u);
+    std::set<std::string> letters;
+    for (const auto w : theme.words) {
+      char grid[MAX_WORD_LETTERS + 1];
+      ASSERT_GT(gridLetters(w.data(), w.size(), grid, sizeof(grid)), 0u) << w;
+      EXPECT_TRUE(letters.insert(grid).second) << "duplicate " << w;
+    }
+  }
+}
+
+TEST(WordSearchPacks, EveryPackThemeFillsEveryDifficulty) {
+  const std::vector<PackTheme> themes = packThemes();
+  ASSERT_FALSE(themes.empty());
+  auto p = std::make_unique<Puzzle>();
+  for (const PackTheme& t : themes) {
+    SCOPED_TRACE(t.name);
+    std::string storage = t.text;
+    ThemeWords theme;
+    ASSERT_TRUE(parseThemeFile(storage.data(), storage.size(), theme));
+    for (const Difficulty d : ALL_DIFFICULTIES) {
+      int full = 0;
+      for (uint32_t seed = 1; seed <= 12; seed++) {
+        ASSERT_TRUE(generatePuzzle(theme.words.data(), theme.words.size(), d, seed * 7919u, *p))
+            << "difficulty " << int(d) << " seed " << seed;
+        std::snprintf(p->themeKey, sizeof(p->themeKey), "%s%s", FILE_KEY_PREFIX, t.name.c_str());
+        std::snprintf(p->themeTitle, sizeof(p->themeTitle), "%s", theme.title);
+        expectValidPuzzle(*p, d);
+        full += p->wordCount == specFor(d).words ? 1 : 0;
+        if (d == Difficulty::Easy) EXPECT_EQ(p->wordCount, 8) << "Easy places all 8";
+      }
+      EXPECT_GE(full, 10) << "difficulty " << int(d) << ": mostly full puzzles";
+    }
+  }
 }

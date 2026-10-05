@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 51",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "P", "A"],
+  ["O", "T", "T", "E", "R"],
+  ["P", "R", "I", "S", "M"],
+  ["A", "U", "N", "T", "S"],
+  ["L", "E", "G", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Mineral springs resort"],
+   [4, "Sea mammal that floats on its back"],
+   [6, "Glass piece that splits light into a rainbow"],
+   [7, "Relatives such as Dad's sisters"],
+   [8, "One stage of a relay race"]
+  ],
+  "Down": [
+   [1, "Painful jab from a bee"],
+   [2, "Garden nuisance like an aphid"],
+   [3, "Limbs with elbows"],
+   [4, "October birthstone"],
+   [5, "Not false"]
+  ]
+ }
+}

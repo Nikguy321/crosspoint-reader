@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 16",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  [5, 6, 0, 0, 0, 0, "#"],
+  [7, 0, 0, 0, 0, 0, 8],
+  [9, 0, 0, "#", 10, 0, 0],
+  [11, 0, 0, 12, 0, 0, 0],
+  ["#", 13, 0, 0, 0, 0, 0],
+  ["#", 14, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "F", "O", "R", "E", "#"],
+  ["S", "C", "E", "N", "E", "S", "#"],
+  ["A", "R", "R", "E", "S", "T", "S"],
+  ["N", "U", "T", "#", "T", "A", "P"],
+  ["E", "M", "I", "R", "A", "T", "E"],
+  ["#", "B", "L", "A", "R", "E", "D"],
+  ["#", "S", "E", "N", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Golfer's warning shout"],
+   [5, "Divisions of a play's act"],
+   [7, "Takes into custody"],
+   [9, "Squirrel's snack"],
+   [10, "Light touch on the shoulder"],
+   [11, "Gulf land like Qatar or Kuwait"],
+   [13, "Played at full volume"],
+   [14, "Mailed"]
+  ],
+  "Down": [
+   [1, "Good for growing crops"],
+   [2, "Single"],
+   [3, "Reboot, as a computer"],
+   [4, "Large country home with grounds"],
+   [5, "Of sound mind"],
+   [6, "Bits left on a plate after cake"],
+   [8, "Went too fast"],
+   [12, "Hurried on foot"]
+  ]
+ }
+}

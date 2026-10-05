@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 25",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, 11, 0, 0, 0, 0],
+  [12, 0, 0, "#", 13, 0, 0, 0, 0],
+  ["#", "#", 14, 15, 0, 0, 0, "#", "#"],
+  [16, 17, 0, 0, 0, "#", 18, 19, 20],
+  [21, 0, 0, 0, 0, 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "B", "U", "S", "#", "A", "B", "L", "E"],
+  ["R", "A", "N", "K", "#", "C", "R", "A", "G"],
+  ["I", "N", "D", "I", "C", "T", "I", "N", "G"],
+  ["G", "E", "E", "#", "H", "O", "M", "E", "S"],
+  ["#", "#", "S", "T", "I", "R", "S", "#", "#"],
+  ["S", "C", "I", "O", "N", "#", "T", "A", "N"],
+  ["H", "O", "R", "O", "S", "C", "O", "P", "E"],
+  ["E", "D", "E", "N", "#", "A", "N", "E", "W"],
+  ["D", "A", "D", "S", "#", "W", "E", "D", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Big vehicle on a city route"],
+   [4, "Competent"],
+   [8, "Captain or major, e.g."],
+   [9, "Steep, rugged rock"],
+   [10, "Formally charging with a crime"],
+   [12, "\"Gosh!\""],
+   [13, "Houses and apartments"],
+   [14, "Awakens, as old memories"],
+   [16, "Heir to a noble family"],
+   [18, "Darken in the sun"],
+   [21, "Daily astrology forecast"],
+   [23, "Earthly paradise"],
+   [24, "Once more, from the start"],
+   [25, "Fathers, informally"],
+   [26, "Tied the knot"]
+  ],
+  "Down": [
+   [1, "Source of constant trouble"],
+   [2, "Not wanted"],
+   [3, "Glide down a snowy slope"],
+   [4, "Cast member"],
+   [5, "Old name for sulfur"],
+   [6, "Bowling alley strip"],
+   [7, "What hens lay"],
+   [8, "Eighteen-wheeler"],
+   [11, "Spots for goatees"],
+   [15, "Animated shorts, informally"],
+   [16, "Backyard storage hut"],
+   [17, "Closing passage of a piece of music"],
+   [19, "Mimicked"],
+   [20, "Just out of the box"],
+   [22, "Crow's call"]
+  ]
+ }
+}

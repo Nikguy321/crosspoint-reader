@@ -1,0 +1,71 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 22",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, 4, "#", 5, 6, 7, 8],
+  [9, 0, 0, 0, "#", 10, 0, 0, 0],
+  [11, 0, 0, 0, "#", 12, 0, 0, 0],
+  [13, 0, 0, "#", 14, 0, 0, 0, 0],
+  ["#", "#", 15, 16, 0, 0, 0, "#", "#"],
+  [17, 18, 0, 0, 0, "#", 19, 20, 21],
+  [22, 0, 0, 0, "#", 23, 0, 0, 0],
+  [24, 0, 0, 0, "#", 25, 0, 0, 0],
+  [26, 0, 0, 0, "#", 27, 0, 0, 0]
+ ],
+ "solution": [
+  ["C", "A", "P", "O", "#", "S", "P", "E", "D"],
+  ["O", "W", "E", "D", "#", "P", "A", "G", "E"],
+  ["L", "A", "N", "D", "#", "U", "R", "G", "E"],
+  ["A", "Y", "E", "#", "G", "R", "A", "S", "P"],
+  ["#", "#", "T", "W", "I", "N", "S", "#", "#"],
+  ["S", "H", "R", "U", "G", "#", "A", "M", "P"],
+  ["L", "I", "A", "R", "#", "T", "I", "E", "R"],
+  ["A", "R", "T", "S", "#", "E", "L", "S", "E"],
+  ["M", "E", "E", "T", "#", "A", "S", "A", "P"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Clamp on a guitar's neck"],
+   [5, "Went too fast"],
+   [9, "Had to repay"],
+   [10, "Leaf of a book"],
+   [11, "Touch down, as a plane"],
+   [12, "Strong desire"],
+   [13, "Yes vote"],
+   [14, "Firm grip"],
+   [15, "Siblings born together"],
+   [17, "Gesture meaning \"Who knows?\""],
+   [19, "Band's sound booster"],
+   [22, "Person who isn't truthful"],
+   [23, "Layer of a wedding cake"],
+   [24, "Painting, music and dance"],
+   [25, "Or ___ (end of a threat)"],
+   [26, "Swim ___ (pool competition)"],
+   [27, "Right away, in a memo"]
+  ],
+  "Down": [
+   [1, "Fizzy brown drink"],
+   [2, "Not at home"],
+   [3, "Pierce through"],
+   [4, "Like 3 or 7"],
+   [5, "Reject with scorn"],
+   [6, "Soars behind a boat on a chute"],
+   [7, "Dozen in a carton"],
+   [8, "Far below the surface"],
+   [14, "Musician's booking"],
+   [16, "German sausage"],
+   [17, "Shut with a bang"],
+   [18, "Take on, as an employee"],
+   [20, "Flat-topped hill"],
+   [21, "Get ready, for short"],
+   [23, "Afternoon drink with scones"]
+  ]
+ }
+}

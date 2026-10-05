@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 79",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  [1, 2, 3, 4, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0]
+ ],
+ "solution": [
+  ["T", "I", "T", "A", "N"],
+  ["A", "N", "I", "S", "E"],
+  ["L", "E", "A", "S", "E"],
+  ["E", "R", "R", "E", "D"],
+  ["S", "T", "A", "T", "S"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Mythical giant like Atlas"],
+   [6, "Seed with a licorice flavor"],
+   [7, "Tenant's signed agreement"],
+   [8, "Slipped up"],
+   [9, "Batting average and such, for short"]
+  ],
+  "Down": [
+   [1, "Campfire stories"],
+   [2, "Chemically unreactive"],
+   [3, "Crown for a beauty queen"],
+   [4, "Valuable resource"],
+   [5, "Requires"]
+  ]
+ }
+}

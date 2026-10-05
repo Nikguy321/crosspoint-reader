@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 20",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, 5],
+  ["#", 6, 0, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  [13, 0, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "L", "A", "P", "S", "E"],
+  ["#", "R", "E", "P", "A", "I", "R"],
+  ["S", "E", "T", "T", "L", "E", "R"],
+  ["A", "N", "T", "#", "A", "G", "E"],
+  ["F", "A", "U", "L", "T", "E", "D"],
+  ["E", "M", "C", "E", "E", "S", "#"],
+  ["S", "E", "E", "D", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Run out, as a subscription"],
+   [6, "Fix"],
+   [7, "Frontier pioneer"],
+   [8, "Six-legged hill builder"],
+   [9, "Grow older"],
+   [10, "Criticized"],
+   [12, "Hosts of awards shows"],
+   [13, "What gardeners plant in spring"]
+  ],
+  "Down": [
+   [1, "Leafy salad base"],
+   [2, "Fitting"],
+   [3, "Senses of taste"],
+   [4, "Long blockades of walled cities"],
+   [5, "Made a mistake"],
+   [6, "Give a new title to"],
+   [7, "Locked boxes for valuables"],
+   [11, "Was in first place"]
+  ]
+ }
+}

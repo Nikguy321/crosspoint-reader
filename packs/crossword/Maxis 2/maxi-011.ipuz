@@ -1,0 +1,71 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 11",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, 4, "#", 5, 6, 7, 8],
+  [9, 0, 0, 0, "#", 10, 0, 0, 0],
+  [11, 0, 0, 0, "#", 12, 0, 0, 0],
+  [13, 0, 0, "#", 14, 0, 0, 0, 0],
+  ["#", "#", 15, 16, 0, 0, 0, "#", "#"],
+  [17, 18, 0, 0, 0, "#", 19, 20, 21],
+  [22, 0, 0, 0, "#", 23, 0, 0, 0],
+  [24, 0, 0, 0, "#", 25, 0, 0, 0],
+  [26, 0, 0, 0, "#", 27, 0, 0, 0]
+ ],
+ "solution": [
+  ["U", "N", "T", "O", "#", "A", "R", "M", "S"],
+  ["N", "O", "I", "R", "#", "B", "E", "A", "U"],
+  ["D", "O", "M", "E", "#", "B", "I", "L", "E"],
+  ["O", "N", "E", "#", "G", "E", "N", "T", "S"],
+  ["#", "#", "S", "T", "A", "Y", "S", "#", "#"],
+  ["A", "S", "H", "E", "S", "#", "T", "A", "G"],
+  ["C", "H", "A", "R", "#", "N", "A", "V", "Y"],
+  ["N", "O", "R", "M", "#", "A", "T", "O", "M"],
+  ["E", "W", "E", "S", "#", "P", "E", "W", "S"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "\"Do ___ others...\" (Golden Rule start)"],
+   [5, "Sides of an easy chair"],
+   [9, "Film ___ (dark crime genre)"],
+   [10, "Boyfriend, old-style"],
+   [11, "Rounded roof"],
+   [12, "Digestive fluid from the liver"],
+   [13, "Number before two"],
+   [14, "Ladies and ___"],
+   [15, "Doesn't leave"],
+   [17, "Fireplace leftovers"],
+   [19, "Playground chasing game"],
+   [22, "Burn the edges of"],
+   [23, "Dark blue"],
+   [24, "Standard"],
+   [25, "Particle with a nucleus and electrons"],
+   [26, "Mother sheep"],
+   [27, "Church benches"]
+  ],
+  "Down": [
+   [1, "Cancel out"],
+   [2, "Midday"],
+   [3, "Jointly owned vacation property"],
+   [4, "Mined rock"],
+   [5, "Monastery"],
+   [6, "Restore to a former job"],
+   [7, "Sprouted grain used in baking"],
+   [8, "Brings a lawsuit against"],
+   [14, "Fuel for a car"],
+   [16, "Conditions of a contract"],
+   [17, "Pimple problem"],
+   [18, "TV program"],
+   [20, "State firmly"],
+   [21, "Places to work out"],
+   [23, "Short snooze"]
+  ]
+ }
+}

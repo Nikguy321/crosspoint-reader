@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 50",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "C", "A", "N"],
+  ["P", "H", "A", "S", "E"],
+  ["A", "U", "D", "I", "O"],
+  ["C", "L", "E", "A", "N"],
+  ["E", "A", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Soup container on a pantry shelf"],
+   [4, "Crescent or full, for the moon"],
+   [6, "Sound portion of a video"],
+   [7, "Free of dirt"],
+   [8, "Chow down"]
+  ],
+  "Down": [
+   [1, "Military academy student"],
+   [2, "Largest continent"],
+   [3, "Element with atomic number 10"],
+   [4, "Walk back and forth nervously"],
+   [5, "Hawaiian dance"]
+  ]
+ }
+}

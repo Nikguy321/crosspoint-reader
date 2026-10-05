@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 41",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "E", "A"],
+  ["#", "S", "P", "A", "S"],
+  ["H", "A", "R", "S", "H"],
+  ["O", "M", "I", "T", "#"],
+  ["P", "E", "G", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Large body of salt water"],
+   [4, "Places for massages and facials"],
+   [5, "Rough and severe"],
+   [6, "Leave out"],
+   [7, "Tent stake"]
+  ],
+  "Down": [
+   [1, "Small stem of mint, used as a garnish"],
+   [2, "Where the sun rises"],
+   [3, "Gray dust left by a fire"],
+   [4, "Identical"],
+   [5, "Jump on one foot"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 52",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "T", "O", "T"],
+  ["T", "H", "E", "R", "E"],
+  ["H", "E", "N", "C", "E"],
+  ["A", "R", "E", "A", "S"],
+  ["N", "O", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Toddler"],
+   [4, "In that place"],
+   [6, "For this reason"],
+   [7, "Regions or zones"],
+   [8, "\"___ so fast!\""]
+  ],
+  "Down": [
+   [1, "Guiding principle"],
+   [2, "Black-and-white toothed whale"],
+   [3, "Golf ball pegs"],
+   [4, "Better ___ ever"],
+   [5, "Brave rescuer"]
+  ]
+ }
+}

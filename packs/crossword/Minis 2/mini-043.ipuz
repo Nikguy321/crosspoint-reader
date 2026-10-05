@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 43",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "L", "I", "P"],
+  ["#", "P", "A", "C", "E"],
+  ["D", "E", "T", "E", "R"],
+  ["U", "S", "E", "D", "#"],
+  ["B", "O", "X", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Rim of a cup or pitcher"],
+   [4, "Walk back and forth nervously"],
+   [5, "Scare off, as a burglar"],
+   [6, "Secondhand, as a car"],
+   [7, "Cardboard shipping container"]
+  ],
+  "Down": [
+   [1, "Milky sap of the rubber tree"],
+   [2, "Chilled, as tea"],
+   [3, "For each"],
+   [4, "Unit of money in Mexico"],
+   [5, "Give a nickname to"]
+  ]
+ }
+}

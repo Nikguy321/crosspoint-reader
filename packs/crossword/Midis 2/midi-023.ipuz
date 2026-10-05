@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 23",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  [5, 6, 0, 0, 0, 0, "#"],
+  [7, 0, 0, 0, 0, 0, 8],
+  [9, 0, 0, "#", 10, 0, 0],
+  [11, 0, 0, 12, 0, 0, 0],
+  ["#", 13, 0, 0, 0, 0, 0],
+  ["#", 14, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "A", "G", "S", "#"],
+  ["A", "S", "P", "I", "R", "E", "#"],
+  ["C", "H", "A", "R", "A", "D", "E"],
+  ["N", "O", "T", "#", "N", "A", "Y"],
+  ["E", "R", "U", "D", "I", "T", "E"],
+  ["#", "E", "L", "A", "T", "E", "S"],
+  ["#", "S", "A", "M", "E", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Droops"],
+   [5, "Have high hopes (to)"],
+   [7, "Pretense that fools no one"],
+   [9, "___ at all"],
+   [10, "Opposite of yea"],
+   [11, "Very well-read"],
+   [13, "Thrills"],
+   [14, "Identical"]
+  ],
+  "Down": [
+   [1, "Pancake flipper"],
+   [2, "Broadcast on TV"],
+   [3, "Hard rock for kitchen countertops"],
+   [4, "Calm and dignified"],
+   [5, "Pimply skin condition"],
+   [6, "Coastlines"],
+   [8, "Watches closely"],
+   [12, "Barrier built by beavers"]
+  ]
+ }
+}

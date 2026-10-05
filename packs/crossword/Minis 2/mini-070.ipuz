@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 70",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "R", "A", "N", "#"],
+  ["P", "E", "S", "O", "S"],
+  ["U", "N", "T", "I", "E"],
+  ["G", "E", "E", "S", "E"],
+  ["#", "W", "R", "Y", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Sprinted"],
+   [4, "Mexican currency units"],
+   [6, "Unfasten, as a ribbon"],
+   [7, "Honking birds that fly in a V"],
+   [8, "Like a crooked, knowing smile"]
+  ],
+  "Down": [
+   [1, "Extend, as a library book"],
+   [2, "Daisy-like fall flower"],
+   [3, "Loud and rowdy"],
+   [4, "Small, curly-tailed dog"],
+   [5, "I ___ what you mean"]
+  ]
+ }
+}

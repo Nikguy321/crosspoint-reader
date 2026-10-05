@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 77",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  [1, 2, 3, 4, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0]
+ ],
+ "solution": [
+  ["S", "M", "A", "S", "H"],
+  ["P", "E", "S", "T", "O"],
+  ["E", "T", "H", "O", "S"],
+  ["A", "R", "E", "N", "T"],
+  ["R", "O", "S", "E", "S"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Shatter"],
+   [6, "Garlicky green spread made with basil"],
+   [7, "Guiding beliefs of a group"],
+   [8, "\"They ___ here yet\""],
+   [9, "Thorny garden flowers"]
+  ],
+  "Down": [
+   [1, "Asparagus stalk"],
+   [2, "Underground train in Paris"],
+   [3, "Fireplace remains"],
+   [4, "Pit of a peach"],
+   [5, "Has guests over"]
+  ]
+ }
+}

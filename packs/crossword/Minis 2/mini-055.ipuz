@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 55",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "A", "T", "E"],
+  ["#", "P", "L", "O", "Y"],
+  ["E", "L", "I", "T", "E"],
+  ["L", "E", "G", "S", "#"],
+  ["F", "A", "N", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Dined"],
+   [4, "Crafty tactic"],
+   [5, "Top-tier, as an athlete"],
+   [6, "Table supports"],
+   [7, "Cooling device with blades"]
+  ],
+  "Down": [
+   [1, "Put in a straight line"],
+   [2, "Toddlers"],
+   [3, "Organ of sight"],
+   [4, "Earnest request"],
+   [5, "Santa's workshop helper"]
+  ]
+ }
+}

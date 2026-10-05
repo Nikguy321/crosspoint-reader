@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 58",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "C", "H", "O", "P"],
+  ["S", "H", "A", "V", "E"],
+  ["L", "I", "V", "E", "S"],
+  ["I", "N", "E", "R", "T"],
+  ["P", "A", "N", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Cut up, as onions"],
+   [5, "Use a razor"],
+   [6, "Resides"],
+   [7, "Not reactive, as neon"],
+   [8, "Breathe hard after a sprint"]
+  ],
+  "Down": [
+   [1, "Fine dinnerware"],
+   [2, "Safe place"],
+   [3, "Out in the open"],
+   [4, "Nuisance"],
+   [5, "Lose one's footing"]
+  ]
+ }
+}

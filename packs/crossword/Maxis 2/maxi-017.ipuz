@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 17",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, "#", "#", 4, 5, 6, 7],
+  [8, 0, 0, "#", 9, 0, 0, 0, 0],
+  [10, 0, 0, "#", 11, 0, 0, 0, 0],
+  [12, 0, 0, 13, 0, 0, "#", "#", "#"],
+  ["#", 14, 0, 0, 0, 0, 15, 16, "#"],
+  ["#", "#", "#", 17, 0, 0, 0, 0, 18],
+  [19, 20, 21, 0, 0, "#", 22, 0, 0],
+  [23, 0, 0, 0, 0, "#", 24, 0, 0],
+  [25, 0, 0, 0, "#", "#", 26, 0, 0]
+ ],
+ "solution": [
+  ["P", "E", "P", "#", "#", "L", "E", "T", "S"],
+  ["O", "D", "E", "#", "T", "A", "B", "O", "O"],
+  ["L", "I", "T", "#", "E", "M", "B", "E", "D"],
+  ["O", "C", "T", "A", "N", "E", "#", "#", "#"],
+  ["#", "T", "Y", "R", "A", "N", "T", "S", "#"],
+  ["#", "#", "#", "I", "N", "T", "O", "N", "E"],
+  ["L", "E", "A", "S", "T", "#", "L", "E", "D"],
+  ["O", "G", "R", "E", "S", "#", "L", "A", "G"],
+  ["T", "O", "T", "S", "#", "#", "S", "K", "Y"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Get-up-and-go"],
+   [4, "Rents out"],
+   [8, "Poem of praise"],
+   [9, "Strictly forbidden"],
+   [10, "Glowing, as a candle"],
+   [11, "Set firmly in place"],
+   [12, "Gas pump rating"],
+   [14, "Cruel rulers"],
+   [17, "Recite in a chanting voice"],
+   [19, "Smallest in amount"],
+   [22, "Was ahead in the race"],
+   [23, "Fairy-tale brutes"],
+   [24, "Jet ___ (travel tiredness)"],
+   [25, "Little kids"],
+   [26, "Where clouds float"]
+  ],
+  "Down": [
+   [1, "Game on horseback with mallets"],
+   [2, "Official order"],
+   [3, "Small-minded"],
+   [4, "Express sorrow over"],
+   [5, "Go out, as the tide"],
+   [6, "One of the little piggies in a nursery game"],
+   [7, "Layer of grass and soil"],
+   [9, "People who pay rent"],
+   [13, "Gets up"],
+   [15, "Bridge fees"],
+   [16, "Move quietly"],
+   [18, "Tense and nervous"],
+   [19, "Parking area"],
+   [20, "Thing a compliment boosts"],
+   [21, "State of the ___"]
+  ]
+ }
+}

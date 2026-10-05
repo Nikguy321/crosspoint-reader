@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 60",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "M", "A", "S", "T"],
+  ["C", "E", "L", "L", "O"],
+  ["A", "L", "I", "E", "N"],
+  ["L", "E", "A", "P", "S"],
+  ["F", "E", "S", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Pole that holds up a sail"],
+   [5, "Bowed instrument held between the knees"],
+   [6, "UFO passenger in a sci-fi film"],
+   [7, "Jumps"],
+   [8, "Lively gathering, informally"]
+  ],
+  "Down": [
+   [1, "Free-for-all"],
+   [2, "Assumed name"],
+   [3, "Got some shut-eye"],
+   [4, "Units of 2,000 pounds, in the U.S."],
+   [5, "Young cow"]
+  ]
+ }
+}

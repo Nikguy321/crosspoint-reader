@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 24",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "N", "I", "P", "#"],
+  ["#", "S", "T", "A", "T", "U", "S"],
+  ["A", "L", "A", "B", "A", "M", "A"],
+  ["H", "I", "M", "#", "L", "I", "T"],
+  ["E", "D", "I", "F", "I", "C", "E"],
+  ["M", "E", "N", "A", "C", "E", "#"],
+  ["#", "S", "A", "N", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Cut with scissors"],
+   [5, "Social standing"],
+   [7, "Gulf Coast state between Mississippi and Georgia"],
+   [8, "That man"],
+   [9, "Illuminated"],
+   [10, "Large, imposing building"],
+   [12, "Source of danger"],
+   [13, "___ serif (plain style of type)"]
+  ],
+  "Down": [
+   [1, "Staying power"],
+   [2, "Catch in the act"],
+   [3, "Type that leans to the right"],
+   [4, "Light volcanic stone that can float"],
+   [5, "Playground chutes"],
+   [6, "Satisfy fully, as hunger"],
+   [7, "Sound made to get attention"],
+   [11, "Sports enthusiast"]
+  ]
+ }
+}

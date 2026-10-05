@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 45",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "C", "A", "W", "#"],
+  ["P", "O", "L", "O", "S"],
+  ["A", "B", "O", "U", "T"],
+  ["T", "R", "U", "L", "Y"],
+  ["#", "A", "D", "D", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Crow's call"],
+   [4, "Knit shirts with collars"],
+   [6, "Approximately"],
+   [7, "Honestly"],
+   [8, "Mix in, as sugar"]
+  ],
+  "Down": [
+   [1, "Snake in a charmer's basket"],
+   [2, "So that others can hear"],
+   [3, "___ you like some tea?"],
+   [4, "Small square of butter"],
+   [5, "Muddy home for hogs"]
+  ]
+ }
+}

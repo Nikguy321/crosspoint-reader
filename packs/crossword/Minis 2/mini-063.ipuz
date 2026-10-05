@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 63",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "B", "L", "A", "B"],
+  ["P", "L", "A", "C", "E"],
+  ["A", "O", "R", "T", "A"],
+  ["S", "A", "V", "O", "R"],
+  ["S", "T", "A", "R", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Tell a secret carelessly"],
+   [5, "Set down carefully"],
+   [6, "Body's largest artery"],
+   [7, "Enjoy slowly, as a fine meal"],
+   [8, "Twinkler in the night sky"]
+  ],
+  "Down": [
+   [1, "Swell, as after a big meal"],
+   [2, "Caterpillar, for one"],
+   [3, "Stage performer"],
+   [4, "Grizzly, for example"],
+   [5, "Throw to a teammate"]
+  ]
+ }
+}

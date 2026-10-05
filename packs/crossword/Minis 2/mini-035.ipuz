@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 35",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "W", "H", "O"],
+  ["#", "C", "R", "E", "W"],
+  ["W", "H", "I", "R", "L"],
+  ["E", "A", "S", "E", "#"],
+  ["B", "I", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "___ goes there?"],
+   [4, "Ship's workers"],
+   [5, "Spin around fast"],
+   [6, "Lack of difficulty"],
+   [7, "Horse's mouthpiece"]
+  ],
+  "Down": [
+   [1, "Joint between hand and forearm"],
+   [2, "In this place"],
+   [3, "Night bird that hoots"],
+   [4, "Spiced milk tea"],
+   [5, "Spider's creation"]
+  ]
+ }
+}

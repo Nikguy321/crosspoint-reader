@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 38",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "D", "O", "T", "#"],
+  ["P", "O", "U", "R", "S"],
+  ["U", "N", "T", "I", "L"],
+  ["T", "O", "D", "A", "Y"],
+  ["#", "R", "O", "D", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Tiny round mark"],
+   [4, "Rains very hard"],
+   [6, "Up to the time of"],
+   [7, "Not yesterday or tomorrow"],
+   [8, "Fishing pole"]
+  ],
+  "Down": [
+   [1, "Giver to a charity"],
+   [2, "Surpass"],
+   [3, "Group of three"],
+   [4, "Placed"],
+   [5, "Crafty, like a fox"]
+  ]
+ }
+}

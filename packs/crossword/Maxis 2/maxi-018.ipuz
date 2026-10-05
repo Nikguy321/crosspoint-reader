@@ -1,0 +1,71 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 18",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, 4, "#", 5, 6, 7, 8],
+  [9, 0, 0, 0, "#", 10, 0, 0, 0],
+  [11, 0, 0, 0, "#", 12, 0, 0, 0],
+  [13, 0, 0, "#", 14, 0, 0, 0, 0],
+  ["#", "#", 15, 16, 0, 0, 0, "#", "#"],
+  [17, 18, 0, 0, 0, "#", 19, 20, 21],
+  [22, 0, 0, 0, "#", 23, 0, 0, 0],
+  [24, 0, 0, 0, "#", 25, 0, 0, 0],
+  [26, 0, 0, 0, "#", 27, 0, 0, 0]
+ ],
+ "solution": [
+  ["S", "T", "A", "Y", "#", "S", "T", "I", "R"],
+  ["L", "A", "C", "E", "#", "W", "I", "R", "E"],
+  ["O", "R", "C", "S", "#", "A", "M", "I", "D"],
+  ["W", "O", "E", "#", "P", "R", "E", "S", "S"],
+  ["#", "#", "S", "T", "E", "M", "S", "#", "#"],
+  ["A", "S", "S", "E", "T", "#", "H", "A", "S"],
+  ["P", "A", "I", "R", "#", "H", "A", "L", "O"],
+  ["E", "G", "O", "S", "#", "O", "R", "A", "L"],
+  ["S", "A", "N", "E", "#", "P", "E", "S", "O"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Remain"],
+   [5, "Mix with a spoon"],
+   [9, "Delicate openwork fabric"],
+   [10, "Copper strand for electricity"],
+   [11, "Goblin-like fantasy foes"],
+   [12, "Among"],
+   [13, "Sorrow"],
+   [14, "Iron, as trousers"],
+   [15, "Flower stalks"],
+   [17, "Valuable team member, say"],
+   [19, "___ a ball (enjoys oneself)"],
+   [22, "Two of a kind"],
+   [23, "Glow around a saint's head in a painting"],
+   [24, "Senses of self"],
+   [25, "Like a spoken exam"],
+   [26, "Of sound mind"],
+   [27, "Money in Mexico or Chile"]
+  ],
+  "Down": [
+   [1, "Sluggish"],
+   [2, "Root used to make poi"],
+   [3, "New addition to a museum collection"],
+   [4, "Nod's meaning"],
+   [5, "Large group of bees"],
+   [6, "Vacation condo split among owners by the week"],
+   [7, "Colored part of the eye"],
+   [8, "Scarlet and crimson"],
+   [14, "Stroke, as a cat"],
+   [16, "Short and blunt"],
+   [17, "Copies clumsily"],
+   [18, "Long heroic tale"],
+   [20, "Sadly, in old-fashioned speech"],
+   [21, "Like a student pilot's first unaccompanied flight"],
+   [23, "Jump on one foot"]
+  ]
+ }
+}

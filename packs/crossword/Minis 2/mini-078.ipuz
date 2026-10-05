@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 78",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  [1, 2, 3, 4, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0]
+ ],
+ "solution": [
+  ["M", "O", "T", "E", "L"],
+  ["E", "R", "O", "D", "E"],
+  ["L", "A", "R", "G", "E"],
+  ["O", "T", "T", "E", "R"],
+  ["N", "E", "E", "D", "Y"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Roadside lodging"],
+   [6, "Eat away at, as waves on a cliff"],
+   [7, "Big"],
+   [8, "Furry swimmer that cracks clams on its belly"],
+   [9, "In want"]
+  ],
+  "Down": [
+   [1, "Cantaloupe or honeydew"],
+   [2, "Give a long speech"],
+   [3, "Rich layered cake"],
+   [4, "Inched forward"],
+   [5, "Suspicious and cautious"]
+  ]
+ }
+}

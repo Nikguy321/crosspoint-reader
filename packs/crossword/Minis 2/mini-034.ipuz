@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 34",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "U", "G", "H"],
+  ["#", "A", "R", "E", "A"],
+  ["A", "N", "G", "R", "Y"],
+  ["I", "T", "E", "M", "#"],
+  ["L", "I", "D", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Sound of disgust"],
+   [4, "Length times width, for a rectangle"],
+   [5, "Seeing red"],
+   [6, "Something to check off"],
+   [7, "Jar top"]
+  ],
+  "Down": [
+   [1, "Strongly encouraged"],
+   [2, "Microbe that may cause a cold"],
+   [3, "Dried grass fed to horses"],
+   [4, "Against"],
+   [5, "Be under the weather"]
+  ]
+ }
+}

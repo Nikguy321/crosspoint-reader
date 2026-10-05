@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 14",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, "#"],
+  ["#", 4, 5, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "O", "D", "D", "#"],
+  ["#", "S", "T", "A", "R", "E", "S"],
+  ["F", "L", "O", "R", "I", "S", "T"],
+  ["A", "I", "M", "#", "V", "I", "A"],
+  ["I", "M", "A", "G", "E", "R", "Y"],
+  ["R", "E", "T", "I", "R", "E", "#"],
+  ["#", "D", "O", "G", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Like 3, 5 or 7"],
+   [4, "Looks long and hard"],
+   [7, "Shop worker who arranges bouquets"],
+   [8, "Goal or purpose"],
+   [9, "By means of"],
+   [10, "Vivid word pictures in a poem"],
+   [12, "Leave one's career for good"],
+   [13, "Pet that wags its tail"]
+  ],
+  "Down": [
+   [1, "Rowboat paddle"],
+   [2, "One behind the wheel"],
+   [3, "Strong wish"],
+   [4, "Coated with goo"],
+   [5, "Red fruit in ketchup and salsa"],
+   [6, "Remain in place"],
+   [7, "Just and even-handed"],
+   [11, "One-night job for a band"]
+  ]
+ }
+}

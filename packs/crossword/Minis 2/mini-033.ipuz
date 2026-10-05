@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 33",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "M", "E", "W"],
+  ["#", "P", "A", "V", "E"],
+  ["R", "E", "S", "E", "T"],
+  ["I", "R", "O", "N", "#"],
+  ["B", "U", "N", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Kitten's cry"],
+   [4, "Cover with asphalt"],
+   [5, "Set back to the start, as a stopwatch"],
+   [6, "Press, as a shirt"],
+   [7, "Hot dog holder"]
+  ],
+  "Down": [
+   [1, "Worker with bricks and stone"],
+   [2, "Tied, as a score"],
+   [3, "Not yet dry, as fresh paint"],
+   [4, "Lima's country"],
+   [5, "Chest bone"]
+  ]
+ }
+}

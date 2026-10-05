@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 46",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "R", "I", "D", "#"],
+  ["R", "A", "V", "E", "N"],
+  ["O", "Z", "O", "N", "E"],
+  ["W", "O", "R", "S", "T"],
+  ["#", "R", "Y", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Clear, as a garden of weeds"],
+   [4, "Big glossy black bird"],
+   [6, "Gas that shields Earth from UV rays"],
+   [7, "Least good of all"],
+   [8, "Grain in pumpernickel bread"]
+  ],
+  "Down": [
+   [1, "Shaving tool"],
+   [2, "Creamy off-white shade"],
+   [3, "Thick, as fog"],
+   [4, "Line of seats in a theater"],
+   [5, "Butterfly catcher's tool"]
+  ]
+ }
+}

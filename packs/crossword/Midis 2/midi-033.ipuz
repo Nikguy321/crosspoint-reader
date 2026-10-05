@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 33",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, "#"],
+  ["#", 4, 5, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "W", "A", "R", "#"],
+  ["#", "P", "E", "E", "V", "E", "D"],
+  ["C", "A", "N", "T", "A", "T", "A"],
+  ["A", "N", "D", "#", "L", "O", "B"],
+  ["S", "T", "U", "P", "O", "R", "S"],
+  ["E", "R", "R", "A", "N", "T", "#"],
+  ["#", "Y", "E", "W", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Card game where the higher card wins"],
+   [4, "Annoyed"],
+   [7, "Multi-movement vocal work, often sacred"],
+   [8, "Bread ___ butter"],
+   [9, "High, arcing tennis shot"],
+   [10, "Dazed states"],
+   [12, "Straying from the right course"],
+   [13, "Evergreen often used in hedges"]
+  ],
+  "Down": [
+   [1, "Like paint that hasn't dried"],
+   [2, "Legendary island of King Arthur"],
+   [3, "Witty comeback"],
+   [4, "Food storage room"],
+   [5, "Put up with"],
+   [6, "Small amounts, as of paint"],
+   [7, "Detective's assignment"],
+   [11, "Dog's foot"]
+  ]
+ }
+}

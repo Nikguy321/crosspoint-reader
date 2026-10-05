@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 57",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "P", "E", "P"],
+  ["#", "B", "O", "A", "R"],
+  ["L", "E", "E", "R", "Y"],
+  ["O", "A", "T", "S", "#"],
+  ["B", "U", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Get-up-and-go"],
+   [4, "Wild pig with tusks"],
+   [5, "Wary"],
+   [6, "Grains in granola"],
+   [7, "Big yellow school vehicle"]
+  ],
+  "Down": [
+   [1, "Writers of verse"],
+   [2, "Hearing organs"],
+   [3, "Be nosy"],
+   [4, "Boyfriend, in old-fashioned talk"],
+   [5, "High, arcing tennis shot"]
+  ]
+ }
+}

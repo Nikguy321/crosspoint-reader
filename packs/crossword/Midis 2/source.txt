@@ -1,0 +1,676 @@
+# Midis 2 - original crossword pack, MIT License. Regenerate the .ipuz files with python3 scripts/crossword/make_packs.py
+
+=== midi-013 | Midi 13
+###JAR#
+#STONES
+SNUGGLE
+WIN#LIE
+ADDRESS
+PERISH#
+#RAP###
+A 1 Glass container with a twist-off lid
+A 4 Rocks skipped across a pond
+A 7 Cozy up under a blanket
+A 8 Come out on top
+A 9 Stretch out on the sofa
+A 10 Street and number on an envelope
+A 12 "___ the thought!"
+A 13 Quick knock on a door
+D 1 Run at an easy pace
+D 2 Things measured with a protractor
+D 3 Chopped pickle topping for a hot dog
+D 4 Nastier and more sarcastic
+D 5 Treeless Arctic plain
+D 6 Notices
+D 7 Trade, as baseball cards
+D 11 Tear in a pair of jeans
+
+=== midi-014 | Midi 14
+###ODD#
+#STARES
+FLORIST
+AIM#VIA
+IMAGERY
+RETIRE#
+#DOG###
+A 1 Like 3, 5 or 7
+A 4 Looks long and hard
+A 7 Shop worker who arranges bouquets
+A 8 Goal or purpose
+A 9 By means of
+A 10 Vivid word pictures in a poem
+A 12 Leave one's career for good
+A 13 Pet that wags its tail
+D 1 Rowboat paddle
+D 2 One behind the wheel
+D 3 Strong wish
+D 4 Coated with goo
+D 5 Red fruit in ketchup and salsa
+D 6 Remain in place
+D 7 Just and even-handed
+D 11 One-night job for a band
+
+=== midi-015 | Midi 15
+##CAB##
+#RECEDE
+GENERAL
+AFT#ARM
+PIRATES
+STATES#
+##LED##
+A 1 Taxi
+A 4 Pull back, as floodwaters
+A 7 High-ranking army officer
+A 8 At or near the back of a ship
+A 9 Sleeve filler
+A 10 Seafaring raiders of old
+A 12 Ohio and Utah, for two
+A 13 Was ahead in the race
+D 1 Located in the middle
+D 2 Tennis serve that goes untouched
+D 3 Scolded harshly
+D 4 Overhaul, as a ship
+D 5 Challenges to do something risky
+D 6 Shady street trees
+D 7 Openings in a fence
+D 11 Dined
+
+=== midi-016 | Midi 16
+##FORE#
+SCENES#
+ARRESTS
+NUT#TAP
+EMIRATE
+#BLARED
+#SENT##
+A 1 Golfer's warning shout
+A 5 Divisions of a play's act
+A 7 Takes into custody
+A 9 Squirrel's snack
+A 10 Light touch on the shoulder
+A 11 Gulf land like Qatar or Kuwait
+A 13 Played at full volume
+A 14 Mailed
+D 1 Good for growing crops
+D 2 Single
+D 3 Reboot, as a computer
+D 4 Large country home with grounds
+D 5 Of sound mind
+D 6 Bits left on a plate after cake
+D 8 Went too fast
+D 12 Hurried on foot
+
+=== midi-017 | Midi 17
+##LASH#
+#TILLER
+DECLARE
+AXE#SOD
+RANCHES
+ENSUES#
+#SEED##
+A 1 Hair coated with mascara
+A 5 Lever that steers a small boat
+A 7 Announce officially
+A 8 Lumberjack's chopper
+A 9 Lawn grass sold in rolls
+A 10 Big cattle farms
+A 12 Follows as a result
+A 13 Tiny start of a plant
+D 1 Official permit to drive or fish
+D 2 Each and every one
+D 3 Cut sharply, as prices
+D 4 Brave rescuers
+D 5 People from Dallas or Houston
+D 6 Scarlet and crimson
+D 7 Have the nerve
+D 11 Pool stick
+
+=== midi-018 | Midi 18
+###RASP
+#SCARCE
+SPATTER
+WON#INK
+ENCASES
+AGENTS#
+RELY###
+A 1 Coarse file for shaping wood
+A 5 In short supply
+A 7 Sprinkle with drops of mud
+A 8 Took first place
+A 9 Pen filler
+A 10 Seals inside a shell
+A 12 Pros who help sell houses
+A 13 Depend (on)
+D 1 Snitch
+D 2 Painter or sculptor
+D 3 Picturesque views
+D 4 Job extras, like free lunch
+D 5 Porous kitchen cleaner
+D 6 Call off
+D 7 Take an oath
+D 11 Pick ___ card (magician's request)
+
+=== midi-019 | Midi 19
+##PEAR#
+#LEAVEN
+FERTILE
+RAG#AIR
+ADOPTED
+YELLED#
+#RAYS##
+A 1 Bell-shaped orchard fruit
+A 5 Agent that makes bread dough rise
+A 7 Rich enough to grow good crops
+A 8 Dust cloth
+A 9 What we breathe
+A 10 Took home from a shelter, as a pet
+A 12 Shouted
+A 13 Beams of sunlight
+D 1 Garden structure with a slatted roof for vines
+D 2 Chow down
+D 3 Pilots an aircraft
+D 4 Depended (on)
+D 5 Head of a team or group
+D 6 Brainy type, informally
+D 7 Scuffle
+D 11 One layer of tissue
+
+=== midi-020 | Midi 20
+##LAPSE
+#REPAIR
+SETTLER
+ANT#AGE
+FAULTED
+EMCEES#
+SEEDS##
+A 1 Run out, as a subscription
+A 6 Fix
+A 7 Frontier pioneer
+A 8 Six-legged hill builder
+A 9 Grow older
+A 10 Criticized
+A 12 Hosts of awards shows
+A 13 What gardeners plant in spring
+D 1 Leafy salad base
+D 2 Fitting
+D 3 Senses of taste
+D 4 Long blockades of walled cities
+D 5 Made a mistake
+D 6 Give a new title to
+D 7 Locked boxes for valuables
+D 11 Was in first place
+
+=== midi-021 | Midi 21
+##AMP##
+#CLERGY
+GRANOLA
+LAB#RAP
+AVATARS
+DEMOTE#
+##AWE##
+A 1 Unit of electric current, for short
+A 4 Priests and ministers as a group
+A 7 Oat-and-nut breakfast mix
+A 8 Room with test tubes
+A 9 Sharp knock
+A 10 On-screen figures that stand for players
+A 12 Lower in rank
+A 13 Amazement mixed with respect
+D 1 State whose capital is Montgomery
+D 2 Guys
+D 3 Adjust, as rent for a partial month
+D 4 Long for
+D 5 Angry stare
+D 6 Barks like a small dog
+D 7 Pleased
+D 11 Haul away, as a parked car
+
+=== midi-022 | Midi 22
+##PAGE#
+TSHIRT#
+ITALICS
+FAR#THE
+FLATTEN
+#LOWEST
+#SHOD##
+A 1 One side of a sheet in a book
+A 5 Short-sleeved casual top
+A 7 Slanted type, often for book titles
+A 9 Not near
+A 10 Definite article
+A 11 Make level
+A 13 Bottommost
+A 14 Not barefoot
+D 1 Ruler of ancient Egypt
+D 2 Feel unwell
+D 3 Clenched, as teeth
+D 4 Engraves with acid
+D 5 Petty quarrel
+D 6 Barn compartments for horses
+D 8 Mailed
+D 12 Number of socks in a pair
+
+=== midi-023 | Midi 23
+##SAGS#
+ASPIRE#
+CHARADE
+NOT#NAY
+ERUDITE
+#ELATES
+#SAME##
+A 1 Droops
+A 5 Have high hopes (to)
+A 7 Pretense that fools no one
+A 9 ___ at all
+A 10 Opposite of yea
+A 11 Very well-read
+A 13 Thrills
+A 14 Identical
+D 1 Pancake flipper
+D 2 Broadcast on TV
+D 3 Hard rock for kitchen countertops
+D 4 Calm and dignified
+D 5 Pimply skin condition
+D 6 Coastlines
+D 8 Watches closely
+D 12 Barrier built by beavers
+
+=== midi-024 | Midi 24
+##SNIP#
+#STATUS
+ALABAMA
+HIM#LIT
+EDIFICE
+MENACE#
+#SANS##
+A 1 Cut with scissors
+A 5 Social standing
+A 7 Gulf Coast state between Mississippi and Georgia
+A 8 That man
+A 9 Illuminated
+A 10 Large, imposing building
+A 12 Source of danger
+A 13 ___ serif (plain style of type)
+D 1 Staying power
+D 2 Catch in the act
+D 3 Type that leans to the right
+D 4 Light volcanic stone that can float
+D 5 Playground chutes
+D 6 Satisfy fully, as hunger
+D 7 Sound made to get attention
+D 11 Sports enthusiast
+
+=== midi-025 | Midi 25
+###TART
+#DRIVER
+SEEPAGE
+NAB#TEA
+ADAMANT
+RETORT#
+KNEW###
+A 1 Pleasantly sour
+A 5 Person behind the wheel
+A 7 Slow leak through a crack or wall
+A 8 Catch in the act
+A 9 Drink steeped from dried leaves
+A 10 Unwilling to budge
+A 12 Quick, sharp reply
+A 13 Was aware of
+D 1 Extra cash left for a server
+D 2 Icon that stands for a user online
+D 3 One who rules in place of a young monarch
+D 4 Reward for a well-behaved dog
+D 5 Muffle, as a sound
+D 6 Partial refund after a purchase
+D 7 Sarcastic attitude, informally
+D 11 Cut, as the lawn
+
+=== midi-026 | Midi 26
+###FOE#
+MANORS#
+OVERACT
+DAB#TOO
+STUPORS
+#ALERTS
+#RAT###
+A 1 Adversary
+A 4 Country estates with grand houses
+A 7 Ham it up on stage
+A 9 Small amount, as of paint
+A 10 Also
+A 11 Dazed states
+A 13 Pop-up warnings
+A 14 Lab rodent
+D 1 In favor of
+D 2 Gifted public speaker
+D 3 Accompany for protection
+D 4 Forum moderators, for short
+D 5 On-screen stand-in for a gamer
+D 6 Cloud of gas and dust in space
+D 8 Throw gently
+D 12 Stroke, as a cat
+
+=== midi-027 | Midi 27
+###SIT#
+ACUITY#
+COMPARE
+TIP#LAG
+SNIPING
+#ERECTS
+#DEW###
+A 1 Take a seat
+A 4 Sharpness, as of vision
+A 7 Weigh one against another
+A 9 Pointed end
+A 10 Hang back
+A 11 Making petty, snide remarks
+A 13 Puts up, as a tent
+A 14 Morning moisture on the grass
+D 1 Small taste of a drink
+D 2 Slanted, like some type
+D 3 Cruel, all-powerful ruler
+D 4 Divisions of a play
+D 5 Invented, as a new word
+D 6 Official who calls balls and strikes
+D 8 Things a hen lays
+D 12 Church bench
+
+=== midi-028 | Midi 28
+##SHED#
+#SCALES
+STAMINA
+POP#COT
+ERUDITE
+DELETE#
+#SAWS##
+A 1 Backyard storage building
+A 5 Devices for weighing
+A 7 Staying power
+A 8 Burst, as a balloon
+A 9 Folding camp bed
+A 10 Deeply learned
+A 12 Erase, as a file
+A 13 Toothed cutting tools
+D 1 Shoulder blade, to a doctor
+D 2 Glazed holiday roast
+D 3 Brings out, as laughter
+D 4 Signify
+D 5 Shops
+D 6 Satisfy fully, as hunger
+D 7 Went too fast
+D 11 Dampness on a spiderweb at dawn
+
+=== midi-029 | Midi 29
+###FIAT
+#TWINGE
+SHORTEN
+PIN#AND
+INDICTS
+ELECTS#
+LYRE###
+A 1 Official decree
+A 5 Sudden sharp pang
+A 7 Trim, as pants that are too long
+A 8 Bowling target
+A 9 Bread ___ butter
+A 10 Formally charges with a crime
+A 12 Votes into office
+A 13 Harp-like instrument of ancient Greece
+D 1 Evergreen tree with flat needles
+D 2 Undamaged
+D 3 Representatives for actors or writers
+D 4 Looks after
+D 5 In a sparse way
+D 6 Awe
+D 7 Salesperson's pitch
+D 11 Hockey surface
+
+=== midi-030 | Midi 30
+##SASS#
+#HARMED
+SORCERY
+NOD#LIE
+AVIATES
+GENRES#
+#SEED##
+A 1 Back talk
+A 5 Hurt
+A 7 Wizard's magic
+A 8 Silent "yes"
+A 9 Stretch out on a couch
+A 10 Flies a plane
+A 12 Mystery and romance, for two
+A 13 Something planted in spring
+D 1 Fish that may be packed in oil
+D 2 Curved path of a thrown ball
+D 3 Refined, as ore
+D 4 Ordered sequence, as of events
+D 5 Horses' feet
+D 6 Colors, as fabric
+D 7 Unexpected problem
+D 11 Plural form of "is"
+
+=== midi-031 | Midi 31
+###VIAL
+STRANGE
+TAINTED
+OLD#RIG
+REDROSE
+ENLISTS
+STEP###
+A 1 Small glass container for medicine
+A 5 Odd
+A 8 Spoiled or contaminated
+A 9 Not new
+A 10 Offshore drilling platform
+A 11 Classic Valentine's Day flower
+A 13 Signs up for military service
+A 14 Stage in a process
+D 1 Delivery vehicle
+D 2 Opening parts of songs, informally
+D 3 Biased against older people
+D 4 Narrow shelves on cliffs
+D 5 Shops
+D 6 Natural gift or ability
+D 7 Puzzling question
+D 12 Tear along a seam
+
+=== midi-032 | Midi 32
+##SAINT
+#STYMIE
+STEEPEN
+HER#ACT
+ORIOLES
+RELIES#
+NOELS##
+A 1 Person with a halo, in paintings
+A 6 Thwart
+A 7 Make more sharply sloped
+A 8 Him or ___
+A 9 Part of a play
+A 10 Orange-and-black songbirds
+A 12 Depends (on)
+A 13 Christmas carols
+D 1 Germ-free
+D 2 Yes vote
+D 3 Skewers
+D 4 Siblings' daughters
+D 5 Shelters pitched at camp
+D 6 Not mono, as sound
+D 7 Sheared, as a sheep
+D 11 Salad dressing ingredient
+
+=== midi-033 | Midi 33
+###WAR#
+#PEEVED
+CANTATA
+AND#LOB
+STUPORS
+ERRANT#
+#YEW###
+A 1 Card game where the higher card wins
+A 4 Annoyed
+A 7 Multi-movement vocal work, often sacred
+A 8 Bread ___ butter
+A 9 High, arcing tennis shot
+A 10 Dazed states
+A 12 Straying from the right course
+A 13 Evergreen often used in hedges
+D 1 Like paint that hasn't dried
+D 2 Legendary island of King Arthur
+D 3 Witty comeback
+D 4 Food storage room
+D 5 Put up with
+D 6 Small amounts, as of paint
+D 7 Detective's assignment
+D 11 Dog's foot
+
+=== midi-034 | Midi 34
+###OAR#
+DEMURE#
+OVERAGE
+MAD#BEG
+EDITING
+#ENACTS
+#SAX###
+A 1 Rowboat paddle
+A 4 Modest and reserved
+A 7 Surplus amount
+A 9 Angry
+A 10 Sit up for a treat, as a dog
+A 11 Revising, as a manuscript
+A 13 Passes into law
+A 14 Jazz horn, for short
+D 1 Belonging to us
+D 2 Language spoken in Cairo
+D 3 One who rules for a young monarch
+D 4 Rounded roof
+D 5 Dodges
+D 6 Holy city in Saudi Arabia
+D 8 Things hens lay
+D 12 Sales ___
+
+=== midi-035 | Midi 35
+##FAST#
+#FORKED
+CARMINE
+RUG#PEN
+OCELOTS
+PERILS#
+#TYPE##
+A 1 Quick
+A 5 Split into two branches
+A 7 Deep red
+A 8 Floor covering
+A 9 Write, as a letter
+A 10 Spotted wild cats of the Americas
+A 12 Dangers
+A 13 Kind or sort
+D 1 Fake signature, e.g.
+D 2 Sleeve filler
+D 3 Pointed stick used on the slopes
+D 4 Core beliefs
+D 5 Sink fixture
+D 6 Cub Scout units
+D 7 Trim, as a photo
+D 11 Rim of a cup
+
+=== midi-036 | Midi 36
+##GAPS#
+#SECRET
+AUSTERE
+JET#DEN
+ADAMANT
+RELATE#
+#STYE##
+A 1 Holes in a fence
+A 5 Something kept hidden
+A 7 Stern and plain
+A 8 Jumbo ___
+A 9 Bear's winter home
+A 10 Firmly unyielding
+A 12 Tell, as a story
+A 13 Eyelid bump
+D 1 Whole that's more than its parts
+D 2 Perform on stage
+D 3 Come before in time
+D 4 Tranquil
+D 5 Soft leathers with a napped finish
+D 6 Circus big top, e.g.
+D 7 Slightly open, as a door
+D 11 Month before June
+
+=== midi-037 | Midi 37
+###MEAT
+#DOODLE
+TERMITE
+RAG#TAN
+ORATORY
+MINORS#
+PESO###
+A 1 Beef or pork
+A 5 Draw idly in a margin
+A 7 Wood-munching insect
+A 8 Dusting cloth
+A 9 Bronze in the sun
+A 10 Art of public speaking
+A 12 People under 18
+A 13 Mexican money
+D 1 Mother, informally
+D 2 One who fixes a writer's copy
+D 3 Tables at the front of churches
+D 4 Very, very small
+D 5 Old-fashioned term of endearment
+D 6 Heart, liver and lungs
+D 7 Walk heavily
+D 11 As well
+
+=== midi-038 | Midi 38
+###CUSP
+#BRONCO
+CRATERS
+HOT#VAT
+ANTHEMS
+STEINS#
+MEDS###
+A 1 On the ___ of greatness
+A 5 Bucking horse at a rodeo
+A 7 Holes on the moon
+A 8 Sweltering
+A 9 Big tank for dyeing or brewing
+A 10 National songs
+A 12 Large mugs, often with lids
+A 13 Pills, informally
+D 1 Folding camp bed
+D 2 Bumpy, as a road
+D 3 Clears out in a hurry
+D 4 Fence uprights
+D 5 Surname of novelists Charlotte and Emily
+D 6 Snitched, with "on"
+D 7 Deep gorge
+D 11 Not hers
+
+=== midi-039 | Midi 39
+##COAT#
+SLOWER#
+LITERAL
+APE#ACE
+PIRATES
+#DIGEST
+#SEES##
+A 1 Layer of paint
+A 5 Not as fast
+A 7 Word-for-word, as a translation
+A 9 Mimic
+A 10 Serve that can't be returned
+A 11 Ship raiders of old
+A 13 Break down, as food
+A 14 Notices
+D 1 Close-knit circle of friends
+D 2 Need to pay back
+D 3 Pokes holes in, as a lawn
+D 4 Copies using see-through paper
+D 5 Hockey's ___ shot
+D 6 Fats, to a biologist
+D 8 For fear that
+D 12 Bronze ___

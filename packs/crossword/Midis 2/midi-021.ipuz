@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 21",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, "#", "#"],
+  ["#", 4, 0, 0, 0, 5, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", "#", 13, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "A", "M", "P", "#", "#"],
+  ["#", "C", "L", "E", "R", "G", "Y"],
+  ["G", "R", "A", "N", "O", "L", "A"],
+  ["L", "A", "B", "#", "R", "A", "P"],
+  ["A", "V", "A", "T", "A", "R", "S"],
+  ["D", "E", "M", "O", "T", "E", "#"],
+  ["#", "#", "A", "W", "E", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Unit of electric current, for short"],
+   [4, "Priests and ministers as a group"],
+   [7, "Oat-and-nut breakfast mix"],
+   [8, "Room with test tubes"],
+   [9, "Sharp knock"],
+   [10, "On-screen figures that stand for players"],
+   [12, "Lower in rank"],
+   [13, "Amazement mixed with respect"]
+  ],
+  "Down": [
+   [1, "State whose capital is Montgomery"],
+   [2, "Guys"],
+   [3, "Adjust, as rent for a partial month"],
+   [4, "Long for"],
+   [5, "Angry stare"],
+   [6, "Barks like a small dog"],
+   [7, "Pleased"],
+   [11, "Haul away, as a parked car"]
+  ]
+ }
+}

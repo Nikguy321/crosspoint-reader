@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 53",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "A", "G"],
+  ["S", "P", "A", "C", "E"],
+  ["C", "O", "U", "R", "T"],
+  ["A", "N", "T", "E", "S"],
+  ["R", "Y", "E", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Droop"],
+   [4, "Where astronauts float"],
+   [6, "Tennis or basketball venue"],
+   [7, "Bets made before a poker hand is dealt"],
+   [8, "Grain in pumpernickel bread"]
+  ],
+  "Down": [
+   [1, "Fry quickly in a little oil"],
+   [2, "Unit of farmland area"],
+   [3, "Receives"],
+   [4, "Mark left by a healed wound"],
+   [5, "Small horse"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 66",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "C", "H", "A", "T"],
+  ["S", "H", "O", "R", "E"],
+  ["H", "I", "N", "G", "E"],
+  ["A", "L", "O", "U", "D"],
+  ["M", "I", "R", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Friendly talk"],
+   [5, "Land along a lake or sea"],
+   [6, "Door joint that lets it swing"],
+   [7, "Not silently"],
+   [8, "Swampy ground"]
+  ],
+  "Down": [
+   [1, "Spicy stew often made with beans"],
+   [2, "Pay tribute to"],
+   [3, "Bicker"],
+   [4, "Got ready to drive, in golf (with \"up\")"],
+   [5, "Hoax"]
+  ]
+ }
+}

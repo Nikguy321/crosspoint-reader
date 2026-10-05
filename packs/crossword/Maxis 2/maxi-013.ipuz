@@ -1,0 +1,71 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 13",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, 4, "#", 5, 6, 7, 8],
+  [9, 0, 0, 0, "#", 10, 0, 0, 0],
+  [11, 0, 0, 0, "#", 12, 0, 0, 0],
+  [13, 0, 0, "#", 14, 0, 0, 0, 0],
+  ["#", "#", 15, 16, 0, 0, 0, "#", "#"],
+  [17, 18, 0, 0, 0, "#", 19, 20, 21],
+  [22, 0, 0, 0, "#", 23, 0, 0, 0],
+  [24, 0, 0, 0, "#", 25, 0, 0, 0],
+  [26, 0, 0, 0, "#", 27, 0, 0, 0]
+ ],
+ "solution": [
+  ["A", "L", "T", "O", "#", "S", "I", "T", "E"],
+  ["W", "A", "R", "D", "#", "I", "D", "O", "L"],
+  ["A", "C", "I", "D", "#", "D", "E", "E", "M"],
+  ["Y", "E", "A", "#", "M", "E", "N", "D", "S"],
+  ["#", "#", "T", "R", "U", "S", "T", "#", "#"],
+  ["A", "C", "H", "E", "D", "#", "I", "O", "N"],
+  ["P", "O", "L", "E", "#", "A", "C", "N", "E"],
+  ["P", "L", "O", "D", "#", "R", "A", "T", "E"],
+  ["S", "A", "N", "S", "#", "C", "L", "O", "D"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Voice part between soprano and tenor"],
+   [5, "Spot where something is built"],
+   [9, "Hospital section"],
+   [10, "Object of a fan's worship"],
+   [11, "Substance with a low pH"],
+   [12, "Judge to be"],
+   [13, "Vote in favor"],
+   [14, "Fixes, as a torn sleeve"],
+   [15, "Faith in someone"],
+   [17, "Felt sore"],
+   [19, "Charged particle"],
+   [22, "Shaft that holds a flag"],
+   [23, "Pimply skin condition"],
+   [24, "Walk heavily and slowly"],
+   [25, "Give a score to"],
+   [26, "___ serif (plain font style)"],
+   [27, "Lump of dirt"]
+  ],
+  "Down": [
+   [1, "Not at home"],
+   [2, "Tie up, as boots"],
+   [3, "Swim-bike-run race"],
+   [4, "Like 3, 5 or 7"],
+   [5, "Fries and slaw, at a diner"],
+   [6, "Exactly alike, as some twins"],
+   [7, "Three-___ sloth"],
+   [8, "Shady street trees"],
+   [14, "What pigs love to roll in"],
+   [16, "Tall marsh plants"],
+   [17, "Phone programs"],
+   [18, "Dark fizzy soft drink"],
+   [20, "Aware of, as a scheme"],
+   [21, "Must have"],
+   [23, "Curved path of a thrown ball"]
+  ]
+ }
+}

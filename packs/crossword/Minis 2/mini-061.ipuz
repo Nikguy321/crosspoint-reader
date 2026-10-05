@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 61",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "S", "H", "I", "N"],
+  ["C", "L", "O", "N", "E"],
+  ["L", "I", "V", "E", "S"],
+  ["A", "D", "E", "P", "T"],
+  ["M", "E", "L", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Front of the lower leg"],
+   [5, "Exact duplicate"],
+   [6, "A cat supposedly has nine of them"],
+   [7, "Highly skilled"],
+   [8, "Go from solid to liquid"]
+  ],
+  "Down": [
+   [1, "Playground chute"],
+   [2, "Run-down little shack"],
+   [3, "Lacking skill; bungling"],
+   [4, "Twig home for a robin"],
+   [5, "Shellfish in a chowder"]
+  ]
+ }
+}

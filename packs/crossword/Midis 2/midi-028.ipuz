@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 28",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "H", "E", "D", "#"],
+  ["#", "S", "C", "A", "L", "E", "S"],
+  ["S", "T", "A", "M", "I", "N", "A"],
+  ["P", "O", "P", "#", "C", "O", "T"],
+  ["E", "R", "U", "D", "I", "T", "E"],
+  ["D", "E", "L", "E", "T", "E", "#"],
+  ["#", "S", "A", "W", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Backyard storage building"],
+   [5, "Devices for weighing"],
+   [7, "Staying power"],
+   [8, "Burst, as a balloon"],
+   [9, "Folding camp bed"],
+   [10, "Deeply learned"],
+   [12, "Erase, as a file"],
+   [13, "Toothed cutting tools"]
+  ],
+  "Down": [
+   [1, "Shoulder blade, to a doctor"],
+   [2, "Glazed holiday roast"],
+   [3, "Brings out, as laughter"],
+   [4, "Signify"],
+   [5, "Shops"],
+   [6, "Satisfy fully, as hunger"],
+   [7, "Went too fast"],
+   [11, "Dampness on a spiderweb at dawn"]
+  ]
+ }
+}

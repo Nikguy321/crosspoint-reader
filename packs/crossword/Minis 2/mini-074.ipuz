@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 74",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "B", "R", "I", "E"],
+  ["G", "L", "A", "D", "E"],
+  ["N", "A", "V", "E", "L"],
+  ["A", "R", "E", "A", "S"],
+  ["W", "E", "D", "S", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Soft French cheese with a white rind"],
+   [5, "Open, grassy space in a forest"],
+   [6, "Belly button"],
+   [7, "Zones"],
+   [8, "Marries"]
+  ],
+  "Down": [
+   [1, "Sound loudly, as a car horn"],
+   [2, "Gave a glowing review"],
+   [3, "Brainstorm results"],
+   [4, "Slippery, snakelike swimmers"],
+   [5, "Chew on, like a beaver"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 76",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  [1, 2, 3, 4, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, 0],
+  [9, 0, 0, 0, 0]
+ ],
+ "solution": [
+  ["G", "R", "A", "T", "E"],
+  ["R", "A", "M", "E", "N"],
+  ["A", "V", "E", "R", "T"],
+  ["D", "E", "N", "S", "E"],
+  ["E", "L", "D", "E", "R"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Shred, as cheese"],
+   [6, "Japanese noodle soup"],
+   [7, "Turn away, as one's eyes"],
+   [8, "Tightly packed, as a crowd"],
+   [9, "Respected village senior"]
+  ],
+  "Down": [
+   [1, "Letter on a report card"],
+   [2, "Tangle, as yarn"],
+   [3, "Change, as a law"],
+   [4, "Short and curt"],
+   [5, "Come in"]
+  ]
+ }
+}

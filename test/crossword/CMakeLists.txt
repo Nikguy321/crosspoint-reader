@@ -13,21 +13,24 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(arduinojson)
 
 file(GLOB CROSSWORD_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/lib/Crossword/*.cpp)
-add_executable(CrosswordTest CrosswordTest.cpp CrosswordContactTest.cpp ${CROSSWORD_SOURCES})
+add_executable(CrosswordTest CrosswordTest.cpp CrosswordContactTest.cpp CrosswordPacksTest.cpp ${CROSSWORD_SOURCES})
 target_include_directories(CrosswordTest PRIVATE
   ${REPO_ROOT}/lib/Crossword
   ${REPO_ROOT}/lib/EpdFont
   ${arduinojson_SOURCE_DIR}/src
 )
-target_compile_definitions(CrosswordTest PRIVATE CROSSWORD_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+target_compile_definitions(CrosswordTest PRIVATE CROSSWORD_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+  CROSSWORD_PACKS="${REPO_ROOT}/packs/crossword")
 target_link_libraries(CrosswordTest PRIVATE crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(CrosswordTest)
 
-# The generated built-in table and the committed fixtures must match their scripts.
+# The generated built-in table, the committed fixtures and the pack .ipuz files must match their scripts.
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
   add_test(NAME crossword_builtin_current
     COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/crossword/gen_builtin.py --check)
   add_test(NAME crossword_fixtures_current
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/make_fixtures.py --check)
+  add_test(NAME crossword_packs_current
+    COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/crossword/make_packs.py --check)
 endif()

@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 13",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, "#"],
+  ["#", 4, 5, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "J", "A", "R", "#"],
+  ["#", "S", "T", "O", "N", "E", "S"],
+  ["S", "N", "U", "G", "G", "L", "E"],
+  ["W", "I", "N", "#", "L", "I", "E"],
+  ["A", "D", "D", "R", "E", "S", "S"],
+  ["P", "E", "R", "I", "S", "H", "#"],
+  ["#", "R", "A", "P", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Glass container with a twist-off lid"],
+   [4, "Rocks skipped across a pond"],
+   [7, "Cozy up under a blanket"],
+   [8, "Come out on top"],
+   [9, "Stretch out on the sofa"],
+   [10, "Street and number on an envelope"],
+   [12, "\"___ the thought!\""],
+   [13, "Quick knock on a door"]
+  ],
+  "Down": [
+   [1, "Run at an easy pace"],
+   [2, "Things measured with a protractor"],
+   [3, "Chopped pickle topping for a hot dog"],
+   [4, "Nastier and more sarcastic"],
+   [5, "Treeless Arctic plain"],
+   [6, "Notices"],
+   [7, "Trade, as baseball cards"],
+   [11, "Tear in a pair of jeans"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 65",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "B", "I", "O", "S"],
+  ["T", "E", "M", "P", "O"],
+  ["A", "G", "A", "I", "N"],
+  ["S", "I", "G", "N", "S"],
+  ["K", "N", "E", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Short life stories, informally"],
+   [5, "Speed of a piece of music"],
+   [6, "One more time"],
+   [7, "Autographs"],
+   [8, "Leg joint covered by a cap"]
+  ],
+  "Down": [
+   [1, "Kick off"],
+   [2, "Reflection in a mirror"],
+   [3, "Share a view"],
+   [4, "Boys in a family"],
+   [5, "Job to be done"]
+  ]
+ }
+}

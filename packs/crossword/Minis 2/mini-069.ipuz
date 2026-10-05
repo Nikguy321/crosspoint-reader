@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 69",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "T", "A", "B", "#"],
+  ["W", "O", "R", "L", "D"],
+  ["A", "R", "R", "A", "Y"],
+  ["S", "T", "O", "R", "E"],
+  ["#", "E", "W", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Key above Caps Lock"],
+   [4, "The whole globe"],
+   [6, "Wide assortment"],
+   [7, "Put away for later"],
+   [8, "Female sheep"]
+  ],
+  "Down": [
+   [1, "Rich layered cake"],
+   [2, "Symbol on a one-way sign"],
+   [3, "Sound loudly, as a horn"],
+   [4, "That ___ close!"],
+   [5, "Color, as Easter eggs"]
+  ]
+ }
+}

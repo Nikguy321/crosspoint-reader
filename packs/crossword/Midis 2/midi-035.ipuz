@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 35",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "F", "A", "S", "T", "#"],
+  ["#", "F", "O", "R", "K", "E", "D"],
+  ["C", "A", "R", "M", "I", "N", "E"],
+  ["R", "U", "G", "#", "P", "E", "N"],
+  ["O", "C", "E", "L", "O", "T", "S"],
+  ["P", "E", "R", "I", "L", "S", "#"],
+  ["#", "T", "Y", "P", "E", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Quick"],
+   [5, "Split into two branches"],
+   [7, "Deep red"],
+   [8, "Floor covering"],
+   [9, "Write, as a letter"],
+   [10, "Spotted wild cats of the Americas"],
+   [12, "Dangers"],
+   [13, "Kind or sort"]
+  ],
+  "Down": [
+   [1, "Fake signature, e.g."],
+   [2, "Sleeve filler"],
+   [3, "Pointed stick used on the slopes"],
+   [4, "Core beliefs"],
+   [5, "Sink fixture"],
+   [6, "Cub Scout units"],
+   [7, "Trim, as a photo"],
+   [11, "Rim of a cup"]
+  ]
+ }
+}

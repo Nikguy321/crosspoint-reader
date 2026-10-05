@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 25",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, 4],
+  ["#", 5, 6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  [13, 0, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "T", "A", "R", "T"],
+  ["#", "D", "R", "I", "V", "E", "R"],
+  ["S", "E", "E", "P", "A", "G", "E"],
+  ["N", "A", "B", "#", "T", "E", "A"],
+  ["A", "D", "A", "M", "A", "N", "T"],
+  ["R", "E", "T", "O", "R", "T", "#"],
+  ["K", "N", "E", "W", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Pleasantly sour"],
+   [5, "Person behind the wheel"],
+   [7, "Slow leak through a crack or wall"],
+   [8, "Catch in the act"],
+   [9, "Drink steeped from dried leaves"],
+   [10, "Unwilling to budge"],
+   [12, "Quick, sharp reply"],
+   [13, "Was aware of"]
+  ],
+  "Down": [
+   [1, "Extra cash left for a server"],
+   [2, "Icon that stands for a user online"],
+   [3, "One who rules in place of a young monarch"],
+   [4, "Reward for a well-behaved dog"],
+   [5, "Muffle, as a sound"],
+   [6, "Partial refund after a purchase"],
+   [7, "Sarcastic attitude, informally"],
+   [11, "Cut, as the lawn"]
+  ]
+ }
+}

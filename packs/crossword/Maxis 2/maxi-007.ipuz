@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 7",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, "#", 11, 0, 0, 0],
+  [12, 0, 0, 0, 13, 0, 0, 0, 0],
+  ["#", "#", "#", 14, 0, 0, "#", "#", "#"],
+  [15, 16, 17, 0, 0, 0, 18, 19, 20],
+  [21, 0, 0, 0, "#", 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "R", "U", "T", "#", "D", "A", "T", "A"],
+  ["W", "I", "T", "H", "#", "E", "P", "I", "C"],
+  ["A", "F", "A", "R", "#", "F", "E", "L", "T"],
+  ["R", "E", "H", "E", "A", "R", "S", "E", "S"],
+  ["#", "#", "#", "A", "G", "O", "#", "#", "#"],
+  ["S", "T", "A", "T", "E", "S", "M", "A", "N"],
+  ["P", "A", "V", "E", "#", "T", "A", "C", "O"],
+  ["U", "P", "O", "N", "#", "E", "M", "I", "T"],
+  ["N", "E", "W", "S", "#", "D", "A", "D", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Deep groove worn in a dirt road"],
+   [4, "Facts and figures"],
+   [8, "In the company of"],
+   [9, "Long heroic poem"],
+   [10, "At a great distance"],
+   [11, "Fabric used on pool tables"],
+   [12, "Practices lines before a show"],
+   [14, "A week ___ (seven days back)"],
+   [15, "Respected political leader"],
+   [21, "Cover a road with asphalt"],
+   [22, "Mexican dish in a tortilla shell"],
+   [23, "On top of"],
+   [24, "Give off, as light"],
+   [25, "Current events"],
+   [26, "Father's Day honoree"]
+  ],
+  "Down": [
+   [1, "Teeming (with)"],
+   [2, "Beehive State"],
+   [3, "Menaces"],
+   [4, "Thawed out"],
+   [5, "Mimics"],
+   [6, "Square on a bathroom floor"],
+   [7, "Parts of a play"],
+   [8, "Card game where the high card wins"],
+   [13, "Grow older"],
+   [15, "Twirled around"],
+   [16, "Measuring ___ (carpenter's tool)"],
+   [17, "Declare openly"],
+   [18, "Baby's word for mother"],
+   [19, "Opposite of a base, in chemistry"],
+   [20, "Word that makes a sentence negative"]
+  ]
+ }
+}

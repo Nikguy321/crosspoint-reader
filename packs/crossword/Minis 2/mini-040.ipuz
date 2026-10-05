@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 40",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "T", "Y"],
+  ["#", "T", "O", "R", "E"],
+  ["H", "A", "L", "O", "S"],
+  ["E", "X", "I", "T", "#"],
+  ["R", "I", "D", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Pig's pen"],
+   [4, "Ripped"],
+   [5, "Rings of light around the moon"],
+   [6, "Way out"],
+   [7, "Get ___ of (throw away)"]
+  ],
+  "Down": [
+   [1, "Not hollow"],
+   [2, "Horse's gait between a walk and a canter"],
+   [3, "Answer shown by a nod"],
+   [4, "Cab with a meter"],
+   [5, "She, as the object of a verb"]
+  ]
+ }
+}

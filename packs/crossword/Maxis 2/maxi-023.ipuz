@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 23",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, "#", 11, 0, 0, 0],
+  [12, 0, 0, 0, 13, 0, 0, 0, 0],
+  ["#", "#", "#", 14, 0, 0, "#", "#", "#"],
+  [15, 16, 17, 0, 0, 0, 18, 19, 20],
+  [21, 0, 0, 0, "#", 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "R", "O", "T", "#", "P", "L", "O", "W"],
+  ["H", "U", "S", "H", "#", "A", "I", "D", "E"],
+  ["I", "S", "L", "E", "#", "I", "C", "E", "D"],
+  ["S", "H", "O", "R", "T", "N", "E", "S", "S"],
+  ["#", "#", "#", "M", "A", "T", "#", "#", "#"],
+  ["O", "R", "G", "A", "N", "I", "S", "T", "S"],
+  ["P", "E", "A", "L", "#", "N", "A", "I", "L"],
+  ["T", "A", "L", "L", "#", "G", "R", "E", "Y"],
+  ["S", "P", "A", "Y", "#", "S", "I", "R", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Decay"],
+   [4, "Till the soil"],
+   [8, "\"Quiet, please!\""],
+   [9, "Senator's helper"],
+   [10, "Small piece of land in a lake"],
+   [11, "Frosted, as a cake"],
+   [12, "Lack of height"],
+   [14, "Welcome ___ (doorstep item)"],
+   [15, "Church keyboard players"],
+   [21, "Ringing of bells"],
+   [22, "Hammer's target"],
+   [23, "Like a giraffe"],
+   [24, "Like storm clouds, to a Brit"],
+   [25, "Neuter, as a female cat"],
+   [26, "Knight's title"]
+  ],
+  "Down": [
+   [1, "Hurry"],
+   [2, "Capital of Norway"],
+   [3, "In a heat-related way"],
+   [4, "Works hung in a gallery"],
+   [5, "Tiny pests in hair"],
+   [6, "Lyrical tributes"],
+   [7, "Marries"],
+   [8, "Not hers"],
+   [13, "Get bronze in the sun"],
+   [15, "Picks, with 'for'"],
+   [16, "Gather in, as a crop"],
+   [17, "Fancy party"],
+   [18, "Draped garment worn in India"],
+   [19, "Row of stadium seats"],
+   [20, "Crafty, like a fox"]
+  ]
+ }
+}

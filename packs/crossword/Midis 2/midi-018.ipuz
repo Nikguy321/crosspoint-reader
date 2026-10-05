@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 18",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, 4],
+  ["#", 5, 6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  [13, 0, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "R", "A", "S", "P"],
+  ["#", "S", "C", "A", "R", "C", "E"],
+  ["S", "P", "A", "T", "T", "E", "R"],
+  ["W", "O", "N", "#", "I", "N", "K"],
+  ["E", "N", "C", "A", "S", "E", "S"],
+  ["A", "G", "E", "N", "T", "S", "#"],
+  ["R", "E", "L", "Y", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Coarse file for shaping wood"],
+   [5, "In short supply"],
+   [7, "Sprinkle with drops of mud"],
+   [8, "Took first place"],
+   [9, "Pen filler"],
+   [10, "Seals inside a shell"],
+   [12, "Pros who help sell houses"],
+   [13, "Depend (on)"]
+  ],
+  "Down": [
+   [1, "Snitch"],
+   [2, "Painter or sculptor"],
+   [3, "Picturesque views"],
+   [4, "Job extras, like free lunch"],
+   [5, "Porous kitchen cleaner"],
+   [6, "Call off"],
+   [7, "Take an oath"],
+   [11, "Pick ___ card (magician's request)"]
+  ]
+ }
+}

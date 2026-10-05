@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 27",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, "#"],
+  [4, 5, 6, 0, 0, 0, "#"],
+  [7, 0, 0, 0, 0, 0, 8],
+  [9, 0, 0, "#", 10, 0, 0],
+  [11, 0, 0, 12, 0, 0, 0],
+  ["#", 13, 0, 0, 0, 0, 0],
+  ["#", 14, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "S", "I", "T", "#"],
+  ["A", "C", "U", "I", "T", "Y", "#"],
+  ["C", "O", "M", "P", "A", "R", "E"],
+  ["T", "I", "P", "#", "L", "A", "G"],
+  ["S", "N", "I", "P", "I", "N", "G"],
+  ["#", "E", "R", "E", "C", "T", "S"],
+  ["#", "D", "E", "W", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Take a seat"],
+   [4, "Sharpness, as of vision"],
+   [7, "Weigh one against another"],
+   [9, "Pointed end"],
+   [10, "Hang back"],
+   [11, "Making petty, snide remarks"],
+   [13, "Puts up, as a tent"],
+   [14, "Morning moisture on the grass"]
+  ],
+  "Down": [
+   [1, "Small taste of a drink"],
+   [2, "Slanted, like some type"],
+   [3, "Cruel, all-powerful ruler"],
+   [4, "Divisions of a play"],
+   [5, "Invented, as a new word"],
+   [6, "Official who calls balls and strikes"],
+   [8, "Things a hen lays"],
+   [12, "Church bench"]
+  ]
+ }
+}

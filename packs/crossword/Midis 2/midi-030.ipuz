@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 30",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "A", "S", "S", "#"],
+  ["#", "H", "A", "R", "M", "E", "D"],
+  ["S", "O", "R", "C", "E", "R", "Y"],
+  ["N", "O", "D", "#", "L", "I", "E"],
+  ["A", "V", "I", "A", "T", "E", "S"],
+  ["G", "E", "N", "R", "E", "S", "#"],
+  ["#", "S", "E", "E", "D", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Back talk"],
+   [5, "Hurt"],
+   [7, "Wizard's magic"],
+   [8, "Silent \"yes\""],
+   [9, "Stretch out on a couch"],
+   [10, "Flies a plane"],
+   [12, "Mystery and romance, for two"],
+   [13, "Something planted in spring"]
+  ],
+  "Down": [
+   [1, "Fish that may be packed in oil"],
+   [2, "Curved path of a thrown ball"],
+   [3, "Refined, as ore"],
+   [4, "Ordered sequence, as of events"],
+   [5, "Horses' feet"],
+   [6, "Colors, as fabric"],
+   [7, "Unexpected problem"],
+   [11, "Plural form of \"is\""]
+  ]
+ }
+}

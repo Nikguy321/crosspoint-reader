@@ -1,0 +1,851 @@
+# Minis 2 - original crossword pack, MIT License. Regenerate the .ipuz files with python3 scripts/crossword/make_packs.py
+
+=== mini-031 | Mini 31
+##TAD
+PLATE
+LEMON
+ENEMY
+ADD##
+A 1 Smidgen
+A 4 Dinner dish
+A 6 Sour yellow citrus fruit
+A 7 Opposite of an ally
+A 8 Find the total of
+D 1 Made gentle, as a wild horse
+D 2 Building block of a molecule
+D 3 Refuse to admit
+D 4 Earnest request
+D 5 Let someone borrow
+
+=== mini-032 | Mini 32
+#ROB#
+COULD
+UTTER
+TODAY
+#ROT#
+A 1 Steal from
+A 4 Was able to
+A 6 Say aloud
+A 7 Not yesterday or tomorrow
+A 8 Spoil, as old fruit
+D 1 Spinning part of a helicopter
+D 2 Surpass
+D 3 Cry like a lamb
+D 4 Snip with scissors
+D 5 Like a desert
+
+=== mini-033 | Mini 33
+##MEW
+#PAVE
+RESET
+IRON#
+BUN##
+A 1 Kitten's cry
+A 4 Cover with asphalt
+A 5 Set back to the start, as a stopwatch
+A 6 Press, as a shirt
+A 7 Hot dog holder
+D 1 Worker with bricks and stone
+D 2 Tied, as a score
+D 3 Not yet dry, as fresh paint
+D 4 Lima's country
+D 5 Chest bone
+
+=== mini-034 | Mini 34
+##UGH
+#AREA
+ANGRY
+ITEM#
+LID##
+A 1 Sound of disgust
+A 4 Length times width, for a rectangle
+A 5 Seeing red
+A 6 Something to check off
+A 7 Jar top
+D 1 Strongly encouraged
+D 2 Microbe that may cause a cold
+D 3 Dried grass fed to horses
+D 4 Against
+D 5 Be under the weather
+
+=== mini-035 | Mini 35
+##WHO
+#CREW
+WHIRL
+EASE#
+BIT##
+A 1 ___ goes there?
+A 4 Ship's workers
+A 5 Spin around fast
+A 6 Lack of difficulty
+A 7 Horse's mouthpiece
+D 1 Joint between hand and forearm
+D 2 In this place
+D 3 Night bird that hoots
+D 4 Spiced milk tea
+D 5 Spider's creation
+
+=== mini-036 | Mini 36
+##LAY
+#MULE
+RECAP
+ASKS#
+WHY##
+A 1 Set down gently
+A 4 Stubborn pack animal
+A 5 Brief summary
+A 6 Inquires
+A 7 For what reason?
+D 1 Fortunate
+D 2 Sad to say
+D 3 Casual yes
+D 4 Screen door material
+D 5 Uncooked
+
+=== mini-037 | Mini 37
+#SON#
+UPPER
+SIEVE
+ERRED
+#EAR#
+A 1 Male child
+A 4 Higher in position
+A 6 Kitchen strainer with fine mesh
+A 7 Made a mistake
+A 8 Organ of hearing
+D 1 Tall, pointed top of a church tower
+D 2 Musical drama full of arias
+D 3 At no time
+D 4 Employ
+D 5 Color of a ripe tomato
+
+=== mini-038 | Mini 38
+#DOT#
+POURS
+UNTIL
+TODAY
+#ROD#
+A 1 Tiny round mark
+A 4 Rains very hard
+A 6 Up to the time of
+A 7 Not yesterday or tomorrow
+A 8 Fishing pole
+D 1 Giver to a charity
+D 2 Surpass
+D 3 Group of three
+D 4 Placed
+D 5 Crafty, like a fox
+
+=== mini-039 | Mini 39
+##SPA
+#STOP
+TAINT
+ONLY#
+YET##
+A 1 Place for a mud bath and a massage
+A 4 Word on a red octagonal sign
+A 5 Contaminate
+A 6 ___ child (kid with no brothers or sisters)
+A 7 Up to now
+D 1 Pole for walking high off the ground
+D 2 Small horse
+D 3 Fitting, as a remark
+D 4 Of sound mind
+D 5 Teddy bear, for one
+
+=== mini-040 | Mini 40
+##STY
+#TORE
+HALOS
+EXIT#
+RID##
+A 1 Pig's pen
+A 4 Ripped
+A 5 Rings of light around the moon
+A 6 Way out
+A 7 Get ___ of (throw away)
+D 1 Not hollow
+D 2 Horse's gait between a walk and a canter
+D 3 Answer shown by a nod
+D 4 Cab with a meter
+D 5 She, as the object of a verb
+
+=== mini-041 | Mini 41
+##SEA
+#SPAS
+HARSH
+OMIT#
+PEG##
+A 1 Large body of salt water
+A 4 Places for massages and facials
+A 5 Rough and severe
+A 6 Leave out
+A 7 Tent stake
+D 1 Small stem of mint, used as a garnish
+D 2 Where the sun rises
+D 3 Gray dust left by a fire
+D 4 Identical
+D 5 Jump on one foot
+
+=== mini-042 | Mini 42
+##LOT
+#SAVE
+SEDAN
+KEEL#
+INN##
+A 1 Place to park cars
+A 4 Put away for later
+A 5 Four-door car
+A 6 Backbone along the bottom of a boat
+A 7 Country lodging for travelers
+D 1 Heavily loaded
+D 2 Egg-shaped figure
+D 3 Number of toes on two feet
+D 4 Spotted
+D 5 Glide down a snowy slope
+
+=== mini-043 | Mini 43
+##LIP
+#PACE
+DETER
+USED#
+BOX##
+A 1 Rim of a cup or pitcher
+A 4 Walk back and forth nervously
+A 5 Scare off, as a burglar
+A 6 Secondhand, as a car
+A 7 Cardboard shipping container
+D 1 Milky sap of the rubber tree
+D 2 Chilled, as tea
+D 3 For each
+D 4 Unit of money in Mexico
+D 5 Give a nickname to
+
+=== mini-044 | Mini 44
+#COY#
+SOLID
+ORDER
+DAILY
+#LED#
+A 1 Playfully shy
+A 4 Sturdy and well made
+A 6 Request from a menu
+A 7 Once every 24 hours
+A 8 Was in first place
+D 1 Reef builder in warm seas
+D 2 Hit song from years ago
+D 3 Give way at a merge
+D 4 Lawn grass sold in rolls
+D 5 Opposite of damp
+
+=== mini-045 | Mini 45
+#CAW#
+POLOS
+ABOUT
+TRULY
+#ADD#
+A 1 Crow's call
+A 4 Knit shirts with collars
+A 6 Approximately
+A 7 Honestly
+A 8 Mix in, as sugar
+D 1 Snake in a charmer's basket
+D 2 So that others can hear
+D 3 ___ you like some tea?
+D 4 Small square of butter
+D 5 Muddy home for hogs
+
+=== mini-046 | Mini 46
+#RID#
+RAVEN
+OZONE
+WORST
+#RYE#
+A 1 Clear, as a garden of weeds
+A 4 Big glossy black bird
+A 6 Gas that shields Earth from UV rays
+A 7 Least good of all
+A 8 Grain in pumpernickel bread
+D 1 Shaving tool
+D 2 Creamy off-white shade
+D 3 Thick, as fog
+D 4 Line of seats in a theater
+D 5 Butterfly catcher's tool
+
+=== mini-047 | Mini 47
+##BOW
+BIOME
+ANGER
+SCENE
+SHY##
+A 1 Archer's weapon
+A 4 Tundra or rainforest, for one
+A 6 Fury
+A 7 Make a ___ (throw a fit in public)
+A 8 Bashful
+D 1 One over par in golf
+D 2 Warning sign of what's ahead
+D 3 You ___ right all along
+D 4 Lowest male singing voice
+D 5 One-twelfth of a foot
+
+=== mini-048 | Mini 48
+##ELM
+IGLOO
+RABID
+OZONE
+NEW##
+A 1 Tall shade tree with toothed leaves
+A 4 Dome made of snow blocks
+A 6 Wildly enthusiastic, as a fan
+A 7 Form of oxygen with three atoms per molecule
+A 8 Fresh out of the box
+D 1 Joint in the middle of the arm
+D 2 Pork cut for roasting
+D 3 Method, as of transportation
+D 4 Mineral in spinach and red meat
+D 5 Look long and steadily
+
+=== mini-049 | Mini 49
+##NOW
+BIOME
+ADMIT
+SEATS
+SAD##
+A 1 At this moment
+A 4 Ecological zone such as tundra or rainforest
+A 6 Let in, as a ticket holder
+A 7 Chairs and benches
+A 8 Unhappy
+D 1 One who roams from camp to camp
+D 2 Leave out
+D 3 Dampens
+D 4 Lowest male singing voice
+D 5 Notion
+
+=== mini-050 | Mini 50
+##CAN
+PHASE
+AUDIO
+CLEAN
+EAT##
+A 1 Soup container on a pantry shelf
+A 4 Crescent or full, for the moon
+A 6 Sound portion of a video
+A 7 Free of dirt
+A 8 Chow down
+D 1 Military academy student
+D 2 Largest continent
+D 3 Element with atomic number 10
+D 4 Walk back and forth nervously
+D 5 Hawaiian dance
+
+=== mini-051 | Mini 51
+##SPA
+OTTER
+PRISM
+AUNTS
+LEG##
+A 1 Mineral springs resort
+A 4 Sea mammal that floats on its back
+A 6 Glass piece that splits light into a rainbow
+A 7 Relatives such as Dad's sisters
+A 8 One stage of a relay race
+D 1 Painful jab from a bee
+D 2 Garden nuisance like an aphid
+D 3 Limbs with elbows
+D 4 October birthstone
+D 5 Not false
+
+=== mini-052 | Mini 52
+##TOT
+THERE
+HENCE
+AREAS
+NOT##
+A 1 Toddler
+A 4 In that place
+A 6 For this reason
+A 7 Regions or zones
+A 8 "___ so fast!"
+D 1 Guiding principle
+D 2 Black-and-white toothed whale
+D 3 Golf ball pegs
+D 4 Better ___ ever
+D 5 Brave rescuer
+
+=== mini-053 | Mini 53
+##SAG
+SPACE
+COURT
+ANTES
+RYE##
+A 1 Droop
+A 4 Where astronauts float
+A 6 Tennis or basketball venue
+A 7 Bets made before a poker hand is dealt
+A 8 Grain in pumpernickel bread
+D 1 Fry quickly in a little oil
+D 2 Unit of farmland area
+D 3 Receives
+D 4 Mark left by a healed wound
+D 5 Small horse
+
+=== mini-054 | Mini 54
+##BIN
+CELLO
+OVALS
+MESSY
+ART##
+A 1 Recycling container
+A 4 Bowed instrument held between the knees
+A 6 Egg shapes
+A 7 Untidy
+A 8 Painting or sculpture
+D 1 "___ off!" (rocket launch cry)
+D 2 Ailments
+D 3 Too curious about others' business
+D 4 Long, deep unconscious state
+D 5 "Happily ___ after"
+
+=== mini-055 | Mini 55
+##ATE
+#PLOY
+ELITE
+LEGS#
+FAN##
+A 1 Dined
+A 4 Crafty tactic
+A 5 Top-tier, as an athlete
+A 6 Table supports
+A 7 Cooling device with blades
+D 1 Put in a straight line
+D 2 Toddlers
+D 3 Organ of sight
+D 4 Earnest request
+D 5 Santa's workshop helper
+
+=== mini-056 | Mini 56
+##AGO
+MANIA
+EXIST
+NESTS
+USE##
+A 1 Long ___ (way back when)
+A 4 Frenzied enthusiasm
+A 6 Be real
+A 7 Twig homes for robin chicks
+A 8 Put to work
+D 1 Licorice-flavored seed
+D 2 Main point
+D 3 Grains fed to horses
+D 4 List of dishes at a restaurant
+D 5 Chopping tools
+
+=== mini-057 | Mini 57
+##PEP
+#BOAR
+LEERY
+OATS#
+BUS##
+A 1 Get-up-and-go
+A 4 Wild pig with tusks
+A 5 Wary
+A 6 Grains in granola
+A 7 Big yellow school vehicle
+D 1 Writers of verse
+D 2 Hearing organs
+D 3 Be nosy
+D 4 Boyfriend, in old-fashioned talk
+D 5 High, arcing tennis shot
+
+=== mini-058 | Mini 58
+#CHOP
+SHAVE
+LIVES
+INERT
+PANT#
+A 1 Cut up, as onions
+A 5 Use a razor
+A 6 Resides
+A 7 Not reactive, as neon
+A 8 Breathe hard after a sprint
+D 1 Fine dinnerware
+D 2 Safe place
+D 3 Out in the open
+D 4 Nuisance
+D 5 Lose one's footing
+
+=== mini-059 | Mini 59
+#EVIL
+PRONE
+ORGAN
+SOUND
+TREE#
+A 1 Wicked
+A 5 Lying face down
+A 6 Keyboard instrument with pipes
+A 7 Safe and ___
+A 8 Birch or willow
+D 1 Mistake on a math test
+D 2 Fashion of the moment
+D 3 Silly and pointless
+D 4 Let someone borrow
+D 5 Upright pole in a fence
+
+=== mini-060 | Mini 60
+#MAST
+CELLO
+ALIEN
+LEAPS
+FEST#
+A 1 Pole that holds up a sail
+A 5 Bowed instrument held between the knees
+A 6 UFO passenger in a sci-fi film
+A 7 Jumps
+A 8 Lively gathering, informally
+D 1 Free-for-all
+D 2 Assumed name
+D 3 Got some shut-eye
+D 4 Units of 2,000 pounds, in the U.S.
+D 5 Young cow
+
+=== mini-061 | Mini 61
+#SHIN
+CLONE
+LIVES
+ADEPT
+MELT#
+A 1 Front of the lower leg
+A 5 Exact duplicate
+A 6 A cat supposedly has nine of them
+A 7 Highly skilled
+A 8 Go from solid to liquid
+D 1 Playground chute
+D 2 Run-down little shack
+D 3 Lacking skill; bungling
+D 4 Twig home for a robin
+D 5 Shellfish in a chowder
+
+=== mini-062 | Mini 62
+#STOW
+CHIVE
+HATES
+APART
+TENT#
+A 1 Pack away, as luggage in an overhead bin
+A 5 Slender herb snipped onto baked potatoes
+A 6 Loathes
+A 7 Not together
+A 8 Canvas home on a camping trip
+D 1 Circle or square, for example
+D 2 Saturn's largest moon
+D 3 Plain to see; not secret
+D 4 Where the sun sets
+D 5 Talk casually
+
+=== mini-063 | Mini 63
+#BLAB
+PLACE
+AORTA
+SAVOR
+STAR#
+A 1 Tell a secret carelessly
+A 5 Set down carefully
+A 6 Body's largest artery
+A 7 Enjoy slowly, as a fine meal
+A 8 Twinkler in the night sky
+D 1 Swell, as after a big meal
+D 2 Caterpillar, for one
+D 3 Stage performer
+D 4 Grizzly, for example
+D 5 Throw to a teammate
+
+=== mini-064 | Mini 64
+#LAST
+MANTA
+EDGES
+SLEEK
+SELL#
+A 1 Hold up over time
+A 5 ___ ray (large, flat ocean fish)
+A 6 Rims or borders
+A 7 Smooth and glossy
+A 8 Put on the market
+D 1 Big spoon for serving punch
+D 2 Halo wearer in paintings
+D 3 Strong alloy made mostly of iron
+D 4 Chore
+D 5 Untidy state
+
+=== mini-065 | Mini 65
+#BIOS
+TEMPO
+AGAIN
+SIGNS
+KNEE#
+A 1 Short life stories, informally
+A 5 Speed of a piece of music
+A 6 One more time
+A 7 Autographs
+A 8 Leg joint covered by a cap
+D 1 Kick off
+D 2 Reflection in a mirror
+D 3 Share a view
+D 4 Boys in a family
+D 5 Job to be done
+
+=== mini-066 | Mini 66
+#CHAT
+SHORE
+HINGE
+ALOUD
+MIRE#
+A 1 Friendly talk
+A 5 Land along a lake or sea
+A 6 Door joint that lets it swing
+A 7 Not silently
+A 8 Swampy ground
+D 1 Spicy stew often made with beans
+D 2 Pay tribute to
+D 3 Bicker
+D 4 Got ready to drive, in golf (with "up")
+D 5 Hoax
+
+=== mini-067 | Mini 67
+#SHIP
+TWINE
+RINSE
+ANGER
+MEET#
+A 1 Ocean liner, e.g.
+A 5 Strong string for tying parcels
+A 6 Lather, ___, repeat
+A 7 Make mad
+A 8 Be introduced to
+D 1 Pigs, collectively
+D 2 Door part that lets it swing
+D 3 Small map within a larger map
+D 4 Person of equal standing
+D 5 Streetcar, in Britain
+
+=== mini-068 | Mini 68
+#GUT#
+GENIE
+ANIME
+BROIL
+#END#
+A 1 ___ feeling (hunch)
+A 4 Lamp dweller who grants wishes
+A 6 Japanese cartoon style
+A 7 Cook under direct high heat
+A 8 Conclusion
+D 1 Mystery or sci-fi, for a novel
+D 2 Labor group, or a marriage
+D 3 Shy and easily frightened
+D 4 Gift of ___ (way with words)
+D 5 Moray, for one
+
+=== mini-069 | Mini 69
+#TAB#
+WORLD
+ARRAY
+STORE
+#EWE#
+A 1 Key above Caps Lock
+A 4 The whole globe
+A 6 Wide assortment
+A 7 Put away for later
+A 8 Female sheep
+D 1 Rich layered cake
+D 2 Symbol on a one-way sign
+D 3 Sound loudly, as a horn
+D 4 That ___ close!
+D 5 Color, as Easter eggs
+
+=== mini-070 | Mini 70
+#RAN#
+PESOS
+UNTIE
+GEESE
+#WRY#
+A 1 Sprinted
+A 4 Mexican currency units
+A 6 Unfasten, as a ribbon
+A 7 Honking birds that fly in a V
+A 8 Like a crooked, knowing smile
+D 1 Extend, as a library book
+D 2 Daisy-like fall flower
+D 3 Loud and rowdy
+D 4 Small, curly-tailed dog
+D 5 I ___ what you mean
+
+=== mini-071 | Mini 71
+#APT#
+BRIEF
+ARENA
+RACER
+#YET#
+A 1 Fitting, as a remark
+A 4 Short and to the point
+A 6 Indoor sports venue
+A 7 Sprinter or speed skater
+A 8 Are we there ___?
+D 1 Orderly arrangement in rows
+D 2 Portion of pie
+D 3 Guiding principle
+D 4 Measure in sheet music
+D 5 A long way off
+
+=== mini-072 | Mini 72
+##TAB
+SCENE
+ORATE
+RESIN
+EWE##
+A 1 Pick up the ___ (pay the bill)
+A 4 Make a ___ (cause a public fuss)
+A 6 Give a formal speech
+A 7 Sticky sap used in varnishes
+A 8 Mother of a lamb
+D 1 Poke fun at
+D 2 Opposed to
+D 3 Where have you ___?
+D 4 Achy after a workout
+D 5 Workers on a ship or film set
+
+=== mini-073 | Mini 73
+#TART
+DIVER
+RAISE
+IRATE
+PANS#
+A 1 Small fruit-filled pastry
+A 5 Swimmer who leaps off a high board
+A 6 Bump in pay
+A 7 Seeing red
+A 8 Skillets and woks
+D 1 Sparkly headpiece for a princess
+D 2 Having to do with birds
+D 3 Takes a break
+D 4 Spruce or cedar
+D 5 Sound from a leaky faucet
+
+=== mini-074 | Mini 74
+#BRIE
+GLADE
+NAVEL
+AREAS
+WEDS#
+A 1 Soft French cheese with a white rind
+A 5 Open, grassy space in a forest
+A 6 Belly button
+A 7 Zones
+A 8 Marries
+D 1 Sound loudly, as a car horn
+D 2 Gave a glowing review
+D 3 Brainstorm results
+D 4 Slippery, snakelike swimmers
+D 5 Chew on, like a beaver
+
+=== mini-075 | Mini 75
+SCARE
+TOTAL
+AVOID
+TENSE
+STEER
+A 1 Frighten
+A 6 Add up
+A 7 Keep away from
+A 8 On edge
+A 9 Pilot, as a canoe
+D 1 Box score numbers, for short
+D 2 Crave enviously
+D 3 Make up for a wrong
+D 4 Bring up, as a child
+D 5 Older, as a sister
+
+=== mini-076 | Mini 76
+GRATE
+RAMEN
+AVERT
+DENSE
+ELDER
+A 1 Shred, as cheese
+A 6 Japanese noodle soup
+A 7 Turn away, as one's eyes
+A 8 Tightly packed, as a crowd
+A 9 Respected village senior
+D 1 Letter on a report card
+D 2 Tangle, as yarn
+D 3 Change, as a law
+D 4 Short and curt
+D 5 Come in
+
+=== mini-077 | Mini 77
+SMASH
+PESTO
+ETHOS
+ARENT
+ROSES
+A 1 Shatter
+A 6 Garlicky green spread made with basil
+A 7 Guiding beliefs of a group
+A 8 "They ___ here yet"
+A 9 Thorny garden flowers
+D 1 Asparagus stalk
+D 2 Underground train in Paris
+D 3 Fireplace remains
+D 4 Pit of a peach
+D 5 Has guests over
+
+=== mini-078 | Mini 78
+MOTEL
+ERODE
+LARGE
+OTTER
+NEEDY
+A 1 Roadside lodging
+A 6 Eat away at, as waves on a cliff
+A 7 Big
+A 8 Furry swimmer that cracks clams on its belly
+A 9 In want
+D 1 Cantaloupe or honeydew
+D 2 Give a long speech
+D 3 Rich layered cake
+D 4 Inched forward
+D 5 Suspicious and cautious
+
+=== mini-079 | Mini 79
+TITAN
+ANISE
+LEASE
+ERRED
+STATS
+A 1 Mythical giant like Atlas
+A 6 Seed with a licorice flavor
+A 7 Tenant's signed agreement
+A 8 Slipped up
+A 9 Batting average and such, for short
+D 1 Campfire stories
+D 2 Chemically unreactive
+D 3 Crown for a beauty queen
+D 4 Valuable resource
+D 5 Requires
+
+=== mini-080 | Mini 80
+LARCH
+OPERA
+NAVEL
+GRUEL
+STEPS
+A 1 Conifer that sheds its needles each fall
+A 6 Drama that is sung, not spoken
+A 7 Seedless orange variety
+A 8 Thin, watery porridge
+A 9 Staircase parts
+D 1 Yearns (for)
+D 2 In separate places
+D 3 Stage show of skits and songs
+D 4 Move at a snail's pace
+D 5 Corridors

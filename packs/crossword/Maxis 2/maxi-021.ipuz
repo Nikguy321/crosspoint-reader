@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 21",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  [1, 2, 3, "#", "#", 4, 5, 6, 7],
+  [8, 0, 0, "#", 9, 0, 0, 0, 0],
+  [10, 0, 0, "#", 11, 0, 0, 0, 0],
+  [12, 0, 0, 13, 0, 0, "#", "#", "#"],
+  ["#", 14, 0, 0, 0, 0, 15, 16, "#"],
+  ["#", "#", "#", 17, 0, 0, 0, 0, 18],
+  [19, 20, 21, 0, 0, "#", 22, 0, 0],
+  [23, 0, 0, 0, 0, "#", 24, 0, 0],
+  [25, 0, 0, 0, "#", "#", 26, 0, 0]
+ ],
+ "solution": [
+  ["P", "I", "T", "#", "#", "T", "O", "S", "S"],
+  ["A", "C", "E", "#", "S", "E", "P", "I", "A"],
+  ["T", "O", "N", "#", "C", "A", "T", "T", "Y"],
+  ["S", "N", "E", "E", "R", "S", "#", "#", "#"],
+  ["#", "S", "T", "R", "E", "E", "T", "S", "#"],
+  ["#", "#", "#", "M", "E", "T", "A", "L", "S"],
+  ["A", "G", "A", "I", "N", "#", "L", "I", "T"],
+  ["R", "E", "I", "N", "S", "#", "O", "D", "E"],
+  ["C", "E", "D", "E", "#", "#", "N", "E", "W"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Hard center of a peach"],
+   [4, "Lob gently"],
+   [8, "Unreturnable tennis serve"],
+   [9, "Brownish tint of old photos"],
+   [10, "Heavy unit of weight"],
+   [11, "Spitefully mean"],
+   [12, "Scornful looks"],
+   [14, "Avenues and boulevards"],
+   [17, "Iron and copper, e.g."],
+   [19, "One more time"],
+   [22, "Ignited"],
+   [23, "Straps for steering a horse"],
+   [24, "Poem of praise"],
+   [25, "Give up, as territory"],
+   [26, "Not used before"]
+  ],
+  "Down": [
+   [1, "Gentle taps"],
+   [2, "Small clickable pictures"],
+   [3, "Core belief"],
+   [4, "Pot, cups and saucers"],
+   [5, "Decide (to)"],
+   [6, "Command to a puppy"],
+   [7, "Utter"],
+   [9, "Mesh panels on windows"],
+   [13, "Weasel in its white winter coat"],
+   [15, "Eagle's claw"],
+   [16, "Playground chute"],
+   [18, "Cook slowly in liquid"],
+   [19, "Curved path"],
+   [20, "\"Golly!\""],
+   [21, "Help"]
+  ]
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 19",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3, 4, "#"],
+  ["#", 5, 0, 0, 0, 0, 6],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  ["#", 13, 0, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "P", "E", "A", "R", "#"],
+  ["#", "L", "E", "A", "V", "E", "N"],
+  ["F", "E", "R", "T", "I", "L", "E"],
+  ["R", "A", "G", "#", "A", "I", "R"],
+  ["A", "D", "O", "P", "T", "E", "D"],
+  ["Y", "E", "L", "L", "E", "D", "#"],
+  ["#", "R", "A", "Y", "S", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Bell-shaped orchard fruit"],
+   [5, "Agent that makes bread dough rise"],
+   [7, "Rich enough to grow good crops"],
+   [8, "Dust cloth"],
+   [9, "What we breathe"],
+   [10, "Took home from a shelter, as a pet"],
+   [12, "Shouted"],
+   [13, "Beams of sunlight"]
+  ],
+  "Down": [
+   [1, "Garden structure with a slatted roof for vines"],
+   [2, "Chow down"],
+   [3, "Pilots an aircraft"],
+   [4, "Depended (on)"],
+   [5, "Head of a team or group"],
+   [6, "Brainy type, informally"],
+   [7, "Scuffle"],
+   [11, "One layer of tissue"]
+  ]
+ }
+}

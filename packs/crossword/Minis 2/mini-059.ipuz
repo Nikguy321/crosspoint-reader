@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 59",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "E", "V", "I", "L"],
+  ["P", "R", "O", "N", "E"],
+  ["O", "R", "G", "A", "N"],
+  ["S", "O", "U", "N", "D"],
+  ["T", "R", "E", "E", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Wicked"],
+   [5, "Lying face down"],
+   [6, "Keyboard instrument with pipes"],
+   [7, "Safe and ___"],
+   [8, "Birch or willow"]
+  ],
+  "Down": [
+   [1, "Mistake on a math test"],
+   [2, "Fashion of the moment"],
+   [3, "Silly and pointless"],
+   [4, "Let someone borrow"],
+   [5, "Upright pole in a fence"]
+  ]
+ }
+}

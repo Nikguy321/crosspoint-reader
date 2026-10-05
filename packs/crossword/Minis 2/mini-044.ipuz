@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 44",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "C", "O", "Y", "#"],
+  ["S", "O", "L", "I", "D"],
+  ["O", "R", "D", "E", "R"],
+  ["D", "A", "I", "L", "Y"],
+  ["#", "L", "E", "D", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Playfully shy"],
+   [4, "Sturdy and well made"],
+   [6, "Request from a menu"],
+   [7, "Once every 24 hours"],
+   [8, "Was in first place"]
+  ],
+  "Down": [
+   [1, "Reef builder in warm seas"],
+   [2, "Hit song from years ago"],
+   [3, "Give way at a merge"],
+   [4, "Lawn grass sold in rolls"],
+   [5, "Opposite of damp"]
+  ]
+ }
+}

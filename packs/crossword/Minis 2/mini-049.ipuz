@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 49",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "N", "O", "W"],
+  ["B", "I", "O", "M", "E"],
+  ["A", "D", "M", "I", "T"],
+  ["S", "E", "A", "T", "S"],
+  ["S", "A", "D", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "At this moment"],
+   [4, "Ecological zone such as tundra or rainforest"],
+   [6, "Let in, as a ticket holder"],
+   [7, "Chairs and benches"],
+   [8, "Unhappy"]
+  ],
+  "Down": [
+   [1, "One who roams from camp to camp"],
+   [2, "Leave out"],
+   [3, "Dampens"],
+   [4, "Lowest male singing voice"],
+   [5, "Notion"]
+  ]
+ }
+}

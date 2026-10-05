@@ -1,0 +1,837 @@
+# Maxis 2 - original crossword pack, MIT License. Regenerate the .ipuz files with python3 scripts/crossword/make_packs.py
+
+=== maxi-007 | Maxi 7
+#RUT#DATA
+WITH#EPIC
+AFAR#FELT
+REHEARSES
+###AGO###
+STATESMAN
+PAVE#TACO
+UPON#EMIT
+NEWS#DAD#
+A 1 Deep groove worn in a dirt road
+A 4 Facts and figures
+A 8 In the company of
+A 9 Long heroic poem
+A 10 At a great distance
+A 11 Fabric used on pool tables
+A 12 Practices lines before a show
+A 14 A week ___ (seven days back)
+A 15 Respected political leader
+A 21 Cover a road with asphalt
+A 22 Mexican dish in a tortilla shell
+A 23 On top of
+A 24 Give off, as light
+A 25 Current events
+A 26 Father's Day honoree
+D 1 Teeming (with)
+D 2 Beehive State
+D 3 Menaces
+D 4 Thawed out
+D 5 Mimics
+D 6 Square on a bathroom floor
+D 7 Parts of a play
+D 8 Card game where the high card wins
+D 13 Grow older
+D 15 Twirled around
+D 16 Measuring ___ (carpenter's tool)
+D 17 Declare openly
+D 18 Baby's word for mother
+D 19 Opposite of a base, in chemistry
+D 20 Word that makes a sentence negative
+
+=== maxi-008 | Maxi 8
+AGED#OGRE
+LAVA#FLEA
+PLAY#TADS
+SAP#MESSY
+##OMENS##
+EGRET#WIN
+MEAL#CANE
+UNTO#URNS
+SEEN#BEST
+A 1 Ripened, as cheese
+A 5 Mean giant in old folk tales
+A 9 Hot flow down a volcano's side
+A 10 Tiny jumping pest on a dog
+A 11 Have fun at recess
+A 12 Small amounts
+A 13 Drain, as energy
+A 14 Untidy
+A 15 Warnings of what's ahead
+A 17 White wading bird
+A 19 Come in first
+A 22 Breakfast, lunch or dinner
+A 23 Walking stick
+A 24 To, in old writing
+A 25 Large coffee servers
+A 26 Spotted
+A 27 Finest
+D 1 Swiss mountain range
+D 2 Fancy party
+D 3 Dry up, as a puddle
+D 4 Twenty-four hours
+D 5 Many times
+D 6 Goblets and tumblers
+D 7 Scarlet and crimson
+D 8 Not hard
+D 14 Ran into
+D 16 Cantaloupe or honeydew
+D 17 Big flightless birds from Australia
+D 18 Unit of heredity
+D 20 Roadside lodgings
+D 21 Robin's home
+D 23 Young bear
+
+=== maxi-009 | Maxi 9
+#SIP#OGRE
+FACE#PLAY
+EVEN#TOTE
+DESCRIBES
+###HIM###
+ARMADILLO
+LEAN#SOIL
+SALT#TOLD
+OPTS#SPY#
+A 1 Small taste of a drink
+A 4 Big, scary storybook creature
+A 8 Front of a clock
+A 9 Show at the theater
+A 10 Tied, as a score
+A 11 Lug around
+A 12 Tells what something is like
+A 14 That guy
+A 15 Mammal with a bony shell
+A 21 Not fatty, as meat
+A 22 Dirt in a flowerpot
+A 23 It's sprinkled on icy sidewalks
+A 24 Informed
+A 25 Makes a choice
+A 26 Watch in secret
+D 1 Put money aside
+D 2 Frosts, as a cake
+D 3 Strong likings
+D 4 Glass-half-full types
+D 5 Blob of goo
+D 6 Give stars to, as a movie
+D 7 Potato spots
+D 8 Gave a meal to
+D 13 Free (of)
+D 15 Besides
+D 16 Bring in, as wheat
+D 17 Thick soda fountain shake
+D 18 Roller coaster circle
+D 19 Easter flower
+D 20 Up in years
+
+=== maxi-010 | Maxi 10
+ARM##BONE
+WEEP#AHOY
+LIMO#TIDE
+SNOWSHOES
+###DIM###
+INTERACTS
+LAIR#TRUE
+LIME#SINE
+SLED##BAD
+A 1 Sleeve filler
+A 4 Skeleton part
+A 8 Shed tears
+A 10 Sailor's hello
+A 11 Fancy ride with a chauffeur
+A 12 Rise and fall of the sea
+A 13 Racket-shaped footwear for winter hikes
+A 15 Not bright
+A 16 Mingles with others
+A 22 Den of a wild beast
+A 23 Not false
+A 24 Key ___ pie
+A 25 Opposite over hypotenuse, in trig
+A 26 Snow day ride down a hill
+A 27 Not good
+D 1 Pointed tools for poking holes in leather
+D 2 Strap to steer a horse
+D 3 Office note
+D 4 Rugs outside a shower
+D 5 Buckeye State
+D 6 Junction in a network
+D 7 Looks at closely
+D 9 Dusted, as some doughnuts
+D 14 Title for a knight
+D 16 Ailments
+D 17 Hammer's target
+D 18 What a clock tells
+D 19 Baby's bed
+D 20 Big ocean fish used in sushi
+D 21 Thing sown in a garden
+
+=== maxi-011 | Maxi 11
+UNTO#ARMS
+NOIR#BEAU
+DOME#BILE
+ONE#GENTS
+##STAYS##
+ASHES#TAG
+CHAR#NAVY
+NORM#ATOM
+EWES#PEWS
+A 1 "Do ___ others..." (Golden Rule start)
+A 5 Sides of an easy chair
+A 9 Film ___ (dark crime genre)
+A 10 Boyfriend, old-style
+A 11 Rounded roof
+A 12 Digestive fluid from the liver
+A 13 Number before two
+A 14 Ladies and ___
+A 15 Doesn't leave
+A 17 Fireplace leftovers
+A 19 Playground chasing game
+A 22 Burn the edges of
+A 23 Dark blue
+A 24 Standard
+A 25 Particle with a nucleus and electrons
+A 26 Mother sheep
+A 27 Church benches
+D 1 Cancel out
+D 2 Midday
+D 3 Jointly owned vacation property
+D 4 Mined rock
+D 5 Monastery
+D 6 Restore to a former job
+D 7 Sprouted grain used in baking
+D 8 Brings a lawsuit against
+D 14 Fuel for a car
+D 16 Conditions of a contract
+D 17 Pimple problem
+D 18 TV program
+D 20 State firmly
+D 21 Places to work out
+D 23 Short snooze
+
+=== maxi-012 | Maxi 12
+#MOM#APPS
+RIPE#GLEE
+ACED#RULE
+MANIFESTS
+###TIE###
+PALATABLE
+EXIT#BOIL
+ELSE#LOCK
+LETS#EKE#
+A 1 Ma
+A 4 Phone programs
+A 8 Ready to eat, as fruit
+A 9 Great delight
+A 10 Got a perfect score on
+A 11 Govern
+A 12 Shows clearly
+A 14 Fasten with a knot
+A 15 Acceptable to the taste
+A 21 Way out
+A 22 Heat until bubbling
+A 23 Otherwise
+A 24 Secure with a key
+A 25 Permits
+A 26 ___ out a win (barely succeed)
+D 1 Shiny mineral that splits into thin sheets
+D 2 Unwrap, as a gift
+D 3 Sits quietly in deep thought
+D 4 Easy to get along with
+D 5 Addition sign
+D 6 Animal skin with fur
+D 7 Spots
+D 8 Male sheep
+D 13 In good shape
+D 15 Banana skin
+D 16 Rod that wheels turn on
+D 17 To-do ___
+D 18 Novel, for one
+D 19 Tiny pests in hair
+D 20 Big deer of the West
+
+=== maxi-013 | Maxi 13
+ALTO#SITE
+WARD#IDOL
+ACID#DEEM
+YEA#MENDS
+##TRUST##
+ACHED#ION
+POLE#ACNE
+PLOD#RATE
+SANS#CLOD
+A 1 Voice part between soprano and tenor
+A 5 Spot where something is built
+A 9 Hospital section
+A 10 Object of a fan's worship
+A 11 Substance with a low pH
+A 12 Judge to be
+A 13 Vote in favor
+A 14 Fixes, as a torn sleeve
+A 15 Faith in someone
+A 17 Felt sore
+A 19 Charged particle
+A 22 Shaft that holds a flag
+A 23 Pimply skin condition
+A 24 Walk heavily and slowly
+A 25 Give a score to
+A 26 ___ serif (plain font style)
+A 27 Lump of dirt
+D 1 Not at home
+D 2 Tie up, as boots
+D 3 Swim-bike-run race
+D 4 Like 3, 5 or 7
+D 5 Fries and slaw, at a diner
+D 6 Exactly alike, as some twins
+D 7 Three-___ sloth
+D 8 Shady street trees
+D 14 What pigs love to roll in
+D 16 Tall marsh plants
+D 17 Phone programs
+D 18 Dark fizzy soft drink
+D 20 Aware of, as a scheme
+D 21 Must have
+D 23 Curved path of a thrown ball
+
+=== maxi-014 | Maxi 14
+#HAM#OSLO
+DIVA#ROAN
+AKIN#GONE
+MEDITATES
+###FUN###
+BLUEBIRDS
+EONS#SARI
+GRIT#TRAP
+SETS#SEW#
+A 1 Baked Easter meat
+A 4 Capital of Norway
+A 8 Star soprano
+A 9 Horse with white hairs mixed into its coat
+A 10 Similar (to)
+A 11 No longer here
+A 12 Sits quietly and clears the mind
+A 14 Amusement
+A 15 Sky-colored thrushes
+A 21 Very long stretches of time
+A 22 Draped garment worn in India
+A 23 Pluck and determination
+A 24 Snare
+A 25 Puts in place
+A 26 Use a needle and thread
+D 1 Long walk on a trail
+D 2 Eager
+D 3 Ship cargo lists
+D 4 Church keyboard players
+D 5 Chimney grime
+D 6 Narrow country road
+D 7 Loved ___
+D 8 Beaver's barrier
+D 13 Place for a bubble bath
+D 15 Asks for a treat, as a dog
+D 16 Handed-down knowledge
+D 17 Single apartment
+D 18 Hard to find
+D 19 Sketch
+D 20 Small taste of a drink
+
+=== maxi-015 | Maxi 15
+CUP##SODA
+ASAP#AVID
+SELL#TEND
+TREASURES
+###NOR###
+WESTWARDS
+AXLE#TOOK
+SPAR#EASE
+HOWS##DEW
+A 1 Champion's trophy, often
+A 4 Pop, by another name
+A 8 Right away, in brief
+A 10 Very enthusiastic
+A 11 Exchange for money
+A 12 Be inclined (to)
+A 13 Values highly
+A 15 And not
+A 16 Toward the setting sun
+A 22 Rod between wheels
+A 23 Grabbed
+A 24 Box for practice
+A 25 Lack of difficulty
+A 26 The whys and ___
+A 27 Morning moisture on grass
+D 1 Plaster wrap for a broken arm
+D 2 Computer operator
+D 3 Lacking color
+D 4 Soak through
+D 5 Finished
+D 6 Eat supper
+D 7 Tacks on
+D 9 Big pots for flowers
+D 14 Plant, as seeds
+D 16 Clean with soap and water
+D 17 Trade show
+D 18 Shredded cabbage salad
+D 19 Highway
+D 20 Measured amount of medicine
+D 21 Distort, as data
+
+=== maxi-016 | Maxi 16
+SWAB#SWAT
+LACY#OHIO
+ONCE#NODS
+BEE#TALES
+##SHORE##
+ENSUE#SIT
+LAIN#DOTE
+KNOT#OMEN
+SANS#GEMS
+A 1 Mop, as a ship's deck
+A 5 Slap at, as a fly
+A 9 Like a fancy doily
+A 10 State whose capital is Columbus
+A 11 ___ upon a time
+A 12 Silent yeses
+A 13 Spelling ___
+A 14 Stories
+A 15 Land along a lake
+A 17 Follow as a result
+A 19 Take a seat
+A 22 Had ___ down for a nap
+A 23 Lavish affection (on)
+A 24 Tangle in a shoelace
+A 25 Black cat, to the superstitious
+A 26 Without, in French
+A 27 Precious stones
+D 1 Messy person
+D 2 Shrink, as the moon
+D 3 Coming to the throne
+D 4 Free pass in a tournament round
+D 5 Echo-based locating system on ships
+D 6 Good for body and mind
+D 7 Helper on a staff
+D 8 Throw gently
+D 14 Front tip of a shoe
+D 16 Searches (for)
+D 17 Antlered beasts of the Rockies
+D 18 Grandma, to a toddler
+D 20 Single article for sale
+D 21 Top scores on a 1-to-10 scale
+D 23 Pet that fetches
+
+=== maxi-017 | Maxi 17
+PEP##LETS
+ODE#TABOO
+LIT#EMBED
+OCTANE###
+#TYRANTS#
+###INTONE
+LEAST#LED
+OGRES#LAG
+TOTS##SKY
+A 1 Get-up-and-go
+A 4 Rents out
+A 8 Poem of praise
+A 9 Strictly forbidden
+A 10 Glowing, as a candle
+A 11 Set firmly in place
+A 12 Gas pump rating
+A 14 Cruel rulers
+A 17 Recite in a chanting voice
+A 19 Smallest in amount
+A 22 Was ahead in the race
+A 23 Fairy-tale brutes
+A 24 Jet ___ (travel tiredness)
+A 25 Little kids
+A 26 Where clouds float
+D 1 Game on horseback with mallets
+D 2 Official order
+D 3 Small-minded
+D 4 Express sorrow over
+D 5 Go out, as the tide
+D 6 One of the little piggies in a nursery game
+D 7 Layer of grass and soil
+D 9 People who pay rent
+D 13 Gets up
+D 15 Bridge fees
+D 16 Move quietly
+D 18 Tense and nervous
+D 19 Parking area
+D 20 Thing a compliment boosts
+D 21 State of the ___
+
+=== maxi-018 | Maxi 18
+STAY#STIR
+LACE#WIRE
+ORCS#AMID
+WOE#PRESS
+##STEMS##
+ASSET#HAS
+PAIR#HALO
+EGOS#ORAL
+SANE#PESO
+A 1 Remain
+A 5 Mix with a spoon
+A 9 Delicate openwork fabric
+A 10 Copper strand for electricity
+A 11 Goblin-like fantasy foes
+A 12 Among
+A 13 Sorrow
+A 14 Iron, as trousers
+A 15 Flower stalks
+A 17 Valuable team member, say
+A 19 ___ a ball (enjoys oneself)
+A 22 Two of a kind
+A 23 Glow around a saint's head in a painting
+A 24 Senses of self
+A 25 Like a spoken exam
+A 26 Of sound mind
+A 27 Money in Mexico or Chile
+D 1 Sluggish
+D 2 Root used to make poi
+D 3 New addition to a museum collection
+D 4 Nod's meaning
+D 5 Large group of bees
+D 6 Vacation condo split among owners by the week
+D 7 Colored part of the eye
+D 8 Scarlet and crimson
+D 14 Stroke, as a cat
+D 16 Short and blunt
+D 17 Copies clumsily
+D 18 Long heroic tale
+D 20 Sadly, in old-fashioned speech
+D 21 Like a student pilot's first unaccompanied flight
+D 23 Jump on one foot
+
+=== maxi-019 | Maxi 19
+ACT##ARID
+SHIP#ROSE
+PALE#SALE
+STEEPENED
+###RAN###
+STALWARTS
+NOSE#LOOP
+IRIS#SAGA
+PEAS##RAT
+A 1 Perform on stage
+A 4 Bone-dry, like a desert
+A 8 Send, as a package
+A 10 Thorny garden bloom
+A 11 Lacking color
+A 12 Clearance event at a store
+A 13 Grew more sharply sloped
+A 15 Sprinted
+A 16 Loyal, dependable supporters
+A 22 Organ for smelling
+A 23 Full circle on a roller coaster
+A 24 Eye part that may be blue or brown
+A 25 Long family tale
+A 26 Green veggies in a pod
+A 27 Pack ___ (one who saves everything)
+D 1 Small venomous snakes
+D 2 Talk casually
+D 3 Bathroom floor square
+D 4 Stockpiles of weapons
+D 5 Horse with a coat flecked with white
+D 6 Bit of land in the sea
+D 7 Noble act
+D 9 Without equal
+D 14 Dog's foot
+D 16 Cut with scissors
+D 17 Ripped
+D 18 Largest continent
+D 19 Lion's sound
+D 20 Roman senator's garment
+D 21 Petty squabble
+
+=== maxi-020 | Maxi 20
+CAMP#ABET
+ARIA#IOWA
+RELY#STEM
+PAL#CLASP
+##SIREN##
+ANTSY#ILL
+FOOL#ACAI
+RUNE#PAVE
+ONES#PLAN
+A 1 Sleep in a tent outdoors
+A 5 Help in wrongdoing
+A 9 Opera solo
+A 10 State whose capital is Des Moines
+A 11 Depend (on)
+A 12 Flower stalk
+A 13 Buddy
+A 14 Necklace fastener
+A 15 Wailing alarm on a fire truck
+A 17 Restless and fidgety
+A 19 Under the weather
+A 22 Trick or deceive
+A 23 Purple berry in smoothie bowls
+A 24 Ancient carved letter
+A 25 Surface, as a driveway
+A 26 Loved ___ (dear family members)
+A 27 Map out ahead of time
+D 1 Large pond fish
+D 2 Length times width, for a rectangle
+D 3 Heavy wheel for grinding grain
+D 4 Salary
+D 5 Bride's path at a wedding
+D 6 Relating to the study of plants
+D 7 Mothers in a flock
+D 8 Pack down firmly
+D 14 Weep
+D 16 Keys and atolls, for example
+D 17 Big, rounded hairstyle
+D 18 Word such as 'dog' or 'city'
+D 20 Hot flow down a volcano's side
+D 21 Legal claim on property
+D 23 Phone program
+
+=== maxi-021 | Maxi 21
+PIT##TOSS
+ACE#SEPIA
+TON#CATTY
+SNEERS###
+#STREETS#
+###METALS
+AGAIN#LIT
+REINS#ODE
+CEDE##NEW
+A 1 Hard center of a peach
+A 4 Lob gently
+A 8 Unreturnable tennis serve
+A 9 Brownish tint of old photos
+A 10 Heavy unit of weight
+A 11 Spitefully mean
+A 12 Scornful looks
+A 14 Avenues and boulevards
+A 17 Iron and copper, e.g.
+A 19 One more time
+A 22 Ignited
+A 23 Straps for steering a horse
+A 24 Poem of praise
+A 25 Give up, as territory
+A 26 Not used before
+D 1 Gentle taps
+D 2 Small clickable pictures
+D 3 Core belief
+D 4 Pot, cups and saucers
+D 5 Decide (to)
+D 6 Command to a puppy
+D 7 Utter
+D 9 Mesh panels on windows
+D 13 Weasel in its white winter coat
+D 15 Eagle's claw
+D 16 Playground chute
+D 18 Cook slowly in liquid
+D 19 Curved path
+D 20 "Golly!"
+D 21 Help
+
+=== maxi-022 | Maxi 22
+CAPO#SPED
+OWED#PAGE
+LAND#URGE
+AYE#GRASP
+##TWINS##
+SHRUG#AMP
+LIAR#TIER
+ARTS#ELSE
+MEET#ASAP
+A 1 Clamp on a guitar's neck
+A 5 Went too fast
+A 9 Had to repay
+A 10 Leaf of a book
+A 11 Touch down, as a plane
+A 12 Strong desire
+A 13 Yes vote
+A 14 Firm grip
+A 15 Siblings born together
+A 17 Gesture meaning "Who knows?"
+A 19 Band's sound booster
+A 22 Person who isn't truthful
+A 23 Layer of a wedding cake
+A 24 Painting, music and dance
+A 25 Or ___ (end of a threat)
+A 26 Swim ___ (pool competition)
+A 27 Right away, in a memo
+D 1 Fizzy brown drink
+D 2 Not at home
+D 3 Pierce through
+D 4 Like 3 or 7
+D 5 Reject with scorn
+D 6 Soars behind a boat on a chute
+D 7 Dozen in a carton
+D 8 Far below the surface
+D 14 Musician's booking
+D 16 German sausage
+D 17 Shut with a bang
+D 18 Take on, as an employee
+D 20 Flat-topped hill
+D 21 Get ready, for short
+D 23 Afternoon drink with scones
+
+=== maxi-023 | Maxi 23
+#ROT#PLOW
+HUSH#AIDE
+ISLE#ICED
+SHORTNESS
+###MAT###
+ORGANISTS
+PEAL#NAIL
+TALL#GREY
+SPAY#SIR#
+A 1 Decay
+A 4 Till the soil
+A 8 "Quiet, please!"
+A 9 Senator's helper
+A 10 Small piece of land in a lake
+A 11 Frosted, as a cake
+A 12 Lack of height
+A 14 Welcome ___ (doorstep item)
+A 15 Church keyboard players
+A 21 Ringing of bells
+A 22 Hammer's target
+A 23 Like a giraffe
+A 24 Like storm clouds, to a Brit
+A 25 Neuter, as a female cat
+A 26 Knight's title
+D 1 Hurry
+D 2 Capital of Norway
+D 3 In a heat-related way
+D 4 Works hung in a gallery
+D 5 Tiny pests in hair
+D 6 Lyrical tributes
+D 7 Marries
+D 8 Not hers
+D 13 Get bronze in the sun
+D 15 Picks, with 'for'
+D 16 Gather in, as a crop
+D 17 Fancy party
+D 18 Draped garment worn in India
+D 19 Row of stadium seats
+D 20 Crafty, like a fox
+
+=== maxi-024 | Maxi 24
+RAPT#SUPS
+EURO#UNIT
+STOP#IDLE
+TOO#STEEP
+##FLOES##
+RERAN#IMP
+ACES#AREA
+THAT#HELD
+SODS#ADDS
+A 1 Spellbound
+A 5 Dines in the evening
+A 9 Currency of France and Italy
+A 10 Apartment in a building
+A 11 Word on a red octagonal sign
+A 12 Not in use
+A 13 Also
+A 14 Soak, as tea leaves
+A 15 Floating sheets of ice
+A 17 Aired again
+A 19 Little rascal
+A 22 Gets an A on
+A 23 Neighborhood
+A 24 This or ___
+A 25 Gripped
+A 26 Pieces of turf
+A 27 Puts in
+D 1 Take a break
+D 2 Car
+D 3 Check for typos
+D 4 Lid
+D 5 Set of hotel rooms
+D 6 Not wanted
+D 7 Heap
+D 8 Dance move
+D 14 Male child
+D 16 Endures
+D 17 "Darn it!"
+D 18 Reverberation
+D 20 Blend together
+D 21 Writing tablets
+D 23 "I get it now!"
+
+=== maxi-025 | Maxi 25
+#BUS#ABLE
+RANK#CRAG
+INDICTING
+GEE#HOMES
+##STIRS##
+SCION#TAN
+HOROSCOPE
+EDEN#ANEW
+DADS#WED#
+A 1 Big vehicle on a city route
+A 4 Competent
+A 8 Captain or major, e.g.
+A 9 Steep, rugged rock
+A 10 Formally charging with a crime
+A 12 "Gosh!"
+A 13 Houses and apartments
+A 14 Awakens, as old memories
+A 16 Heir to a noble family
+A 18 Darken in the sun
+A 21 Daily astrology forecast
+A 23 Earthly paradise
+A 24 Once more, from the start
+A 25 Fathers, informally
+A 26 Tied the knot
+D 1 Source of constant trouble
+D 2 Not wanted
+D 3 Glide down a snowy slope
+D 4 Cast member
+D 5 Old name for sulfur
+D 6 Bowling alley strip
+D 7 What hens lay
+D 8 Eighteen-wheeler
+D 11 Spots for goatees
+D 15 Animated shorts, informally
+D 16 Backyard storage hut
+D 17 Closing passage of a piece of music
+D 19 Mimicked
+D 20 Just out of the box
+D 22 Crow's call
+
+=== maxi-026 | Maxi 26
+SHE##SWAM
+LIMA#HIKE
+EDIT#ARIA
+DETERRENT
+###LIP###
+PEDIMENTS
+RARE#SOUL
+OVER#TINE
+PEWS##RAW
+A 1 Pronoun for a ship, traditionally
+A 4 Did the backstroke
+A 8 Capital of Peru
+A 10 Long walk on a trail
+A 11 Polish, as a manuscript
+A 12 Showpiece for a soprano
+A 13 Something meant to discourage
+A 15 Back talk
+A 16 Triangular gables on classical temples
+A 22 Hard to find
+A 23 Inner spirit
+A 24 All done
+A 25 Fork prong
+A 26 Church benches
+A 27 Uncooked
+D 1 Ride down a snowy hill
+D 2 Conceal
+D 3 Give off, as light
+D 4 Keenest, as a blade
+D 5 Thin metal strand
+D 6 Related (to)
+D 7 Beef or pork
+D 9 Artists' studios
+D 14 Outer edge of a wheel
+D 16 Item used on stage
+D 17 Overhanging edge of a roof
+D 18 Sketched
+D 19 Film ___ (shadowy crime genre)
+D 20 Albacore or bluefin
+D 21 Large number

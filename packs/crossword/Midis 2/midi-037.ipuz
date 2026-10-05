@@ -1,0 +1,51 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Midi 37",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 7,
+  "height": 7
+ },
+ "puzzle": [
+  ["#", "#", "#", 1, 2, 3, 4],
+  ["#", 5, 6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0, 0, 0],
+  [8, 0, 0, "#", 9, 0, 0],
+  [10, 0, 0, 11, 0, 0, 0],
+  [12, 0, 0, 0, 0, 0, "#"],
+  [13, 0, 0, 0, "#", "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "#", "M", "E", "A", "T"],
+  ["#", "D", "O", "O", "D", "L", "E"],
+  ["T", "E", "R", "M", "I", "T", "E"],
+  ["R", "A", "G", "#", "T", "A", "N"],
+  ["O", "R", "A", "T", "O", "R", "Y"],
+  ["M", "I", "N", "O", "R", "S", "#"],
+  ["P", "E", "S", "O", "#", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Beef or pork"],
+   [5, "Draw idly in a margin"],
+   [7, "Wood-munching insect"],
+   [8, "Dusting cloth"],
+   [9, "Bronze in the sun"],
+   [10, "Art of public speaking"],
+   [12, "People under 18"],
+   [13, "Mexican money"]
+  ],
+  "Down": [
+   [1, "Mother, informally"],
+   [2, "One who fixes a writer's copy"],
+   [3, "Tables at the front of churches"],
+   [4, "Very, very small"],
+   [5, "Old-fashioned term of endearment"],
+   [6, "Heart, liver and lungs"],
+   [7, "Walk heavily"],
+   [11, "As well"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 39",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  ["#", 4, 0, 0, 0],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, "#"],
+  [7, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "S", "P", "A"],
+  ["#", "S", "T", "O", "P"],
+  ["T", "A", "I", "N", "T"],
+  ["O", "N", "L", "Y", "#"],
+  ["Y", "E", "T", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Place for a mud bath and a massage"],
+   [4, "Word on a red octagonal sign"],
+   [5, "Contaminate"],
+   [6, "___ child (kid with no brothers or sisters)"],
+   [7, "Up to now"]
+  ],
+  "Down": [
+   [1, "Pole for walking high off the ground"],
+   [2, "Small horse"],
+   [3, "Fitting, as a remark"],
+   [4, "Of sound mind"],
+   [5, "Teddy bear, for one"]
+  ]
+ }
+}

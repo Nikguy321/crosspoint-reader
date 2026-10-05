@@ -1,0 +1,69 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Maxi 14",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 9,
+  "height": 9
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#", 4, 5, 6, 7],
+  [8, 0, 0, 0, "#", 9, 0, 0, 0],
+  [10, 0, 0, 0, "#", 11, 0, 0, 0],
+  [12, 0, 0, 0, 13, 0, 0, 0, 0],
+  ["#", "#", "#", 14, 0, 0, "#", "#", "#"],
+  [15, 16, 17, 0, 0, 0, 18, 19, 20],
+  [21, 0, 0, 0, "#", 22, 0, 0, 0],
+  [23, 0, 0, 0, "#", 24, 0, 0, 0],
+  [25, 0, 0, 0, "#", 26, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "H", "A", "M", "#", "O", "S", "L", "O"],
+  ["D", "I", "V", "A", "#", "R", "O", "A", "N"],
+  ["A", "K", "I", "N", "#", "G", "O", "N", "E"],
+  ["M", "E", "D", "I", "T", "A", "T", "E", "S"],
+  ["#", "#", "#", "F", "U", "N", "#", "#", "#"],
+  ["B", "L", "U", "E", "B", "I", "R", "D", "S"],
+  ["E", "O", "N", "S", "#", "S", "A", "R", "I"],
+  ["G", "R", "I", "T", "#", "T", "R", "A", "P"],
+  ["S", "E", "T", "S", "#", "S", "E", "W", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Baked Easter meat"],
+   [4, "Capital of Norway"],
+   [8, "Star soprano"],
+   [9, "Horse with white hairs mixed into its coat"],
+   [10, "Similar (to)"],
+   [11, "No longer here"],
+   [12, "Sits quietly and clears the mind"],
+   [14, "Amusement"],
+   [15, "Sky-colored thrushes"],
+   [21, "Very long stretches of time"],
+   [22, "Draped garment worn in India"],
+   [23, "Pluck and determination"],
+   [24, "Snare"],
+   [25, "Puts in place"],
+   [26, "Use a needle and thread"]
+  ],
+  "Down": [
+   [1, "Long walk on a trail"],
+   [2, "Eager"],
+   [3, "Ship cargo lists"],
+   [4, "Church keyboard players"],
+   [5, "Chimney grime"],
+   [6, "Narrow country road"],
+   [7, "Loved ___"],
+   [8, "Beaver's barrier"],
+   [13, "Place for a bubble bath"],
+   [15, "Asks for a treat, as a dog"],
+   [16, "Handed-down knowledge"],
+   [17, "Single apartment"],
+   [18, "Hard to find"],
+   [19, "Sketch"],
+   [20, "Small taste of a drink"]
+  ]
+ }
+}

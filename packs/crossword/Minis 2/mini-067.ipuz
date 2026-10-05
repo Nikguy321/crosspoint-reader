@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 67",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "S", "H", "I", "P"],
+  ["T", "W", "I", "N", "E"],
+  ["R", "I", "N", "S", "E"],
+  ["A", "N", "G", "E", "R"],
+  ["M", "E", "E", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Ocean liner, e.g."],
+   [5, "Strong string for tying parcels"],
+   [6, "Lather, ___, repeat"],
+   [7, "Make mad"],
+   [8, "Be introduced to"]
+  ],
+  "Down": [
+   [1, "Pigs, collectively"],
+   [2, "Door part that lets it swing"],
+   [3, "Small map within a larger map"],
+   [4, "Person of equal standing"],
+   [5, "Streetcar, in Britain"]
+  ]
+ }
+}

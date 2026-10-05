@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 71",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, "#"],
+  [4, 0, 0, 0, 5],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  ["#", 8, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "A", "P", "T", "#"],
+  ["B", "R", "I", "E", "F"],
+  ["A", "R", "E", "N", "A"],
+  ["R", "A", "C", "E", "R"],
+  ["#", "Y", "E", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Fitting, as a remark"],
+   [4, "Short and to the point"],
+   [6, "Indoor sports venue"],
+   [7, "Sprinter or speed skater"],
+   [8, "Are we there ___?"]
+  ],
+  "Down": [
+   [1, "Orderly arrangement in rows"],
+   [2, "Portion of pie"],
+   [3, "Guiding principle"],
+   [4, "Measure in sheet music"],
+   [5, "A long way off"]
+  ]
+ }
+}

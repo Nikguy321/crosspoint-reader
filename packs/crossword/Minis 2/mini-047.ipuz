@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 47",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", "#", 1, 2, 3],
+  [4, 5, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, "#", "#"]
+ ],
+ "solution": [
+  ["#", "#", "B", "O", "W"],
+  ["B", "I", "O", "M", "E"],
+  ["A", "N", "G", "E", "R"],
+  ["S", "C", "E", "N", "E"],
+  ["S", "H", "Y", "#", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Archer's weapon"],
+   [4, "Tundra or rainforest, for one"],
+   [6, "Fury"],
+   [7, "Make a ___ (throw a fit in public)"],
+   [8, "Bashful"]
+  ],
+  "Down": [
+   [1, "One over par in golf"],
+   [2, "Warning sign of what's ahead"],
+   [3, "You ___ right all along"],
+   [4, "Lowest male singing voice"],
+   [5, "One-twelfth of a foot"]
+  ]
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 62",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "S", "T", "O", "W"],
+  ["C", "H", "I", "V", "E"],
+  ["H", "A", "T", "E", "S"],
+  ["A", "P", "A", "R", "T"],
+  ["T", "E", "N", "T", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Pack away, as luggage in an overhead bin"],
+   [5, "Slender herb snipped onto baked potatoes"],
+   [6, "Loathes"],
+   [7, "Not together"],
+   [8, "Canvas home on a camping trip"]
+  ],
+  "Down": [
+   [1, "Circle or square, for example"],
+   [2, "Saturn's largest moon"],
+   [3, "Plain to see; not secret"],
+   [4, "Where the sun sets"],
+   [5, "Talk casually"]
+  ]
+ }
+}

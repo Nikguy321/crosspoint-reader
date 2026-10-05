@@ -1,0 +1,41 @@
+{
+ "version": "http://ipuz.org/v2",
+ "kind": ["http://ipuz.org/crossword#1"],
+ "title": "Mini 64",
+ "author": "CrossPoint Reader fork",
+ "copyright": "Original puzzle - MIT License",
+ "dimensions": {
+  "width": 5,
+  "height": 5
+ },
+ "puzzle": [
+  ["#", 1, 2, 3, 4],
+  [5, 0, 0, 0, 0],
+  [6, 0, 0, 0, 0],
+  [7, 0, 0, 0, 0],
+  [8, 0, 0, 0, "#"]
+ ],
+ "solution": [
+  ["#", "L", "A", "S", "T"],
+  ["M", "A", "N", "T", "A"],
+  ["E", "D", "G", "E", "S"],
+  ["S", "L", "E", "E", "K"],
+  ["S", "E", "L", "L", "#"]
+ ],
+ "clues": {
+  "Across": [
+   [1, "Hold up over time"],
+   [5, "___ ray (large, flat ocean fish)"],
+   [6, "Rims or borders"],
+   [7, "Smooth and glossy"],
+   [8, "Put on the market"]
+  ],
+  "Down": [
+   [1, "Big spoon for serving punch"],
+   [2, "Halo wearer in paintings"],
+   [3, "Strong alloy made mostly of iron"],
+   [4, "Chore"],
+   [5, "Untidy state"]
+  ]
+ }
+}
