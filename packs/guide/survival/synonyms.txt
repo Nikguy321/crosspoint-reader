@@ -1,0 +1,35 @@
+# Search synonyms for the survival guide (read by scripts/guide/make_pack.py when it builds search.idx).
+# One group a line, words separated by spaces. When a topic's text holds any word of a group, the topic is
+# also indexed under the group's other words at weight 1 (the lowest), so a search for "blood" finds the
+# bleeding pages. Words are lower-case a-z0-9; the builder stems them like every other term.
+bleeding blood hemorrhage
+hypothermia chill shivering
+frostbite frostnip
+fire campfire flame
+shelter hut bivouac
+purify disinfect sterilize
+sos mayday distress
+compass bearing azimuth
+knot hitch
+snakebite rattlesnake viper
+cougar puma lion catamount
+bear grizzly
+tick lyme
+mushroom fungus fungi toadstool
+cpr resuscitation compressions
+choking heimlich
+fracture broken bone
+burn scald blister
+sunburn sunscreen
+lightning thunder thunderstorm
+wildfire smoke
+shellfish clam mussel oyster
+poisonous toxic poison
+beacon plb epirb
+mirror heliograph
+heat heatstroke
+vomit nausea diarrhea
+sting bee wasp hornet
+cordage cord rope paracord
+snare trap
+fishing hook

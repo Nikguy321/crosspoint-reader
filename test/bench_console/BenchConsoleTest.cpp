@@ -896,6 +896,124 @@ TEST(BenchApp, AppsOrWordSearch) {
   EXPECT_TRUE(parseAppArgs(" Sudoku ", target));
   EXPECT_EQ(target, AppTarget::Sudoku);
   EXPECT_FALSE(parseAppArgs("sudoku now", target));
+  EXPECT_TRUE(parseAppArgs("guide", target));
+  EXPECT_EQ(target, AppTarget::Guide);
+  EXPECT_TRUE(parseAppArgs(" GUIDE ", target));
+  EXPECT_EQ(target, AppTarget::Guide);
+  EXPECT_FALSE(parseAppArgs("guide home", target));
+}
+
+namespace {
+GdArgs parseGd(const char* text, bool& ok) {
+  char buf[160];
+  std::snprintf(buf, sizeof(buf), "%s", text);
+  GdArgs args;
+  ok = parseGdArgs(buf, args);
+  return args;
+}
+}  // namespace
+
+TEST(BenchGd, DumpAndSimpleVerbs) {
+  bool ok = false;
+  EXPECT_EQ(parseGd("", ok).op, GdOp::Dump);
+  EXPECT_TRUE(ok);
+  GdArgs empty;
+  EXPECT_TRUE(parseGdArgs(nullptr, empty));
+  EXPECT_EQ(empty.op, GdOp::Dump);
+  const struct {
+    const char* text;
+    GdOp op;
+  } simple[] = {{"about", GdOp::About}, {"HOME", GdOp::Home}, {" next ", GdOp::Next},
+                {"Prev", GdOp::Prev},   {"mark", GdOp::Mark}, {"menu", GdOp::Menu}};
+  for (const auto& c : simple) {
+    EXPECT_EQ(parseGd(c.text, ok).op, c.op) << c.text;
+    EXPECT_TRUE(ok) << c.text;
+  }
+  for (const char* bad : {"next 2", "mark it", "home now", "jump", "openx fire-lays"}) {
+    parseGd(bad, ok);
+    EXPECT_FALSE(ok) << bad;
+  }
+}
+
+TEST(BenchGd, OpenTakesATopicIdAndAOneBasedPage) {
+  bool ok = false;
+  GdArgs a = parseGd("open fire-lays", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, GdOp::Open);
+  EXPECT_STREQ(a.text, "fire-lays");
+  EXPECT_EQ(a.page, 0);
+  a = parseGd("OPEN bleeding-and-shock 3", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_STREQ(a.text, "bleeding-and-shock");
+  EXPECT_EQ(a.page, 2);
+  a = parseGd("open a 64", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.page, 63);
+  for (const char* bad :
+       {"open", "open Fire-Lays", "open fire_lays", "open fire-lays 0", "open fire-lays 65", "open fire-lays 1 2",
+        "open fire-lays x", "open aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}) {  // 33 bytes
+    parseGd(bad, ok);
+    EXPECT_FALSE(ok) << bad;
+  }
+}
+
+TEST(BenchGd, SearchKeepsTheRestOfTheLine) {
+  bool ok = false;
+  GdArgs a = parseGd("search  Bow Drill  ", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, GdOp::Search);
+  EXPECT_STREQ(a.text, "Bow Drill");
+  a = parseGd("SEARCH tourniquet", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_STREQ(a.text, "tourniquet");
+  parseGd("search", ok);
+  EXPECT_FALSE(ok);
+  parseGd("search    ", ok);
+  EXPECT_FALSE(ok);
+  const std::string longest(GD_TEXT_MAX, 'a');
+  a = parseGd(("search " + longest).c_str(), ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(std::string(a.text), longest);
+  parseGd(("search " + longest + "a").c_str(), ok);
+  EXPECT_FALSE(ok);
+}
+
+TEST(BenchGd, ListRowAndFigure) {
+  bool ok = false;
+  GdArgs a = parseGd("list", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, GdOp::List);
+  EXPECT_STREQ(a.text, "");
+  a = parseGd("list first-aid", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_STREQ(a.text, "first-aid");
+  parseGd("list aaaaaaaaaaaaaaaaaaaaa", ok);  // 21 bytes: past a category id
+  EXPECT_FALSE(ok);
+  parseGd("list fire water", ok);
+  EXPECT_FALSE(ok);
+  a = parseGd("row 0", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, GdOp::Row);
+  EXPECT_EQ(a.row, 0);
+  a = parseGd("row 1023", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.row, 1023);
+  for (const char* bad : {"row", "row -1", "row 1024", "row 1 2"}) {
+    parseGd(bad, ok);
+    EXPECT_FALSE(ok) << bad;
+  }
+  a = parseGd("figure", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_EQ(a.op, GdOp::Figure);
+  EXPECT_FALSE(a.close);
+  a = parseGd("figure CLOSE", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_TRUE(a.close);
+  a = parseGd("figure open", ok);
+  EXPECT_TRUE(ok);
+  EXPECT_FALSE(a.close);
+  parseGd("figure shut", ok);
+  EXPECT_FALSE(ok);
 }
 
 namespace {

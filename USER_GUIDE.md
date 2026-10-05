@@ -41,6 +41,7 @@ Welcome to the **CrossPoint** firmware. This guide outlines the hardware control
       - [Word Search](#word-search)
       - [Crossword](#crossword)
       - [Sudoku](#sudoku)
+      - [Survival guide](#survival-guide)
   - [4. Reading Mode](#4-reading-mode)
     - [Page Turning](#page-turning)
     - [Chapter Navigation](#chapter-navigation)
@@ -645,8 +646,9 @@ See [docs/sd-card-fonts.md](./docs/sd-card-fonts.md) for full installation detai
 ### 3.9 Apps
 
 **Apps** on the Home screen (a row in the list styles, a tab in Cover Grid) lists the games: **Word Search**, and on
-readers with a touch screen **Crossword** and **Sudoku**. Back from Apps returns to Home. Each game remembers where you were: put the
-reader to sleep in the middle of one and it comes back to the same game on wake.
+readers with a touch screen **Crossword** and **Sudoku**, and the **Survival** guide. Back from Apps returns to Home.
+Each one remembers where you were: put the reader to sleep in the middle of one and it comes back to the same screen
+on wake.
 
 #### Word Search
 
@@ -800,6 +802,57 @@ pause for two seconds, when you open the menu, when you solve it and when you le
 the live sleep screen's wake, and after Auto Power Off or a restart. The time counts only while the puzzle is on
 screen. A firmware update never changes a puzzle you are playing (the save keeps the grid itself, not just its
 number). Solved puzzles are listed in `/.crosspoint/sudoku/solved.txt`.
+
+#### Survival guide
+
+**Survival** is a built-in field guide with a menu, not a book: 12 sections (EMERGENCY, Priorities & kit, Fire, Water,
+Shelter, First aid, Navigation, Signaling, Weather, Knots & cordage, Food & hazards, Pacific Northwest), 86 topics, 228
+pages and 69 drawings, written fresh from current public guidance (CDC, NPS, NWS/NOAA, USDA Forest Service, FEMA,
+EPA) and line art from U.S. Army survival manuals. It is listed on readers with a touch screen (the X4 Pro).
+
+> **Read this first.** The guide's About page (the last row of its home list) says honestly that it was **reviewed
+> against public guidance by AI reviewers - not by a medical professional**, and every first-aid page opens with the line
+> that it is **reference only, not a substitute for first-aid or survival training**. In an emergency **call 911 or send a satellite SOS first**, stay
+> put and signal.
+
+**Installing it.** The guide reads its pages from the SD card. Copy the folder `packs/guide/build/survival` from this
+repository to the card as **`/Guides/survival/`** (it holds `pack.txt`, `categories.tsv`, `topics.tsv`, `search.idx`,
+`about.txt`, and the `t` and `fig` folders, about 1.6 MB). Without it the guide says where to copy it; a damaged copy says
+so, and a guide made for newer firmware asks for a firmware update. Your bookmarks and history are kept apart, in
+`/.crosspoint/guide/survival/`, so copying a newer guide over the old one keeps them.
+
+**The home list:** **EMERGENCY** first (black, the things to do first: call for help, STOP, stay put, signal), then
+**Quick cards** (ten short cards for when it is urgent), **Search**, **Bookmarks (n)**, **Recent**, the other
+sections ("7 topics"), and **About & sources**. A section lists its topics with a one-line summary.
+
+**A page:** at the top, where you are (**SURVIVAL / FIRE / FIRE LAYS**; a black ribbon at the right when the page is
+bookmarked); the page's title, its drawing, and the text: numbered steps, bullets, and boxed **WARNING** and **NOTE**
+lines. First-aid topics start with the reference-only line. At the bottom: **< PREV**, **MENU** with the screen count
+(**2/5**), **NEXT >**. A page too long for one screen continues on the next one (the count counts screens). **NEXT** on
+a topic's last screen goes on to the next topic of the same section (or the next quick card), and the bar names it;
+**PREV** on the first goes back to the previous topic's last screen. **MENU** goes up to the topic list, with the topic
+you were reading selected. Quick cards use a smaller type so each card fits one screen.
+
+- **By touch:** tap a row to open it; on a page tap **< PREV**, **MENU** or **NEXT >**, or swipe left or right to turn.
+  Tap a drawing to see it on its own and larger, with its caption (tap again to return); a wide drawing is shown
+  sideways, so turn the reader a quarter-turn to the right to read it ("Turn the reader" at the bottom). Hold a finger on a
+  page to bookmark it ("Bookmarked" shows under MENU); hold again to remove it. In a list, swipe up or down, or tap
+  **< PREV** / **NEXT >**, for its other pages. The header's back arrow, a swipe in from the left edge, or **BACK** go
+  up one level (from the guide's home to Apps).
+- **By keys (X4 Pro):** the right and left keys turn pages (in a list they move the frame). Hold the right key to
+  bookmark the page (in a list: to open the framed row); hold the left key to go up a level (it acts when you let go).
+- **The guide menu:** hold the **Home** key on any guide screen for **Search**, **Bookmarks**, **Recent**, **Quick
+  cards** and **About & sources** (a short Home press still goes Home).
+- **Search:** type a few words on the keyboard (`tourniquet`, `bow drill`, `snake bite`). Each word matches the start
+  of a word in the guide ("fir" finds fire and firewood), every word must match, and topics whose titles hold the words
+  come first. A few everyday words find their topics too ("blood" finds the bleeding pages, "rattlesnake" the
+  snakebite one). If nothing matches, the guide looks for the words in topic titles and summaries. **New search** at the top of the results starts again.
+- **Bookmarks** keep up to 50 pages (newest first); **Recent** the last 12 topics you opened.
+
+**About & sources** has the status and the list of sources; the full list, page by page, is
+`packs/guide/survival/ATTRIBUTION.md` in the firmware repository, and the questions still open for a human expert
+are in `packs/guide/survival/OPEN-QUESTIONS.md`. The guide reopens where you were after sleep, on the live sleep
+screen's wake, and after a restart (sleeping inside the search keyboard reopens the screen beneath it).
 
 ---
 

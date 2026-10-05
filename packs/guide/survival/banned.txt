@@ -1,0 +1,26 @@
+# Phrases that must never appear in the survival pack (matched case-insensitively, anywhere in a file).
+# One phrase per line; lines starting with # are comments.
+# The only exception: a page line that starts with "WARNING:" and ends with "<!-- myth-ok -->"
+# (a reviewer-approved "Do NOT ..." myth line). The builder strips the marker.
+#
+# From the content spec (2026-10-04):
+cut and suck
+suction
+edibility test
+release the tourniquet
+loosen the tourniquet
+rub frostbite
+rub the skin
+drink urine
+drink seawater
+eat snow
+maggot
+whiskey
+alcohol to warm
+tourniquet on a snakebite
+ice on a snakebite
+#
+# Added by the FOOD & HAZARDS reviewer:
+universal
+induce vomiting
+hobo

@@ -12,6 +12,7 @@ lib/I18n/I18nStrings.cpp
 *.generated.h
 .vs
 build
+!/packs/guide/build/
 **/__pycache__/
 /compile_commands.json
 /.cache

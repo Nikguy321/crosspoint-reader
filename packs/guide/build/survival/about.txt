@@ -1,0 +1,15 @@
+= About this guide
+**Survival Guide**, version 2026.10.1 (reviewed 2026-10). License: MIT.
+* Reviewed against public guidance by AI reviewers - not by a medical professional.
+! Reference only - not a substitute for training. In an emergency call 911 or send a satellite SOS first, stay put and signal.
+Every first-aid page also says: Reference only - not a substitute for first-aid training. Call for help first.
+Adapted; not endorsed by the U.S. Army, the U.S. Air Force, CDC, NPS, NOAA or any agency. Use of this material does not imply endorsement by any U.S. Government agency, by the Wilderness Medical Society, the American Heart Association, the American Red Cross or the American College of Surgeons.
+---
+= Sources
+Fieldcraft and figures, adapted and rewritten from:
+- ATP 3-50.21, Survival. Headquarters, Department of the Army, September 2018.
+- FM 21-76, Survival. Headquarters, Department of the Army, 5 June 1992 (superseded; original scan, 646 pages).
+- AFH 10-644, Survival Evasion Resistance Escape (SERE) Operations. Department of the Air Force, 27 March 2017.
+Current public guidance, checked and rewritten, from: CDC, DHS, eCFR, EPA, FEMA / Ready.gov, FAA, FCC, FDA, GPS.gov, HRSA, NWS, NIH, NOAA, NPS, NWCG, USDA, USDA Forest Service.
+Medical society and journal guidance was used only to check facts; nothing was copied.
+Figures: line art from the Army manuals above, made 1-bit. The full list of sources, page by page, is packs/guide/survival/ATTRIBUTION.md in the firmware repository.

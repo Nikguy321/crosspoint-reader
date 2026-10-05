@@ -5,13 +5,14 @@
 // The Apps list (a Home row): the games and tools that are not books. Each app is opened with a
 // replace, and its Back replaces back to this list, so no stack has to survive sleep or a boot
 // (an app resumes on its own: Activity::resumeApp). Back here goes Home with the Apps row
-// selected. The rows are decided when the list is built: Crossword and Sudoku need a touch screen.
+// selected. The rows are decided when the list is built: Crossword, Sudoku and Survival (the guide)
+// need a touch screen.
 class AppsActivity final : public UiListActivity {
  public:
   explicit AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-  enum class App : uint8_t { WordSearch, Crossword, Sudoku };
-  static constexpr int MAX_APPS = 3;
+  enum class App : uint8_t { WordSearch, Crossword, Sudoku, Guide };
+  static constexpr int MAX_APPS = 4;
 
   // The app a Back is leaving: the next Apps list opens with its row selected (once).
   static void selectOnNextOpen(App app);

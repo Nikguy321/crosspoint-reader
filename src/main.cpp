@@ -39,6 +39,7 @@
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/apps/CrosswordActivity.h"
+#include "activities/apps/GuideApp.h"
 #include "activities/apps/SudokuActivity.h"
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
@@ -764,6 +765,8 @@ static void resumeLastApp() {
     activityManager.goToCrossword();
   } else if (app == SudokuActivity::APP_ID) {
     activityManager.goToSudoku();
+  } else if (app == GuideScreen::APP_ID) {
+    activityManager.goToGuide(/*resume=*/true);
   } else {
     activityManager.goHome();
   }

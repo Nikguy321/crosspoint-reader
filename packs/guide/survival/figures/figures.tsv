@@ -1,0 +1,77 @@
+atp-p118-1 | ATP 3-50.21 (Sep 2018) | PDF p118 | Figure 5-1. Fire triangle | 170 | keep
+atp-p119-1 | ATP 3-50.21 (Sep 2018) | PDF p119 | Figure 5-2. Types of firewalls | 170 | keep
+fm92-p99-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p99 | Figure 7-2. Dakota fire hole | 170 | redraw (pit dug beside a tree among its roots, contradicting the no-roots WARNING; baked-in label "TREE TO DISPERSE SMOKE" is a concealment purpose; labels in cm only; Dakota page is text-only meanwhile; not referenced)
+atp-p120-1 | ATP 3-50.21 (Sep 2018) | PDF p120 | Figure 5-3. Base and brace | 170 | keep
+atp-p125-1 | ATP 3-50.21 (Sep 2018) | PDF p125 | Figure 5-5. Fire lays | 180 | keep; threshold 170->180 on the 440 px sheets (170 left gaps in the tepee and lean-to sticks)
+atp-p129-1 | ATP 3-50.21 (Sep 2018) | PDF p129 | Figure 5-8. Flint and steel fire-starter | 210 | keep (used only on the Flint and steel page; it shows a rock struck with steel, not a ferro rod); threshold 170->210 on the 440 px sheets (at 170 the rock and the striker almost vanish; 210 keeps both)
+atp-p128-1 | ATP 3-50.21 (Sep 2018) | PDF p128 | Figure 5-7. Using a convex lens as a fire-starter | 205 | keep; threshold 170->205 on the 440 px sheets (205 keeps the sun rays and lens beam that 170 drops)
+atp-p131-1 | ATP 3-50.21 (Sep 2018) | PDF p131 | Figure 5-10. Bow and drill fire-starter | 170 | keep (uniformed figure - candidate for a neutral redraw later; the left-hand parts diagram could be cropped out on its own)
+atp-p132-1 | ATP 3-50.21 (Sep 2018) | PDF p132 | Figure 5-11. Hand drill fire-starter | 170 | keep (uniformed figure - candidate for a neutral redraw later; page text stands alone)
+fm92-p99-2 | FM 21-76 (5 Jun 1992, original scan) | PDF p99 | Figure 7-3. Base for fire in snow-covered area | 170 | keep
+atp-p133-1 | ATP 3-50.21 (Sep 2018) | PDF p133 | Figure 5-12. Fire bundle | 190 | keep; threshold 170->190 on the 440 px sheets (190 keeps the bundle ties)
+atp-p58-2 | ATP 3-50.21 (Sep 2018) | PDF p58 | Figure 3-2. Water machine | 170 | keep
+atp-p63-1 | ATP 3-50.21 (Sep 2018) | PDF p63 | Figure 3-7. Vegetation bag still | 180 | redraw (reads badly at 1-bit: at every threshold 150-215 the clear bag either vanishes or floods black around the leaves; Vegetation bag still page is text-only meanwhile; not referenced)
+atp-p64-1 | ATP 3-50.21 (Sep 2018) | PDF p64 | Figure 3-8. Transpiration bag still | 190 | keep; threshold 170->190 on the 440 px sheets (at 170 the bag outline breaks; 190 keeps it whole)
+atp-p65-1 | ATP 3-50.21 (Sep 2018) | PDF p65 | Figure 3-9. Belowground solar still | 120 | keep (gray fills; 120 keeps the plastic sheet white and its label legible, 170 floods the pit black)
+atp-p66-1 | ATP 3-50.21 (Sep 2018) | PDF p66 | Figure 3-10. Beach well | 170 | keep
+atp-p66-2 | ATP 3-50.21 (Sep 2018) | PDF p66 | Figure 3-11. Sub-surface Water | 170 | keep
+atp-p68-1 | ATP 3-50.21 (Sep 2018) | PDF p68 | Figure 3-12. Water filtering systems | 200 | keep (page says a homemade filter does not remove germs); threshold 170->200 on the 440 px sheets (at 170 the hanging-bag filter outline is faint; 200 keeps it)
+atp-p50-1 | ATP 3-50.21 (Sep 2018) | PDF p50 | Figure 2-7. Heat transfer | 170 | keep (uniformed figure - candidate for a neutral redraw later; page text stands alone)
+atp-p138-1 | ATP 3-50.21 (Sep 2018) | PDF p138 | Figure 6-1. Types of naturally occurring shelters | 170 | keep (gradient shading in fallen-tree and tree-well panels - check at 1-bit)
+atp-p140-1 | ATP 3-50.21 (Sep 2018) | PDF p140 | Figure 6-2. Poncho lean-to | 205 | keep; threshold 170->205 on the 440 px sheets (the gray poncho and ridgeline vanish at 150-170; 205 keeps both without filling)
+atp-p141-1 | ATP 3-50.21 (Sep 2018) | PDF p141 | Figure 6-3. Poncho tent using overhanging branch | 205 | keep (drawing shows a line between two trees; caption in text says so); threshold 170->205 on the 440 px sheets (the gray poncho and ridgeline vanish at 150-170; 205 keeps both without filling)
+atp-p141-2 | ATP 3-50.21 (Sep 2018) | PDF p141 | Figure 6-4. Poncho tent using center support | 205 | keep; threshold 170->205 on the 440 px sheets (the gray poncho and ridgeline vanish at 150-170; 205 keeps both without filling)
+atp-p149-1 | ATP 3-50.21 (Sep 2018) | PDF p149 | Figure 6-13. Debris hut | 170 | keep
+atp-p143-1 | ATP 3-50.21 (Sep 2018) | PDF p143 | Figure 6-6. A-frame shelters | 170 | keep (baked-in panel labels; panel 2 says parachute material)
+atp-p146-1 | ATP 3-50.21 (Sep 2018) | PDF p146 | Figure 6-10. Field-expedient Lean-to and Fire Reflector | 125 | keep (heavy black fill - test threshold); threshold 170->125 on the 440 px sheets (heavy black fill is in the master itself, same at every threshold; reads as a dark woodcut)
+atp-p145-1 | ATP 3-50.21 (Sep 2018) | PDF p145 | Figure 6-8. Tree-Pit Snow Shelter | 170 | keep
+atp-p150-1 | ATP 3-50.21 (Sep 2018) | PDF p150 | Figure 6-14. Placement of ventilation holes in a snow cave | 170 | keep (uniformed figure - candidate for a neutral redraw later; MASTER EDITED: the lit stove on the working platform was erased to match the no-flame-inside text; the unedited figure is on the manual page cited)
+atp-p25-1 | ATP 3-50.21 (Sep 2018) | PDF p25 | Figure 2-2. Application of a pressure dressing | 210 | keep (210 keeps the faint dressing outline that 170 drops; matches current practice; text is written fresh from current guidance)
+atp-p46-1 | ATP 3-50.21 (Sep 2018) | PDF p46 | Figure 2-5. Building a splint | 190 | keep (drawing only; ATP splint text not used); threshold 170->190 on the 440 px sheets (190 firms up the faint arm outlines)
+atp-p47-1 | ATP 3-50.21 (Sep 2018) | PDF p47 | Figure 2-6. Slings | 170 | redraw (shows uniformed soldiers - needs a neutral drawing; the Slings page is text-only until the redraw exists)
+atp-p177-1 | ATP 3-50.21 (Sep 2018) | PDF p177 | Figure 7-24. Measure map distance—straight line | 160 | keep (gray background; 170 checked on a 440 px contact sheet, small labels); threshold 170->160 on the 440 px sheets (gray background floods black from about 175 up; 160 stays clear)
+atp-p176-2 | ATP 3-50.21 (Sep 2018) | PDF p176 | Figure 7-23. Graphic scale | 170 | redraw (labels unreadable at 440 px; map-basics page 2 is text-only meanwhile; not referenced)
+atp-p172-2 | ATP 3-50.21 (Sep 2018) | PDF p172 | Figure 7-15. A hill | 170 | keep
+atp-p173-1 | ATP 3-50.21 (Sep 2018) | PDF p173 | Figure 7-16. A saddle | 170 | keep
+atp-p174-1 | ATP 3-50.21 (Sep 2018) | PDF p174 | Figure 7-18. A ridge | 170 | keep
+atp-p173-2 | ATP 3-50.21 (Sep 2018) | PDF p173 | Figure 7-17. A valley | 170 | keep
+atp-p176-1 | ATP 3-50.21 (Sep 2018) | PDF p176 | Figure 7-22. A cliff | 170 | keep
+atp-p171-1 | ATP 3-50.21 (Sep 2018) | PDF p171 | Figure 7-13. Floating needle compass | 170 | redraw (tiny text, map clutter; compass page 4 is text-only meanwhile; not referenced)
+fm92-p292-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p292 | Figure 18-1. Shadow-tip method | 170 | keep (uniformed figures - candidate for a neutral redraw later; page text stands alone. TALL: about 560 px high at 440 wide, so page text trimmed to 36 words; check the 480x800 fit on the device. ATP Figure 7-8 is a photo, not usable)
+atp-p163-1 | ATP 3-50.21 (Sep 2018) | PDF p163 | Figure 7-9. Equal-shadow method | 170 | keep
+atp-p164-1 | ATP 3-50.21 (Sep 2018) | PDF p164 | Figure 7-10. Watch method | 170 | keep
+atp-p165-1 | ATP 3-50.21 (Sep 2018) | PDF p165 | Figure 7-11. Northern sky | 170 | keep (white-on-black, 352 px master is narrower than 440; consider invert)
+atp-p166-1 | ATP 3-50.21 (Sep 2018) | PDF p166 | Figure 7-12. Southern sky | 170 | keep (white-on-black, 352 px master is narrower than 440; consider invert)
+atp-p156-1 | ATP 3-50.21 (Sep 2018) | PDF p156 | Figure 7-1. Using a pole method to ford stream | 170 | redraw (shows chest-deep water; current NPS limit is knee-deep; redraw at knee depth with the pack hip belt open; page text-only meanwhile; not referenced)
+atp-p157-1 | ATP 3-50.21 (Sep 2018) | PDF p157 | Figure 7-2. Using a pole for multiple crossing | 170 | redraw (baked-in labels put the lightest person upstream, current NPS guidance puts the strongest upstream; chest-deep water; page text-only meanwhile; not referenced)
+fm92-p304-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p304 | Figure 19-4. Aiming an improvised signal mirror | 170 | keep (uniformed figure lying down)
+fm92-p305-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p305 | Figure 19-5. Aiming an improvised signal mirror--stationary object | 170 | keep
+fm92-p301-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p301 | Figure 19-2. Smoke generator--ground | 170 | keep (tall: about 491 px high at 440 wide; page text kept short)
+fm92-p308-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p308 | Figure 19-6. Ground-to-air emergency code (pattern signals) | 170 | keep (MASTER EDITED: the "Number" column cropped off so the labels scale larger at 440 px; the unedited figure is on the manual page cited)
+fm92-p308-2 | FM 21-76 (5 Jun 1992, original scan) | PDF p308 | Figure 19-7. Body signals | 170 | keep (MASTER EDITED: recomposed to 6 of the 11 cells in a 3x2 grid - pick us up, need medical assistance urgently, all OK do not wait, do not attempt to land here, affirmative, negative - so labels stay readable at 440 px, about 440x333; dropped cells are aircraft-crew signals; the unedited figure is on the manual page cited)
+fm92-p310-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p310 | Figure 19-9. Aircraft acknowledgments | 170 | keep (MASTER EDITED: the "Aircraft will indicate..." sub-lines and both night signal-lamp panels removed - lamp colors are not in AFH 10-644 21.5.12 (FAA AIM Fig 6-2-6 still shows green = understood, red = not understood) but signal lamps are rarely carried by civil search aircraft, so left out; both kept panels match the current FAA AIM Fig 6-2-6; about 440x303; the unedited figure is on the manual page cited)
+atp-p196-1 | ATP 3-50.21 (Sep 2018) | PDF p196 | Figure A-1. Elements of ropes and knots | 225 | keep (very light rope lines - at 170 the rope vanishes; 225 tested good)
+atp-p197-1 | ATP 3-50.21 (Sep 2018) | PDF p197 | Figure A-2. Overhand | 170 | keep
+atp-p199-1 | ATP 3-50.21 (Sep 2018) | PDF p199 | Figure A-4. Figure-eight knot | 190 | keep; threshold 170->190 on the 440 px sheets (190 makes the rope outline solid)
+atp-p200-1 | ATP 3-50.21 (Sep 2018) | PDF p200 | Figure A-5. Square knot | 200 | keep (light lines; 200 tested)
+atp-p201-1 | ATP 3-50.21 (Sep 2018) | PDF p201 | Figure A-6. Single sheet bend | 210 | keep (light lines; 200 tested); threshold 200->210 on the 440 px sheets (210 cleans up panel 3)
+atp-p201-2 | ATP 3-50.21 (Sep 2018) | PDF p201 | Figure A-7. Double sheet bend | 225 | keep (light lines; 225 tested)
+atp-p202-1 | ATP 3-50.21 (Sep 2018) | PDF p202 | Figure A-8. Bowline knot | 210 | keep (light lines; 200 tested); threshold 200->210 on the 440 px sheets (210 slightly firmer rope than 200)
+atp-p203-1 | ATP 3-50.21 (Sep 2018) | PDF p203 | Figure A-9. Bowline on a bight knot | 225 | keep (very light lines - nearly blank at 170; 225 tested good)
+atp-p206-1 | ATP 3-50.21 (Sep 2018) | PDF p206 | Figure A-12. Half hitch and a two half hitch | 210 | keep (panel letters A = half hitch, B = two half hitches); threshold 170->210 on the 440 px sheets (rope is stippled and breaks up at 170; 210 solid)
+atp-p198-1 | ATP 3-50.21 (Sep 2018) | PDF p198 | Figure A-3. Round turn and two half hitches | 170 | keep (wide, short; heavy black pole fill)
+atp-p208-1 | ATP 3-50.21 (Sep 2018) | PDF p208 | Figure A-15. Clove hitch | 225 | keep (light lines; baked-in labels "At center of rope" / "At end of rope"; 225 tested)
+atp-p207-1 | ATP 3-50.21 (Sep 2018) | PDF p207 | Figure A-13. Timber hitch | 170 | keep
+atp-p210-1 | ATP 3-50.21 (Sep 2018) | PDF p210 | Figure A-17. Prussic | 225 | redraw (only 289 px wide; Prusik page is text-only meanwhile and does not reference this id)
+atp-p211-1 | ATP 3-50.21 (Sep 2018) | PDF p211 | Figure A-18. Square lashing | 220 | keep (light lines; baked-in step text, small at 440 px, has a source typo "verical")
+atp-p212-1 | ATP 3-50.21 (Sep 2018) | PDF p212 | Figure A-19. Diagonal lashing | 225 | keep (light lines; 225 tested)
+atp-p213-1 | ATP 3-50.21 (Sep 2018) | PDF p213 | Figure A-20. Shear lashing | 210 | keep (poles are flat gray ~211, just above the threshold; threshold 205->210 on the 440 px sheets: 210 shows the lashing turns that are faint at 205, pole grain gets busy but the poles stay white; still a redraw candidate)
+atp-p190-1 | ATP 3-50.21 (Sep 2018) | PDF p190 | Figure 8-8. Making cordage | 245 | keep (very light strands - invisible at 170-200; 245 tested good)
+atp-p216-1 | ATP 3-50.21 (Sep 2018) | PDF p216 | Figure A-22. Three-strand braid | 170 | keep
+atp-p219-1 | ATP 3-50.21 (Sep 2018) | PDF p219 | Figure A-25. Whipping the end of a rope | 225 | keep (hands drawn in line art; panel letters a/b/c; at 170 the stippled rope vanishes, 225 reviewed good)
+atp-p108-1 | ATP 3-50.21 (Sep 2018) | PDF p108 | Figure 4-26. Improvised fish hooks | 200 | keep (thin lines; 200 keeps the gorge and thorn hooks legible at 440 px, 225 bleeds)
+atp-p110-2 | ATP 3-50.21 (Sep 2018) | PDF p110 | Figure 4-30. Various types of fish traps | 170 | keep (regulations caveat on the topic's first page)
+atp-p90-1 | ATP 3-50.21 (Sep 2018) | PDF p90 | Figure 4-7. Simple loop snare | 225 | keep (emergency-only caveat page precedes it; at 170 the light-gray noose and locking-loop lines vanish at 440 px, 225 keeps them)
+atp-p91-1 | ATP 3-50.21 (Sep 2018) | PDF p91 | Figure 4-9. Drag noose snare | 225 | keep (emergency-only caveat; at 170 the hanging noose drops out at 440 px, 225 keeps it; tall figure, 718x963 - check it fits ~440x360 on device or crop to the snare and channel panels; reviewer re-rendered 225 with a Lanczos resize to 440 px and the hanging noose and locking loop stay legible)
+fm92-p234-1 | FM 21-76 (5 Jun 1992, original scan) | PDF p234 | Figure 15-7. Cooking fire/stove | 170 | keep (reviewer removed both printed labels, "HOBO STOVE" and "CRANE HOLDING POT", and trimmed the empty label strip, 1334x856 -> 1334x710; the page caption names both panels; the unedited figure is on the manual page cited)
+atp-p79-1 | ATP 3-50.21 (Sep 2018) | PDF p79 | Figure 4-2. Umbrella-shaped flowers (generic carrot-family plant; caption must not say water hemlock) | 170 | keep

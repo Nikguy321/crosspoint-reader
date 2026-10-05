@@ -1,5 +1,6 @@
 #include "BenchProtocol.h"
 
+#include <cstdio>
 #include <cstring>
 
 namespace bench {
@@ -437,6 +438,10 @@ bool parseAppArgs(const char* args, AppTarget& out) {
     out = AppTarget::Sudoku;
     return true;
   }
+  if (tokenIs(word, "guide")) {
+    out = AppTarget::Guide;
+    return true;
+  }
   return false;
 }
 
@@ -608,6 +613,92 @@ bool parseSuArgs(char* args, SuArgs& out) {
   if (nextToken(args, a)) return false;
   out.op = op;
   return true;
+}
+
+namespace {
+
+// [a-z0-9-]{1,maxLen}: a guide pack id (lib/Guide's validId, kept apart so this file stays alone).
+bool gdId(const char* s, const size_t maxLen) {
+  size_t n = 0;
+  for (; s[n] != '\0'; ++n) {
+    const char c = s[n];
+    if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) return false;
+  }
+  return n >= 1 && n <= maxLen;
+}
+
+}  // namespace
+
+bool parseGdArgs(char* args, GdArgs& out) {
+  out = GdArgs{};
+  if (args == nullptr) return true;
+  char* tok = nullptr;
+  if (!nextToken(args, tok)) return true;  // GD: the dump
+  char* a = nullptr;
+  char* b = nullptr;
+  if (tokenIs(tok, "search")) {
+    // The rest of the line as typed, its ends trimmed.
+    while (isSpace(*args)) ++args;
+    size_t n = std::strlen(args);
+    while (n > 0 && isSpace(args[n - 1])) --n;
+    if (n == 0 || n > GD_TEXT_MAX) return false;
+    for (size_t i = 0; i < n; ++i) {
+      if (static_cast<unsigned char>(args[i]) < 0x20 || args[i] == 0x7F) return false;
+    }
+    std::memcpy(out.text, args, n);
+    out.text[n] = '\0';
+    out.op = GdOp::Search;
+    return true;
+  }
+  if (tokenIs(tok, "open")) {
+    if (!nextToken(args, a) || !gdId(a, 32)) return false;
+    uint32_t page = 1;
+    if (nextToken(args, b) && (!parseU32(b, page) || page < 1 || page > 64)) return false;
+    if (nextToken(args, b)) return false;
+    std::snprintf(out.text, sizeof(out.text), "%s", a);
+    out.page = static_cast<uint8_t>(page - 1);
+    out.op = GdOp::Open;
+    return true;
+  }
+  if (tokenIs(tok, "list")) {
+    if (nextToken(args, a)) {
+      if (!gdId(a, 20) || nextToken(args, b)) return false;
+      std::snprintf(out.text, sizeof(out.text), "%s", a);
+    }
+    out.op = GdOp::List;
+    return true;
+  }
+  if (tokenIs(tok, "row")) {
+    uint32_t row = 0;
+    if (!nextToken(args, a) || !parseU32(a, row) || row > 1023 || nextToken(args, b)) return false;
+    out.row = static_cast<uint16_t>(row);
+    out.op = GdOp::Row;
+    return true;
+  }
+  if (tokenIs(tok, "figure")) {
+    if (nextToken(args, a)) {
+      if (tokenIs(a, "close")) {
+        out.close = true;
+      } else if (!tokenIs(a, "open")) {
+        return false;
+      }
+      if (nextToken(args, b)) return false;
+    }
+    out.op = GdOp::Figure;
+    return true;
+  }
+  static constexpr struct {
+    const char* word;
+    GdOp op;
+  } SIMPLE[] = {{"about", GdOp::About}, {"home", GdOp::Home}, {"next", GdOp::Next},
+                {"prev", GdOp::Prev},   {"mark", GdOp::Mark}, {"menu", GdOp::Menu}};
+  for (const auto& s : SIMPLE) {
+    if (!tokenIs(tok, s.word)) continue;
+    if (nextToken(args, a)) return false;
+    out.op = s.op;
+    return true;
+  }
+  return false;
 }
 
 bool parseWsArgs(char* args, WsArgs& out) {

@@ -1,0 +1,38 @@
+# The guide search's light stemmer: input TAB expected stem. scripts/guide/make_pack.py (stem) and
+# lib/Guide/GdSearch.cpp (gd::stemWord) must both give these; make_pack.py checks itself on every run and
+# test/guide checks the firmware.
+berries	berry
+flies	fly
+ties	tie
+glasses	glass
+boxes	box
+matches	match
+bushes	bush
+knots	knot
+rocks	rock
+gas	gas
+moss	moss
+cactus	cactus
+basis	basis
+bleeding	bleed
+boiling	boil
+making	making
+spring	spring
+cutting	cut
+lightning	lightn
+soaked	soak
+stopped	stop
+needed	need
+bleed	bleed
+used	used
+treated	treat
+falling	fall
+fizzed	fizz
+signals	signal
+signaling	signal
+shelters	shelter
+fires	fire
+911	911
+100s	100s
+a	a
+it	it

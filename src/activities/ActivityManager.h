@@ -99,6 +99,8 @@ class ActivityManager {
   void goToWordSearch();
   void goToCrossword();
   void goToSudoku();
+  // The survival guide: its home, or (resume) the screen state.txt names.
+  void goToGuide(bool resume = false);
   void goToReader(std::string path, bool allowFastInitialRefresh = false);
   // live: the live sleep screen (charging, X4 Pro), which stays up and is redrawn; popup = show
   // "Entering sleep" first (not at a boot straight into the live screen).

@@ -33,6 +33,15 @@ AppsActivity::AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInpu
     apps_[appCount_] = App::Sudoku;
     rowItems_[appCount_++] = sudoku;
   }
+  // The survival guide's screens are touch-first (its bar, figures, the search keyboard).
+  if (mappedInput.hasTouch()) {
+    fui::ListItem guide;
+    guide.label = tr(STR_GUIDE);
+    guide.subtitle = tr(STR_GUIDE_DESC);
+    guide.icon = fui::bitmapFromIcon(icon_guide_32);
+    apps_[appCount_] = App::Guide;
+    rowItems_[appCount_++] = guide;
+  }
   for (int i = 0; i < appCount_; i++) rowItems_[i].actionValue = static_cast<int16_t>(i);
 }
 
@@ -70,6 +79,9 @@ void AppsActivity::activateIndex(const int index) {
       return;
     case App::Sudoku:
       activityManager.goToSudoku();
+      return;
+    case App::Guide:
+      activityManager.goToGuide();
       return;
   }
 }

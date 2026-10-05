@@ -103,6 +103,10 @@ add_subdirectory(crossword_preview)
 # Sudoku: the pure half (engine, play rules, undo, saves, layout, touch), then its drawing.
 add_subdirectory(sudoku)
 add_subdirectory(sudoku_preview)
+# Survival guide: the pure half (pack, pages, layout, navigation, search, saves) and the real pack,
+# then its drawing.
+add_subdirectory(guide)
+add_subdirectory(guide_preview)
 
 add_subdirectory(inflate_stream)
 add_subdirectory(fs_helpers)

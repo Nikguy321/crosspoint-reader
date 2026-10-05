@@ -81,8 +81,8 @@ bool parseSleepArgs(const char* args, SleepKind& out);
 constexpr size_t SSID_MAX_BYTES = 32;
 bool isValidSsid(const char* ssid);
 
-// APP apps|wordsearch|crossword|sudoku: open the Apps list or a game (case ignored).
-enum class AppTarget : uint8_t { Apps, WordSearch, Crossword, Sudoku };
+// APP apps|wordsearch|crossword|sudoku|guide: open the Apps list or a game / the guide (case ignored).
+enum class AppTarget : uint8_t { Apps, WordSearch, Crossword, Sudoku, Guide };
 bool parseAppArgs(const char* args, AppTarget& out);
 
 // WEATHER [show|fetch|clear]: the Weather card's cache summarised (the default), a fetch now on a
@@ -155,6 +155,29 @@ struct SuArgs {
   uint8_t scope = 1;  // Check, Reveal: 0 square, 1 puzzle (sd::Scope)
 };
 bool parseSuArgs(char* args, SuArgs& out);
+
+// GD                       the guide screen on screen (and the pack), dumped
+// GD open <topic> [page]   a topic's page (1-based, default 1), as its list row opens it
+// GD about | GD home       About & sources | the guide home
+// GD search <words>        the results of a search (the rest of the line, 1..63 bytes)
+// GD list [category]       the pack's categories, or one category's topics (no screen change)
+// GD next | GD prev        a page turn (pages) or the selection (lists), as the right / left key
+// GD mark                  the open page's bookmark toggled (as the right key held)
+// GD menu                  up a level (the page's MENU, a list's BACK)
+// GD row <n>               opens list row n (0-based, as a tap on it)
+// GD figure [close]        the page's figure full screen (or closed)
+// Ids are [a-z0-9-] (topics up to 32 bytes, categories 20); words other than the search's are
+// matched without case. Parses in place.
+enum class GdOp : uint8_t { Dump, Open, About, Home, Search, List, Next, Prev, Mark, Menu, Row, Figure };
+constexpr size_t GD_TEXT_MAX = 63;
+struct GdArgs {
+  GdOp op = GdOp::Dump;
+  char text[GD_TEXT_MAX + 1] = {};  // Open: the topic id; Search: the words; List: the category ("" all)
+  uint8_t page = 0;                 // Open: 0-based (the wire's 1-based less one)
+  uint16_t row = 0;                 // Row
+  bool close = false;               // Figure close
+};
+bool parseGdArgs(char* args, GdArgs& out);
 
 // PINS [seconds]: the USB/VBUS-detect pin hunt (default 60, 1..180).
 constexpr uint32_t PINS_DEFAULT_SECONDS = 60;

@@ -1,0 +1,86 @@
+call-for-help	emergency	Call for help	-	t/call-for-help.gp	2	Call or text 911; satellite SOS when there is no signal
+if-lost	emergency	If you are lost: STOP	-	t/if-lost.gp	2	Stop, Think, Observe, Plan - then stay put
+signal-now	emergency	Signal for rescue now	Q	t/signal-now.gp	1	Threes mean help: whistle, fire, light, mirror, ground X
+rule-of-threes	emergency	The rule of threes	Q	t/rule-of-threes.gp	1	Air, warmth, water, food - which to fix first
+life-threats	emergency	Life threats first	QM	t/life-threats.gp	1	Safe scene, 911, stop bleeding, breathing, keep warm
+priorities	priorities	Survival priorities	-	t/priorities.gp	2	What to do first, and in what order
+mindset	priorities	Survival mindset	-	t/mindset.gp	2	Handle fear and keep the will to go on
+gear	priorities	Ten essentials and kit	-	t/gear.gp	4	What to carry on every trip, and a pocket kit
+clothing	priorities	Clothing: your first shelter	-	t/clothing.gp	2	Layer up, avoid cotton, stay dry
+fire-basics	fire	Fire basics and safety	-	t/fire-basics.gp	3	What fire needs, when to light one, how to put it out
+fire-site	fire	Choosing a fire site	-	t/fire-site.gp	3	Where to build a fire, fire walls, Dakota fire hole
+fire-fuel	fire	Tinder, kindling and fuel	-	t/fire-fuel.gp	3	Gather tinder, kindling and fuel before you light up
+fire-lays	fire	Fire lays	-	t/fire-lays.gp	2	Ways to stack wood for quick heat or a long burn
+lighting-fire	fire	Lighting a fire	-	t/lighting-fire.gp	6	Matches, lighters, ferro rods, lenses and sparks
+friction-fire	fire	Friction fire - bow drill	-	t/friction-fire.gp	3	Make a coal with a bow drill or a hand drill
+wet-weather-fire	fire	Fire in rain and snow	-	t/wet-weather-fire.gp	3	Find dry wood in rain, build on snow, carry embers
+water-needs	water	How much water you need	M	t/water-needs.gp	2	Daily needs, drinking pace, signs of dehydration
+finding-water	water	Finding water	-	t/finding-water.gp	3	Signs of water, digging for it, beach wells
+rain-dew-snow	water	Rain, dew and snow	-	t/rain-dew-snow.gp	3	Catch rain, wipe up dew, melt snow and ice
+solar-stills	water	Solar and bag stills	-	t/solar-stills.gp	4	Ground still, vegetation bag, transpiration bag
+filtering-water	water	Filtering muddy water	-	t/filtering-water.gp	2	Settle, strain and filter before you treat
+safe-water	water	Making water safe	-	t/safe-water.gp	4	Boil, bleach, tablets, filters and sunlight
+water-dangers	water	Water you must not drink	Q	t/water-dangers.gp	1	Seawater, urine, chemicals and algae blooms
+shelter-basics	shelter	Why shelter matters	-	t/shelter-basics.gp	2	How you lose heat, and why small and early wins
+shelter-site	shelter	Choosing a shelter site	-	t/shelter-site.gp	3	Flat, dry, safe overhead, out of the wind
+tarp-shelters	shelter	Tarp shelters	-	t/tarp-shelters.gp	3	Lean-to and tent from a tarp or poncho
+debris-shelters	shelter	Debris hut and A-frame	-	t/debris-shelters.gp	4	Warm shelters from poles, leaves and boughs
+lean-to-reflector	shelter	Lean-to with fire reflector	-	t/lean-to-reflector.gp	2	An open shelter that catches a fire's heat
+snow-shelters	shelter	Snow shelters	-	t/snow-shelters.gp	3	Tree pit and snow cave, and how to keep air in them
+bedding-and-heat	shelter	Bedding and safe warmth	-	t/bedding-and-heat.gp	2	Insulate from the ground; no flames inside
+check-and-call	first-aid	Check, call, care	M	t/check-and-call.gp	2	Safe scene, tap and shout, check breathing, call
+cpr-choking	first-aid	CPR and choking	M	t/cpr-choking.gp	3	Hands-only CPR, special cases, and choking
+bleeding-and-shock	first-aid	Bleeding and shock	M	t/bleeding-and-shock.gp	4	Press hard, pressure bandage, tourniquet, shock
+wounds-and-burns	first-aid	Wounds and burns	M	t/wounds-and-burns.gp	5	Clean wounds, watch for infection, cool burns
+sprains-fractures	first-aid	Sprains and broken bones	M	t/sprains-fractures.gp	3	Cold and rest for sprains; splint and sling breaks
+head-spine	first-aid	Head and spine injuries	QM	t/head-spine.gp	1	Keep still, call for help, watch danger signs
+cold-injuries	first-aid	Hypothermia and frostbite	M	t/cold-injuries.gp	5	Spot and treat hypothermia, frostbite, wet feet
+heat-illness	first-aid	Heat exhaustion and heat stroke	M	t/heat-illness.gp	2	Cool down early; heat stroke is an emergency
+snakebite	first-aid	Snakebite	M	t/snakebite.gp	2	Stay calm, keep still, get to a hospital
+bites-stings-rashes	first-aid	Stings, bites and rashes	M	t/bites-stings-rashes.gp	3	Stings, allergic reactions, bites, poison oak
+illness-and-hygiene	first-aid	Stomach illness, hygiene, altitude	M	t/illness-and-hygiene.gp	3	Rehydrate, stay clean, and know altitude illness
+stay-or-move	navigation	Stay or move?	-	t/stay-or-move.gp	2	Usually stay put; when moving is the right call
+map-basics	navigation	Map basics	-	t/map-basics.gp	3	Orient the map, read the scale, measure distance
+terrain-features	navigation	Reading terrain	-	t/terrain-features.gp	5	Hill, saddle, ridge, valley, cliff from contour lines
+compass	navigation	Using a compass	-	t/compass.gp	4	Parts, bearings, declination, a needle compass
+dead-reckoning	navigation	Walking a route	-	t/dead-reckoning.gp	3	Steering marks, handrails, aiming off, pace count
+gps-and-phone	navigation	GPS and your phone	-	t/gps-and-phone.gp	2	Offline maps, saving battery, when not to trust it
+direction-from-sky	navigation	Direction from sun and stars	-	t/direction-from-sky.gp	6	Shadow stick, watch, North Star, Southern Cross, moon
+travel-techniques	navigation	Traveling on foot	-	t/travel-techniques.gp	2	Steady pace, steep slopes, loose rock, snow and brush
+water-crossings	navigation	Crossing streams	-	t/water-crossings.gp	3	Pick the spot, cross with a pole, what to do if swept
+signal-basics	signaling	Signal basics	-	t/signal-basics.gp	2	Be easy to see, be ready, and signal in threes
+signal-mirror	signaling	Signal mirror	-	t/signal-mirror.gp	2	Aim a flash of sunlight at an aircraft
+signal-fire-smoke	signaling	Signal fires and smoke	-	t/signal-fire-smoke.gp	2	Three fires at night, thick smoke by day
+ground-and-body	signaling	Ground and body signals	-	t/ground-and-body.gp	3	Symbols pilots know, how to build them, body poses
+sound-and-light	signaling	Whistle and light	-	t/sound-and-light.gp	2	Three whistle blasts; flash SOS with a light at night
+aircraft-and-helicopters	signaling	Aircraft and helicopters	-	t/aircraft-and-helicopters.gp	2	Has the pilot seen you? Staying safe near a helicopter
+beacons	signaling	Beacons and satellite messengers	-	t/beacons.gp	2	Using a locator beacon or satellite SOS
+weather-signs	weather	Weather signs	-	t/weather-signs.gp	3	Check the forecast, then read wind, sky and smoke
+clouds	weather	Clouds that warn	-	t/clouds.gp	3	High veils, tall towers, low gray layers
+lightning	weather	Lightning	-	t/lightning.gp	2	No place outside is safe; get off high ground
+cold-and-wind	weather	Cold, wind and winter storms	-	t/cold-and-wind.gp	3	Wind chill, whiteouts, and staying warm and dry
+heat	weather	Heat and sun	Q	t/heat.gp	1	Travel cool hours, shade, water, sun and eye cover
+flash-floods	weather	Flash floods	Q	t/flash-floods.gp	1	Never enter moving water; camp high, climb fast
+wildfire	weather	Near a wildfire	-	t/wildfire.gp	2	Leave early, away from the fire; if trapped, get low
+rope-terms	knots	Rope words	Q	t/rope-terms.gp	1	The parts of a rope and how to finish a knot
+stopper-knots	knots	Overhand and figure-eight	-	t/stopper-knots.gp	2	Stopper knots for the end of a rope
+joining-knots	knots	Joining two ropes	-	t/joining-knots.gp	3	Square knot, sheet bend and double sheet bend
+loop-knots	knots	Bowline loops	-	t/loop-knots.gp	2	A fixed loop that will not slip or jam
+hitches	knots	Hitches	-	t/hitches.gp	5	Tie a line to a tree, pole or another line
+lashings	knots	Lashings	-	t/lashings.gp	3	Bind poles together for frames and tripods
+cordage	knots	Making cord	-	t/cordage.gp	4	Find fibers, twist cord, braid straps, whip ends
+food-basics	food	Food in an emergency	-	t/food-basics.gp	3	Food can wait; save energy; insects and grubs
+wild-plants	food	Wild plants: do not guess	M	t/wild-plants.gp	3	Never eat an unknown plant; deadly lookalikes
+mushrooms	food	Never eat wild mushrooms	QM	t/mushrooms.gp	1	Little food value, deadly lookalikes, delayed symptoms
+fishing	food	Emergency fishing	-	t/fishing.gp	3	Rules first; improvised hooks, set lines and traps
+snares	food	Snares (emergency only)	-	t/snares.gp	3	Emergency only; simple loop and drag noose snares
+cleaning-cooking	food	Cleaning and cooking	-	t/cleaning-cooking.gp	3	Clean fish and small game; cook it all the way
+animals-and-camp	food	Animals and your camp	-	t/animals-and-camp.gp	3	Keep your distance, store food, small hazards
+cold-water	pnw	Cold water and wet cold	M	t/cold-water.gp	4	Cold shock, self-rescue, ice, and cold rain
+deadly-plants	pnw	Water hemlock and look-alikes	M	t/deadly-plants.gp	2	Deadly wild plants that look like food
+death-cap	pnw	Death cap mushroom	QM	t/death-cap.gp	1	A deadly mushroom spreading on the West Coast
+ticks	pnw	Ticks	M	t/ticks.gp	2	Northwest ticks, prevention and safe removal
+cougars	pnw	Cougars	-	t/cougars.gp	2	Avoid cougars, and what to do if you meet one
+bears	pnw	Black bears (and grizzlies)	-	t/bears.gp	3	Avoid bears; black bear vs grizzly attacks
+shellfish	pnw	Shellfish poisoning	M	t/shellfish.gp	2	Algae toxins in clams, mussels and oysters
+wildfire-smoke	pnw	Wildfire smoke	M	t/wildfire-smoke.gp	2	Smoke harm, who is at risk, and respirators

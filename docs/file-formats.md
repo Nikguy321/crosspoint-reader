@@ -682,3 +682,98 @@ rewritten); a puzzle finished with reveals is listed with them:
 ```
 <fnv8hex> <tier> <number> <seconds> <checks> <hints> <reveals>
 ```
+
+## Survival guide
+
+The Survival app (`src/activities/apps/Guide*`, the pure half in `lib/Guide`) reads a **device pack** from the card
+and keeps its own state apart from it. The pack is built on a computer by `scripts/guide/make_pack.py` from the
+source in `packs/guide/survival/` (its format: [packs/guide/README.md](../packs/guide/README.md)); the built copy is
+committed in `packs/guide/build/survival/`. All text is ASCII-safe UTF-8 (the builder turns typographic punctuation
+into ASCII); ids are `[a-z0-9-]` (categories 1-20 bytes, topics and figures 1-32).
+
+### Device pack, format 1 (`/Guides/survival/`)
+
+```
+pack.txt          key=value lines ('#' comments and blank lines skipped, unknown keys ignored)
+categories.tsv    <cat-id> TAB <TITLE> TAB <blurb> TAB <order>                 one a line, in order (EMERGENCY first)
+topics.tsv        <topic-id> TAB <cat-id> TAB <title> TAB <flags> TAB <file> TAB <pages> TAB <summary>
+search.idx        <term> TAB <topic-id>:<weight>,<topic-id>:<weight>,...      sorted by term (bytewise), unique
+t/<topic-id>.gp   a topic's pages
+about.txt         About & sources (the .gp format: two pages)
+fig/L/<name>.png  1-bit grayscale PNG, at most 440 x 480 (the builder makes them at most 440 x 400)
+fig/XL/<name>.png optional: the same figure for the full-screen view, 1-bit, at most 456 x 620, made from the master
+                  (not scaled up from fig/L). When it is taller than wide and fig/L is wider than tall it was
+                  turned a quarter-turn counter-clockwise (its top at the screen's left edge) and the app says
+                  "Turn the reader". Missing: the full-screen view shows fig/L
+SHA256SUMS        "<sha256>  <path>" for every other file (for a downloader; the reader does not read it)
+```
+
+`pack.txt` keys: `format` (1), `id` (`survival`), `version`, `title`, `short` (the breadcrumb's root, `SURVIVAL`),
+`status` (`reviewed-by-ai`), `status_text` (the sentence the app shows), `note` (the whole guide's reference-only and
+911 note), `ref_note` (the line a medical topic shows above its first page), `license`, `min_app` (1). `format`, `id`,
+`version` and `title` are required. A `format` above 1 or a `min_app` above 1 is refused as **needs newer firmware**
+(checked first, so a newer pack is never called damaged); anything else that does not parse, or breaks a cap, is
+**damaged**. The app never trusts the pack: every file is read with a size cap and parsed into fixed tables.
+
+`topics.tsv` lists the topics category by category, in the categories' order; a topic's place in its category is its
+place in the file. `flags` is `-` or letters: `Q` a quick card (one page, drawn in the compact style so it fits one
+screen), `M` medical (the `ref_note` line above its first page). `file` is `t/<topic-id>.gp`; `pages` its page count.
+
+Caps: 64 categories, 1024 topics, 64 pages a topic, titles 80 bytes, summaries and blurbs 120; `pack.txt` 4 KB,
+`categories.tsv` 16 KB, `topics.tsv` 256 KB, a `.gp` 64 KB, `about.txt` 16 KB, `search.idx` 256 KB.
+
+**`.gp` page text** - one block a line, blank lines ignored; `**` toggles bold inside any text:
+
+```
+= <page title>              starts a page (every page starts with one)
+@fig <name>[ <caption>]     the page's figure (fig/L/<name>.png); only straight after the title
+1. <text>                   a numbered step (1-999)
+- <text>                    a bullet
+! <text>                    a boxed WARNING
+* <text>                    a boxed NOTE
+---                         the next page
+\<text>                     a paragraph that would otherwise read as markup (the '\' is dropped)
+<text>                      a paragraph
+```
+
+The reader lays each page out for its own screen: a page that does not fit continues on follow-on screens (the bar's
+n/m counts screens), never split into a different page.
+
+**`search.idx`** - a term is a stemmed lower-case word `[a-z0-9]+` (the stemmer and stopwords are shared by
+`make_pack.py` and `lib/Guide/GdSearch`: `scripts/guide/stem_vectors.tsv`, `scripts/guide/stopwords.txt`). A topic's
+weight for a term is title 3 + summary 2 + body 1 for the fields that hold it; a word brought in only by a synonym
+group (`packs/guide/survival/synonyms.txt`) weighs 1. The reader prefix-matches each query word, needs every word, and
+ranks by the summed best weights (then pack order); with no match it falls back to titles and summaries.
+
+### State files (`/.crosspoint/guide/survival/`)
+
+Written tmp -> remove -> rename; when a main file is missing, the `.tmp` beside it is read instead. `state.txt` and
+`recent.txt` are written once input pauses for 3 s, when the search keyboard opens and when the guide is left (Apps,
+Home, sleep), not on each page turn; `marks.txt` when a bookmark changes. Everything is
+keyed by id, never by index, so it survives a pack update: ids the pack no longer has are dropped on load, and pages
+are clamped.
+
+`state.txt`, where the guide reopens (after sleep or a restart); one that does not parse completely opens the home:
+
+```
+GS1
+screen home|list|page|about
+list none|category|quick|search|marks|recent     (the list shown, or the one a page goes back to)
+cat <cat-id>|-
+query <words>                                    (may be empty: "query")
+topic <topic-id>|-                               (the page's topic, or the list's selected one)
+page <0-63>
+sub <0-255>                                      (the screen within the page; 255 = its last)
+sel <0-1023>                                     (the list's selected row)
+end
+```
+
+`marks.txt`, the bookmarks, newest first, at most 50; `recent.txt`, the topics opened, newest first, at most 12. A
+malformed line is skipped (one bad line never costs the rest):
+
+```
+GM1                         GR1
+<topic-id> <page>           <topic-id>
+...                         ...
+end                         end
+```

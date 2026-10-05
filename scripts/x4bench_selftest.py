@@ -66,6 +66,7 @@ class FakeDevice(threading.Thread):
         self.ws_new = []
         self.cw_ops = []
         self.su_ops = []
+        self.gd_ops = []
         self.pins_runs = []
         self.pins_drop = False  # True: the cable goes mid-run
         self.fb = b""
@@ -239,7 +240,8 @@ class FakeDevice(threading.Thread):
             if self.redraw_lands:
                 self.redraws += 1
         elif verb == "APP":
-            names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword", "sudoku": "Sudoku"}
+            names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword", "sudoku": "Sudoku",
+                     "guide": "GuideHome"}
             if rest.lower() not in names:
                 self.emit("ERR APP usage")
                 return
@@ -292,6 +294,51 @@ class FakeDevice(threading.Thread):
                 self.emit(f"CW row {row}")
             self.emit("CW clue 1A Simple shelter in the woods", noise=True)
             self.emit(f"OK CW {op}".rstrip())
+        elif verb == "GD":
+            words = rest.split()
+            op = words[0].lower() if words else ""
+            simple = ("about", "home", "next", "prev", "mark", "menu")
+            if op not in ("", "open", "search", "list", "row", "figure", *simple):
+                self.emit("ERR GD usage")
+                return
+            if (op in simple and len(words) != 1) or (op == "open" and len(words) not in (2, 3)) \
+                    or (op == "search" and len(words) < 2) or (op == "row" and len(words) != 2):
+                self.emit("ERR GD usage")
+                return
+            if op == "list":  # from any screen, as the firmware runs it
+                self.gd_ops.append(rest)
+                self.emit("GD cat emergency topics=7 EMERGENCY", noise=True)
+                self.emit("GD cat fire topics=8 FIRE")
+                self.emit("OK GD list n=2")
+                return
+            if not self.act.startswith("Guide"):
+                self.emit(f"ERR GD notopen act={self.act}")
+                return
+            if op == "open" and words[1] == "nosuch":
+                self.emit("ERR GD notopic nosuch")
+                return
+            if op:
+                self.gd_ops.append(rest)
+            if op == "open":
+                self.act = "GuidePage"
+            elif op == "search":
+                self.act = "GuideList"
+            elif op == "home":
+                self.act = "GuideHome"
+            page = op == "open"
+            self.emit("GD pack id=survival version=2026.10.1 status=reviewed-by-ai categories=12 topics=86 quick=10 "
+                      "marks=1 recent=2", noise=True)
+            if page:
+                self.emit(f"GD screen=page act=GuidePage list=category cat=fire query=\"\" topic={words[1]} page=2/2 "
+                          "sub=0 screens=2 n=2/3 sel=-1 rows=0 marked=0 style=page figure=- full=0 menu=0 msg=- "
+                          "title=\"Log cabin, pyramid and star\"")
+            else:
+                self.emit(f"GD screen={'list' if op == 'search' else 'home'} act={self.act} list=search cat=- "
+                          f"query=\"{' '.join(words[1:])}\" topic=- page=1/0 sub=0 screens=0 n=0/0 sel=1 rows=2 "
+                          "marked=0 style=page figure=- full=0 menu=0 msg=- title=\"Search\"")
+                self.emit("GD row 0 newsearch - | New search |  | 1 found for \"bow drill\"")
+                self.emit("GD row 1 topic bow-drill | Bow drill | FIRE | Friction fire with a bow")
+            self.emit(f"OK GD {op}".rstrip())
         elif verb == "SU":
             words = rest.lower().split()
             op = words[0] if words else ""
@@ -645,6 +692,38 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(code, x4bench.EXIT_ERR)
         code, _ = self.cli("su", "fill")
         self.assertEqual(code, x4bench.EXIT_ERR)
+
+    def test_app_and_guide(self):
+        self.ser.close()
+        code, _ = self.cli("gd")
+        self.assertEqual(code, x4bench.EXIT_ERR)  # the guide is not on screen
+        code, out = self.cli("gd", "list")  # the pack's lists need no guide screen
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines()[-1], "OK GD list n=2")
+        code, out = self.cli("app", "guide")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=GuideHome\n"))
+        code, out = self.cli("gd", "list")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines(), ["cat emergency topics=7 EMERGENCY", "cat fire topics=8 FIRE",
+                                            "OK GD list n=2"])
+        code, out = self.cli("gd", "open", "fire-lays", "2")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("pack id=survival"))
+        self.assertTrue(lines[1].startswith("screen=page act=GuidePage"))
+        self.assertIn("topic=fire-lays page=2/2", lines[1])
+        self.assertEqual(lines[-1], "OK GD open")
+        code, out = self.cli("gd", "search", "bow", "drill")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertIn('query="bow drill"', lines[1])
+        self.assertEqual(lines[3], "row 1 topic bow-drill | Bow drill | FIRE | Friction fire with a bow")
+        self.assertEqual(lines[-1], "OK GD search")
+        code, _ = self.cli("gd", "open", "nosuch")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        code, _ = self.cli("gd", "jump")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.assertEqual(self.dev.gd_ops, ["list", "list", "open fire-lays 2", "search bow drill"])
 
     def test_pins_streams_until_done(self):
         self.ser.close()

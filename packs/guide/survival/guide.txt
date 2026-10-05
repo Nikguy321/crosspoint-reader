@@ -1,0 +1,7 @@
+id=survival
+title=Survival Guide
+version=1
+reviewed=2026-10
+status=reviewed-by-ai
+license=MIT
+note=Reference only - not a substitute for training. In an emergency call 911 or send a satellite SOS first, stay put and signal.

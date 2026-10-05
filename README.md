@@ -41,6 +41,11 @@ Pro. CrossPoint's own README follows further down.
   Hard / Expert by the hardest step a person needs, and numbered (Medium 14 is the same puzzle on every reader);
   square-first entry plus a digit lock, pencil marks, undo, live clash marks, checks, reveals and logic hints; the
   puzzle is kept across sleep.
+- **Survival guide** (touch readers): a built-in, menu-driven field guide read from a pack on the card
+  (`/Guides/survival/`, built from [packs/guide](packs/guide/README.md)): 12 sections with EMERGENCY first, 86 topics,
+  228 pages and 69 line drawings from U.S. Army manuals approved for public release; first aid written fresh from
+  current CDC / NPS / NWS guidance. Breadcrumbs, PREV / MENU / NEXT across pages and topics, quick cards, search,
+  bookmarks and recent, resumed after sleep. Reviewed by AI reviewers, not by a medical professional: reference only.
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.

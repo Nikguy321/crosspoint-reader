@@ -1,0 +1,12 @@
+emergency | EMERGENCY | Do these first: call, stop, stay put, signal
+priorities | PRIORITIES & KIT | What matters most, what to carry, how to think
+fire | FIRE | Make, keep and put out a fire safely
+water | WATER | Find water and make it safe to drink
+shelter | SHELTER | Stay dry, out of the wind, off the ground
+first-aid | FIRST AID | Reference only - call for help first
+navigation | NAVIGATION | Know where you are and which way to go
+signaling | SIGNALING | Help rescuers see and hear you
+weather | WEATHER | Read the sky and stay safe in storms
+knots | KNOTS & CORDAGE | Knots, lashings and homemade cord
+food | FOOD & HAZARDS | Safe food, emergency fishing and snares, animals
+pnw | PACIFIC NORTHWEST | Regional hazards: cold water, plants, wildlife

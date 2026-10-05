@@ -14,6 +14,7 @@
 #include "OpdsServerStore.h"
 #include "apps/AppsActivity.h"
 #include "apps/CrosswordActivity.h"
+#include "apps/GuideApp.h"
 #include "apps/SudokuActivity.h"
 #include "apps/WordSearchActivity.h"
 #include "boot_sleep/BootActivity.h"
@@ -123,13 +124,16 @@ void ActivityManager::loop() {
     // Tap-first control-center entry: a tap on the status-bar band of the
     // top-level tab screens opens it, mirroring the top-edge swipe (which some
     // panels' etched glass makes unreliable). The reader keeps its clean page
-    // (no status bar there to tap). Touch boards only, like the swipe itself.
+    // (no status bar there to tap), and so does a survival guide page (GuidePage: its top band is the
+    // breadcrumb and bookmark ribbon, and on the full-screen figure part of the drawing, where a tap
+    // returns to the page). Touch boards only, like the swipe itself.
     bool statusBarTap = false;
     if (mappedInput.hasTouch() &&
         (currentActivity->name == "Home" || currentActivity->name == "FileBrowser" ||
          currentActivity->name == "Settings" || currentActivity->name == "NetworkModeSelection" ||
          currentActivity->name == "Apps" || currentActivity->name.rfind("Crossword", 0) == 0 ||
-         currentActivity->name.rfind("Sudoku", 0) == 0)) {
+         currentActivity->name.rfind("Sudoku", 0) == 0 || currentActivity->name == GuideScreen::NAME_HOME ||
+         currentActivity->name == GuideScreen::NAME_LIST)) {
       int tx = 0;
       int ty = 0;
       // The header back button shares this band; its taps stay Back.
@@ -340,6 +344,12 @@ void ActivityManager::goToSudoku() {
   replaceActivity(std::move(activity));
 }
 
+void ActivityManager::goToGuide(const bool resume) {
+  auto activity = GuideScreen::makeEntry(renderer, mappedInput, resume);
+  if (!activity) return;  // logged
+  replaceActivity(std::move(activity));
+}
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -395,9 +405,10 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem, bool cleanInitialRefr
     } else if (activityName == "CrossPointWebServer") {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
     } else if (activityName == "Apps" || activityName.rfind("WordSearch", 0) == 0 ||
-               activityName.rfind("Crossword", 0) == 0 || activityName.rfind("Sudoku", 0) == 0) {
+               activityName.rfind("Crossword", 0) == 0 || activityName.rfind("Sudoku", 0) == 0 ||
+               activityName.rfind("Guide", 0) == 0) {
       // The Apps list and every game screen (Word Search: game, menu, theme picker; Crossword:
-      // game, menu, clue list, picker; Sudoku: game, menu).
+      // game, menu, clue list, picker; Sudoku: game, menu; the guide: home, lists, pages).
       initialMenuItem = HomeMenuItem::APPS;
     } else if (activityName == "Settings") {
       initialMenuItem = HomeMenuItem::SETTINGS_MENU;

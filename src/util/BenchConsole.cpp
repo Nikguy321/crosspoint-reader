@@ -39,6 +39,9 @@
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
 #include "activities/apps/CrosswordActivity.h"
+#include "activities/apps/GuideApp.h"
+#include "activities/apps/GuidePageActivity.h"
+#include "activities/apps/GuideStore.h"
 #include "activities/apps/SudokuActivity.h"
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
@@ -70,6 +73,8 @@ constexpr unsigned long SHOT_SETTLE_TIMEOUT_MS = 5000;
 constexpr unsigned long LINE_TX_BUDGET_MS = 100;
 constexpr unsigned long WDT_FEED_MS = 250;
 constexpr uint16_t OPEN_MAX_PASSES = 200;
+// GD: how long a guide command waits for its screen to finish drawing before the dump.
+constexpr uint32_t GD_SETTLE_MS = 8000;
 // LS: a FAT long name is up to 255 UTF-16 units, 765 bytes of UTF-8.
 constexpr size_t LS_NAME_CAP = 800;
 constexpr size_t LS_LINE_CAP = LS_NAME_CAP + 48;
@@ -90,7 +95,7 @@ bool txStalled = false;
 
 bench::HostPresence host;
 
-enum class Pending : uint8_t { None, Input, Shot, Open, Card, App };
+enum class Pending : uint8_t { None, Input, Shot, Open, Card, App, Guide };
 struct PendingState {
   Pending kind = Pending::None;
   char verb[12] = {};
@@ -1008,8 +1013,8 @@ void cmdCard(char* args, const bool exclusive) {
   pend.passes = 0;
 }
 
-// APP apps|wordsearch|crossword|sudoku: the Apps list or a game, as their Home row / list row
-// opens them. The reply waits until the switch has happened.
+// APP apps|wordsearch|crossword|sudoku|guide: the Apps list or a game (the guide: its home), as
+// their Home row / list row opens them. The reply waits until the switch has happened.
 void cmdApp(const char* args, const bool exclusive) {
   bench::AppTarget target = bench::AppTarget::Apps;
   if (!bench::parseAppArgs(args, target)) {
@@ -1034,6 +1039,9 @@ void cmdApp(const char* args, const bool exclusive) {
   } else if (target == bench::AppTarget::Sudoku) {
     activityManager.goToSudoku();
     snprintf(pathBuf, sizeof(pathBuf), "%s", SudokuActivity::NAME);
+  } else if (target == bench::AppTarget::Guide) {
+    activityManager.goToGuide();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", GuideScreen::NAME_HOME);
   } else {
     activityManager.goToWordSearch();
     snprintf(pathBuf, sizeof(pathBuf), "%s", WordSearchActivity::NAME);
@@ -1332,6 +1340,216 @@ void suGen(const int tier, const uint32_t seed) {
         gen.givenCount(), static_cast<unsigned long>(sd::givensFnv(gen.givens)), sd::techName(gen.grade.hardest));
   reply("OK SU gen ms=%lu.%03lu mhz=%lu/%lu", us / 1000, us % 1000, static_cast<unsigned long>(mhzBefore),
         static_cast<unsigned long>(mhzAfter));
+}
+
+// ---- GD: the survival guide ------------------------------------------------------------------------
+
+GuideScreen* currentGuide() {
+  return strncmp(activityManager.benchCurrentName(), "Guide", 5) == 0
+             ? static_cast<GuideScreen*>(activityManager.benchCurrentActivity())
+             : nullptr;
+}
+
+const char* gdErrorName(const gd::PackError e) {
+  switch (e) {
+    case gd::PackError::None:
+      return "none";
+    case gd::PackError::Missing:
+      return "nopack";
+    case gd::PackError::NeedsNewerFirmware:
+      return "newer";
+    case gd::PackError::Damaged:
+      return "damaged";
+  }
+  return "?";
+}
+
+const char* gdScreenName(const gd::Screen s) {
+  static constexpr const char* NAMES[] = {"home", "list", "page", "about"};
+  return NAMES[static_cast<int>(s)];
+}
+
+const char* gdListName(const gd::ListKind k) {
+  static constexpr const char* NAMES[] = {"none", "category", "quick", "search", "marks", "recent"};
+  return NAMES[static_cast<int>(k)];
+}
+
+// The pack line, the screen line, then a list's rows (at most GD_ROWS_MAX).
+constexpr int GD_ROWS_MAX = 40;
+bool dumpGuide() {
+  GuideScreen* g = currentGuide();
+  if (!g) return false;
+  gd::store::Store& store = gd::store::Store::get();
+  if (store.isOpen()) {
+    const gd::Catalog& c = store.catalog();
+    reply("GD pack id=%s version=%s status=%s categories=%d topics=%d quick=%d marks=%d recent=%d", store.info().id,
+          store.info().version, store.info().status, c.categoryCount(), c.topicCount(), c.quickCount(),
+          store.marks().count, store.recent().count);
+  } else {
+    reply("GD pack error=%s", gdErrorName(store.error()));
+  }
+  GuideScreen::BenchInfo i;
+  g->benchInfo(i);
+  const gd::State& s = i.state;
+  reply(
+      "GD screen=%s act=%s list=%s cat=%s query=\"%s\" topic=%s page=%d/%d sub=%d screens=%d n=%d/%d sel=%d "
+      "rows=%d marked=%d style=%s figure=%s full=%d menu=%d msg=%s title=\"%s\"",
+      gdScreenName(s.screen), activityManager.benchCurrentName(), gdListName(s.list), s.category[0] ? s.category : "-",
+      s.query, s.topic[0] ? s.topic : "-", s.page + 1, i.pages, s.sub, i.screens, i.ordinal, i.total, i.selected,
+      i.rows, i.marked ? 1 : 0, i.compact ? "compact" : "page", i.figure[0] ? i.figure : "-", i.fullFigure ? 1 : 0,
+      i.menuOpen ? 1 : 0, i.message[0] ? i.message : "-", i.title ? i.title : "");
+  char row[200];
+  for (int r = 0; r < i.rows && r < GD_ROWS_MAX && g->benchRow(r, row, sizeof(row)); r++) reply("GD row %d %s", r, row);
+  return true;
+}
+
+// GD list [category]: the catalog, without changing the screen (the pack is opened for it, and
+// let go again when no guide screen holds it).
+void gdList(const char* category) {
+  gd::store::Store& store = gd::store::Store::get();
+  // A guide screen anywhere on the stack (under the search keyboard or the light panel too) holds
+  // the store: releasing it would pull the catalog from under that screen's rows.
+  const bool held = activityManager.resumeApp() == GuideScreen::APP_ID;
+  if (store.open() != gd::PackError::None) {
+    reply("ERR GD pack %s", gdErrorName(store.error()));
+    if (!held) store.release();
+    return;
+  }
+  const gd::Catalog& c = store.catalog();
+  int n = 0;
+  if (category[0] == '\0') {
+    for (int k = 0; k < c.categoryCount(); k++, n++) {
+      const gd::Category& cat = c.category(k);
+      reply("GD cat %s topics=%u %s", cat.id, static_cast<unsigned>(cat.count), cat.title);
+    }
+  } else {
+    const int k = c.findCategory(category);
+    if (k < 0) {
+      reply("ERR GD nocat %s", category);
+      if (!held) store.release();
+      return;
+    }
+    const gd::Category& cat = c.category(k);
+    for (int t = cat.first; t < cat.first + cat.count; t++, n++) {
+      const gd::Topic& topic = c.topic(t);
+      reply("GD topic %s %s%s pages=%u %s", topic.id, topic.quick() ? "Q" : "", topic.medical() ? "M" : "",
+            static_cast<unsigned>(topic.pages), topic.title);
+    }
+  }
+  if (!held) store.release();
+  reply("OK GD list n=%d", n);
+}
+
+// GD [open <topic> [page]|about|home|search <words>|list [cat]|next|prev|mark|menu|row <n>|figure
+// [close]]: through the guide screen on screen (APP guide first), then (once the screen has
+// settled) the dump.
+void cmdGd(char* args, const bool exclusive) {
+  bench::GdArgs a;
+  if (!bench::parseGdArgs(args, a)) {
+    reply("ERR GD usage");
+    return;
+  }
+  if (a.op == bench::GdOp::List) {
+    if (storageBusy(exclusive)) {
+      reply("ERR GD busy");
+      return;
+    }
+    gdList(a.text);
+    return;
+  }
+  GuideScreen* g = currentGuide();
+  if (!g) {
+    reply("ERR GD notopen act=%s", activityManager.benchCurrentName());
+    return;
+  }
+  if (a.op == bench::GdOp::Dump) {
+    dumpGuide();
+    reply("OK GD");
+    return;
+  }
+  // Everything else can read or write the card (pages, the state, bookmarks).
+  if (activityManager.benchSwitchPending() || storageBusy(exclusive)) {
+    reply("ERR GD busy");
+    return;
+  }
+  gd::store::Store& store = gd::store::Store::get();
+  const bool page = strcmp(activityManager.benchCurrentName(), GuideScreen::NAME_PAGE) == 0;
+  gd::State s;
+  const char* op = "";
+  switch (a.op) {
+    case bench::GdOp::Open: {
+      const int t = store.isOpen() ? store.catalog().findTopic(a.text) : -1;
+      if (t < 0) {
+        reply("ERR GD notopic %s", a.text);
+        return;
+      }
+      const gd::Catalog& c = store.catalog();
+      s.screen = gd::Screen::Page;
+      s.list = gd::ListKind::Category;
+      snprintf(s.category, sizeof(s.category), "%s", c.category(c.topic(t).category).id);
+      snprintf(s.topic, sizeof(s.topic), "%s", a.text);
+      s.page = a.page;
+      g->openScreen(s);
+      op = "open";
+      break;
+    }
+    case bench::GdOp::About:
+      s.screen = gd::Screen::About;
+      g->openScreen(s);
+      op = "about";
+      break;
+    case bench::GdOp::Home:
+      g->openScreen(s);
+      op = "home";
+      break;
+    case bench::GdOp::Search:
+      s.screen = gd::Screen::List;
+      s.list = gd::ListKind::Search;
+      snprintf(s.query, sizeof(s.query), "%s", a.text);
+      g->openScreen(s);
+      op = "search";
+      break;
+    case bench::GdOp::Next:
+    case bench::GdOp::Prev:
+      g->benchStep(a.op == bench::GdOp::Next ? 1 : -1);
+      op = a.op == bench::GdOp::Next ? "next" : "prev";
+      break;
+    case bench::GdOp::Mark:
+      if (!page) {
+        reply("ERR GD notpage");
+        return;
+      }
+      g->benchAct();
+      op = "mark";
+      break;
+    case bench::GdOp::Menu:
+      g->benchUp();
+      op = "menu";
+      break;
+    case bench::GdOp::Row:
+      if (page || !g->benchOpenRow(a.row)) {
+        reply("ERR GD norow %u", static_cast<unsigned>(a.row));
+        return;
+      }
+      op = "row";
+      break;
+    case bench::GdOp::Figure:
+      if (!page) {
+        reply("ERR GD notpage");
+        return;
+      }
+      static_cast<GuidePageActivity*>(g)->benchFigure(!a.close);
+      op = "figure";
+      break;
+    case bench::GdOp::Dump:
+    case bench::GdOp::List:
+      break;
+  }
+  snprintf(pend.detail, sizeof(pend.detail), "%s", op);
+  pend.kind = Pending::Guide;
+  pend.passes = 0;
+  pend.idleStreak = 0;
+  pend.deadline = millis() + GD_SETTLE_MS;
 }
 
 // SU [new <tier> <n>|seed <tier> <seed>|put r c d|note r c d|erase r c|hint|check|reveal
@@ -1811,6 +2029,8 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdCw(args, exclusive);
   } else if (strcmp(verb, "SU") == 0) {
     cmdSu(args, exclusive);
+  } else if (strcmp(verb, "GD") == 0) {
+    cmdGd(args, exclusive);
   } else if (strcmp(verb, "PINS") == 0) {
     cmdPins(args, exclusive);
   } else if (strcmp(verb, "WIFILAST") == 0) {
@@ -1870,6 +2090,24 @@ void servicePending() {
     }
     reply("OK CARD %s shown=%s outcome=%s ms=%lu", pathBuf, sleepcards::cardName(result.shown), result.outcome,
           result.ms);
+    return;
+  }
+  if (pend.kind == Pending::Guide) {
+    if (activityManager.benchSwitchPending()) {
+      if (++pend.passes < OPEN_MAX_PASSES) return;
+      pend.kind = Pending::None;
+      reply("ERR GD timeout");
+      return;
+    }
+    // The screen it opened (or changed) has drawn: two idle polls running, or the deadline.
+    pend.idleStreak = activityManager.benchRenderIdle() ? pend.idleStreak + 1 : 0;
+    if (pend.idleStreak < 2 && static_cast<long>(now - pend.deadline) < 0) return;
+    pend.kind = Pending::None;
+    if (!dumpGuide()) {
+      reply("OK GD %s act=%s", pend.detail, activityManager.benchCurrentName());
+      return;
+    }
+    reply("OK GD %s", pend.detail);
     return;
   }
   if (pend.kind == Pending::App) {

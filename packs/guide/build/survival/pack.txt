@@ -1,0 +1,12 @@
+# Survival Guide device pack, built by scripts/guide/make_pack.py from packs/guide/survival. Do not edit.
+format=1
+id=survival
+version=2026.10.1
+title=Survival Guide
+short=SURVIVAL
+status=reviewed-by-ai
+status_text=Reviewed against public guidance by AI reviewers - not by a medical professional.
+note=Reference only - not a substitute for training. In an emergency call 911 or send a satellite SOS first, stay put and signal.
+ref_note=Reference only - not a substitute for first-aid training. Call for help first.
+license=MIT
+min_app=1
