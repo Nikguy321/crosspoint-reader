@@ -80,9 +80,12 @@ otherwise - a wrong location is worse than none:
 
 Setting up an Android phone with gpsdRelay, in short: turn on the phone's Wi-Fi hotspot (the reader needs 2.4 GHz) and
 join it from the reader like any network; in gpsdRelay, allow precise location, set its battery use to Unrestricted,
-and add the TCP server above (filter `RMC;GGA` is enough); start it, then run Locate Me outdoors or by a window. The
-[WiPhone](https://github.com/Nikguy321/wiphone-meshtastic) README ("Phone location") covers the same apps for the
-WiPhone. With the `x4pro` dev build, `scripts/x4bench.py locphone <address>` lets a computer on the same network stand
+and add the TCP server above with NMEA relaying ticked and NMEA generation unticked; turn Monitor default network
+state off in its settings (otherwise it stops whenever the phone loses cell signal); start it, then run Locate Me
+outdoors or by a window. The
+[WiPhone guide](https://github.com/Nikguy321/wiphone-meshtastic/blob/main/docs/phone-location.md) has the
+step-by-step setup for each app (hotspot settings, permissions, battery) and applies to the reader unchanged. With
+the `x4pro` dev build, `scripts/x4bench.py locphone <address>` lets a computer on the same network stand
 in for the phone for `scripts/x4bench.py loctest`, which prints what the pipeline would find without saving it (Locate
 Me itself always asks the network's gateway).
 
