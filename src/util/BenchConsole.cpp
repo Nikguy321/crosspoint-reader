@@ -19,6 +19,7 @@
 #include <HalMemory.h>
 #include <HalPowerManager.h>
 #include <HalStorage.h>
+#include <LibraryBuilder.h>
 #include <Logging.h>
 #include <MD5Builder.h>
 #include <Memory.h>
@@ -926,6 +927,14 @@ void cmdPut(char* args, const bool exclusive) {
     failPut("rename");
     reply("ERR PUT rename");
     return;
+  }
+  // A book landed: the Library must rebuild its index on the next entry, exactly
+  // as after a web or OPDS upload. Without this a book pushed over the cable sat
+  // on the card but never showed in Library (only in Browse Files).
+  const std::string_view name{path};
+  if (FsHelpers::checkFileExtension(name, ".epub") || FsHelpers::checkFileExtension(name, ".txt") ||
+      FsHelpers::checkFileExtension(name, ".md") || FsHelpers::checkFileExtension(name, ".xtc")) {
+    library::markLibraryIndexDirty();
   }
   LOG_INF("BENCH", "PUT %s (%lu bytes)", path, static_cast<unsigned long>(size));
   reply("OK PUT %s %s", hex, path);
