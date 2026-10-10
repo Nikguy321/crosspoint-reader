@@ -8,6 +8,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <Utf8.h>
+#include <strings.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -194,6 +195,21 @@ bool isBookName(const std::string& name) {
 // these (FileBrowserActivity isMacOSMetadataEntry); the shelf must agree, or a
 // card written on a Mac shows every book twice.
 bool isHiddenOrSidecar(const char* name) { return name[0] == '.'; }
+
+// The firmware's own data, not books. The survival guide's pack lives in /Guides
+// (about.txt, pack.txt, ...) and the puzzle packs in /Puzzles; the Quote card reads
+// /quotes.txt and a crash leaves /crash_report.txt. The file browser still shows all
+// of them; the Library is for things to read. Only TEXT files are passed over in the
+// two folders, so an EPUB someone files there is still a book.
+bool isAppDataDir(const char* name) { return strcasecmp(name, "Guides") == 0 || strcasecmp(name, "Puzzles") == 0; }
+
+bool isAppDataFileAtRoot(const char* name) {
+  return strcasecmp(name, "quotes.txt") == 0 || strcasecmp(name, "crash_report.txt") == 0;
+}
+
+bool isTextBookName(const std::string& name) {
+  return FsHelpers::checkFileExtension(name, ".txt") || FsHelpers::checkFileExtension(name, ".md");
+}
 
 std::string stemOf(const std::string& name) {
   const size_t dot = name.find_last_of('.');
@@ -424,7 +440,7 @@ struct DedupFrame {
   ~DedupFrame() { state.activeDedupCount = base; }
 };
 
-void walk(WalkState& st, const std::string& path, const int depth) {
+void walk(WalkState& st, const std::string& path, const int depth, const bool inAppData = false) {
   if (st.failed || depth > LIBRARY_MAX_DEPTH || st.books >= CLIX_MAX_RECORDS) return;
 
   const uint16_t dedupBase = st.activeDedupCount;
@@ -475,7 +491,7 @@ void walk(WalkState& st, const std::string& path, const int depth) {
     if (isDir) {
       const size_t resumePosition = dir.position();
       dir.close();
-      walk(st, joinLibraryPath(path, name), depth + 1);
+      walk(st, joinLibraryPath(path, name), depth + 1, inAppData || (depth == 0 && isAppDataDir(name.c_str())));
       if (st.failed || st.books >= CLIX_MAX_RECORDS) return;
 
       dir = Storage.open(path.c_str());
@@ -488,6 +504,7 @@ void walk(WalkState& st, const std::string& path, const int depth) {
       continue;
     }
     if (!isBookName(name)) continue;
+    if ((inAppData && isTextBookName(name)) || (depth == 0 && isAppDataFileAtRoot(name.c_str()))) continue;
 
     // A zero-length book is a dangling directory entry: the name enumerates but
     // the contents do not exist. Counted rather than silently dropped.

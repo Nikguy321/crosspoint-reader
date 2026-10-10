@@ -88,6 +88,29 @@ TEST_F(LibraryBuilderTest, FolderHeavyUnchangedReconciliationIoScalesLinearly) {
   EXPECT_LT(largeIo, smallIo * 3u);
 }
 
+TEST_F(LibraryBuilderTest, FirmwareDataFilesAreNotBooks) {
+  fake::add("/Guides/survival/about.txt");
+  fake::add("/Guides/survival/pack.txt");
+  fake::add("/guides/notes.md");
+  fake::add("/Guides/field.epub");
+  fake::add("/Puzzles/Crossword/source.txt");
+  fake::add("/quotes.txt");
+  fake::add("/CRASH_REPORT.TXT");
+  fake::add("/notes/quotes.txt");
+  fake::add("/Books/story.txt");
+
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+
+  LibraryIndexFile index;
+  ASSERT_TRUE(index.open(INDEX));
+  std::vector<std::string> paths;
+  for (uint16_t row = 0; row < index.bookCount(); row++) paths.push_back(pathAt(index, SortOrder::TitleAsc, row));
+  std::sort(paths.begin(), paths.end());
+  const std::vector<std::string> want = {"/Books/story.txt", "/Guides/field.epub", "/a.epub", "/b.epub",
+                                         "/notes/quotes.txt"};
+  EXPECT_EQ(paths, want);
+}
+
 TEST_F(LibraryBuilderTest, DirectoryEntriesAreEnumeratedOnce) {
   fake::add("/folder/c.txt");
 
