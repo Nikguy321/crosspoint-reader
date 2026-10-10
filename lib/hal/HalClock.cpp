@@ -2,10 +2,18 @@
 
 #include <Logging.h>
 #include <WiFi.h>
+#include <esp_attr.h>
 #include <esp_sntp.h>
 #include <time.h>
 
 HalClock halClock;  // Singleton instance
+
+namespace {
+// When syncFromNTP() last set the RTC (RTC memory: garbage after a power loss, hence the magic).
+constexpr uint32_t SYNCED_MAGIC = 0x4E545053;  // "NTPS"
+RTC_NOINIT_ATTR uint32_t syncedMagic;
+RTC_NOINIT_ATTR uint32_t syncedUtc;
+}  // namespace
 
 void HalClock::begin() {
   _available = _sdkRtc.begin();
@@ -120,6 +128,8 @@ bool HalClock::syncFromNTP() {
         _cachedUtc = epochFromUtc(dt);
         _hasCachedTime = true;
         _lastPollMs = 0;
+        syncedUtc = static_cast<uint32_t>(_cachedUtc);
+        syncedMagic = SYNCED_MAGIC;
         LOG_INF("CLK", "RTC set to %04u-%02u-%02u %02u:%02u:%02u UTC", dt.year, dt.month, dt.day, dt.hour, dt.minute,
                 dt.second);
       }
@@ -132,4 +142,10 @@ bool HalClock::syncFromNTP() {
   LOG_ERR("CLK", "NTP sync timed out");
   setTimezone(savedTz);
   return false;
+}
+
+bool HalClock::lastSyncUtc(time_t& out) const {
+  if (syncedMagic != SYNCED_MAGIC) return false;
+  out = static_cast<time_t>(syncedUtc);
+  return true;
 }

@@ -22,6 +22,7 @@
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "LiveSleep.h"
+#include "LocationFix.h"
 #include "components/UITheme.h"
 #include "util/BookProgress.h"
 #include "util/BookmarkFile.h"
@@ -224,7 +225,8 @@ DeviceCardIo deviceIo;
 
 SleepCardSettings snapshotSettings() {
   SleepCardSettings s;
-  copyText(s.location, sizeof(s.location), SETTINGS.sleepCardLocation);
+  // An internet-address location (older firmware) counts as not set: it names a carrier's city.
+  copyText(s.location, sizeof(s.location), usableLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation));
   s.huntMode = static_cast<HuntMode>(std::min<uint8_t>(SETTINGS.huntingSeason, 2));
   s.huntStart = {SETTINGS.huntStartMonth, SETTINGS.huntStartDay};
   s.huntEnd = {SETTINGS.huntEndMonth, SETTINGS.huntEndDay};

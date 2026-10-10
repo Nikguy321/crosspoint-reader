@@ -17,7 +17,6 @@
 #include "activities/network/WifiSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
-#include "network/GeolocateClient.h"
 #include "network/RadioPower.h"
 #include "sleepcards/CardTime.h"
 #include "sleepcards/LocationFix.h"
@@ -27,13 +26,6 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
-
-constexpr const char* BEACONDB_URL = "https://api.beacondb.net/v1/geolocate";
-// Only the fields read, which keeps the answer to ~150 bytes.
-constexpr const char* IPWHOIS_URL = "https://ipwho.is/?fields=success,message,latitude,longitude,city,region";
-
-// Scan results kept for the request (the strongest 20 are sent); a crowded scan is cut here.
-constexpr size_t MAX_SCAN = 48;
 
 // "47.62, -122.35": two decimals (~1 km) is all a place line needs.
 void shortCoordinates(const double lat, const double lon, char* out, const size_t cap) {
@@ -77,8 +69,12 @@ void LocateMeActivity::onRow(const fui::ActionEvent& event, void* user) {
   self->activate(event.value);
 }
 
+bool LocateMeActivity::offerNetwork() const {
+  return failure == Failure::NoLocation && wifiVerdict == geolocate::WifiVerdict::Unreachable;
+}
+
 int LocateMeActivity::actionCount() const {
-  if (state == State::Failed) return failure == Failure::Unreachable ? 2 : 1;
+  if (state == State::Failed) return offerNetwork() ? 2 : 1;
   return 2;
 }
 
@@ -97,7 +93,7 @@ void LocateMeActivity::activate(const int row) {
       finish();
     }
   } else if (state == State::Failed) {
-    if (row == 0 && failure == Failure::Unreachable) {
+    if (row == 0 && offerNetwork()) {
       chooseNetwork();
     } else {
       finish();
@@ -109,7 +105,7 @@ void LocateMeActivity::startLocate() {
   LOG_INF("LOC", "Locate requested");
   selected = 0;
   if (WiFi.status() == WL_CONNECTED) {
-    showStatus(StrId::STR_LOCATE_SCANNING);
+    showStatus(StrId::STR_LOCATE_ASKING_PHONE);
     return;
   }
   joinNetwork(true);
@@ -149,7 +145,7 @@ void LocateMeActivity::onWifiDone(const bool connected) {
     fail(picking ? failure : Failure::NoWifi);
     return;
   }
-  showStatus(StrId::STR_LOCATE_SCANNING);
+  showStatus(StrId::STR_LOCATE_ASKING_PHONE);
 }
 
 // A failure screen waits for a tap with the radio fully off (and the clock free to drop), and a
@@ -171,97 +167,40 @@ void LocateMeActivity::fail(const Failure why) {
   requestUpdate();
 }
 
-namespace {
-geolocate::Reply replyOf(const GeolocateClient::Result result) {
-  switch (result) {
-    case GeolocateClient::Result::Ok:
-    case GeolocateClient::Result::TooLarge:
-      return geolocate::Reply::Answered;
-    case GeolocateClient::Result::NoMemory:
-      return geolocate::Reply::NoMemory;
-    case GeolocateClient::Result::Transport:
+void LocateMeActivity::onStep(const LocateRun::Step step, void* user) {
+  auto* self = static_cast<LocateMeActivity*>(user);
+  switch (step) {
+    case LocateRun::Step::Phone:
+      self->status = StrId::STR_LOCATE_ASKING_PHONE;
+      break;
+    case LocateRun::Step::Scan:
+      self->status = StrId::STR_LOCATE_SCANNING;
+      break;
+    case LocateRun::Step::Wifi:
+      self->status = StrId::STR_LOCATE_ASKING_WIFI;
       break;
   }
-  return geolocate::Reply::NoAnswer;
+  self->requestUpdateAndWait();
 }
-}  // namespace
 
 void LocateMeActivity::runLookup() {
-  // Heap, freed on return: the scan copy (48 x 40 B), the request body (1.3 KB) and one response
-  // (4 KB). Too big for the loop task's stack, and only alive for this one lookup.
-  auto aps = makeUniqueNoThrow<geolocate::AccessPoint[]>(MAX_SCAN);
-  auto request = makeUniqueNoThrow<char[]>(geolocate::REQUEST_CAP);
-  auto response = makeUniqueNoThrow<char[]>(geolocate::RESPONSE_CAP + 1);
-  if (!aps || !request || !response) {
-    LOG_ERR("LOC", "OOM: lookup buffers");
+  LocateRun::Options options;
+  options.onStep = &LocateMeActivity::onStep;
+  options.ctx = this;
+  LocateRun::Outcome outcome;
+  LocateRun::run(outcome, options);
+  phoneVerdict = outcome.phone;
+  wifiVerdict = outcome.wifi;
+
+  if (!outcome.fix.valid()) {
     radioOff();
-    fail(Failure::NoMemory);
-    return;
-  }
-
-  // The scan: a blocking station scan on the joined radio.
-  int16_t found = 0;
-  const size_t apCount = GeolocateClient::scanAccessPoints(aps.get(), MAX_SCAN, found);
-  const size_t sent = geolocate::buildRequestBody(aps.get(), apCount, request.get(), geolocate::REQUEST_CAP);
-  aps.reset();
-  LOG_INF("LOC", "Scan: %d networks, %u usable for Wi-Fi lookup", static_cast<int>(found), static_cast<unsigned>(sent));
-
-  geolocate::Fix wifiFix;
-  geolocate::Fix ipFix;
-  geolocate::Reply beaconReply = geolocate::Reply::NotAsked;
-  geolocate::Reply ipReply = geolocate::Reply::NotAsked;
-  size_t length = 0;
-  int httpStatus = 0;
-  if (sent >= geolocate::MIN_REQUEST_APS) {
-    status = StrId::STR_LOCATE_ASKING_WIFI;
-    requestUpdateAndWait();
-    const auto result = GeolocateClient::request(BEACONDB_URL, request.get(), response.get(),
-                                                 geolocate::RESPONSE_CAP + 1, length, httpStatus);
-    beaconReply = replyOf(result);
-    if (result == GeolocateClient::Result::Ok && httpStatus == 200) {
-      if (!geolocate::parseBeaconDbResponse(response.get(), length, wifiFix))
-        LOG_INF("LOC", "beaconDB: no usable answer");
-    } else {
-      LOG_INF("LOC", "beaconDB: result %d, HTTP %d", static_cast<int>(result), httpStatus);
-    }
-  }
-
-  if (geolocate::needsIpLookup(wifiFix)) {
-    status = StrId::STR_LOCATE_ASKING_IP;
-    requestUpdateAndWait();
-    const auto result =
-        GeolocateClient::request(IPWHOIS_URL, nullptr, response.get(), geolocate::RESPONSE_CAP + 1, length, httpStatus);
-    ipReply = replyOf(result);
-    if (result == GeolocateClient::Result::Ok && httpStatus == 200) {
-      if (!geolocate::parseIpWhoisResponse(response.get(), length, ipFix)) LOG_INF("LOC", "ipwho.is: no usable answer");
-    } else {
-      LOG_INF("LOC", "ipwho.is: result %d, HTTP %d", static_cast<int>(result), httpStatus);
-    }
-  }
-
-  const geolocate::Fix* chosen = geolocate::chooseFix(wifiFix, ipFix);
-  if (chosen == nullptr) {
-    radioOff();
-    switch (geolocate::classifyFailure(sent, beaconReply, ipReply)) {
-      case geolocate::LookupFailure::TooFew:
-        fail(Failure::TooFew);
-        break;
-      case geolocate::LookupFailure::NotFound:
-        fail(Failure::NotFound);
-        break;
-      case geolocate::LookupFailure::NoMemory:
-        fail(Failure::NoMemory);
-        break;
-      case geolocate::LookupFailure::Unreachable:
-        fail(Failure::Unreachable);
-        break;
-    }
+    fail(wifiVerdict == geolocate::WifiVerdict::NoMemory ? Failure::NoMemory : Failure::NoLocation);
     return;
   }
   // The result screen needs no radio; a session this activity started ends with the reboot.
   if (radioStarted) RadioPower::stop();
-  fix = *chosen;
-  LOG_INF("LOC", "located: %s, accuracy %lu m", fix.source == geolocate::FixSource::Wifi ? "wifi" : "ip",
+  fix = outcome.fix;
+  LOG_INF("LOC", "located: %s, accuracy %lu m", fix.source == geolocate::FixSource::Phone ? "phone" : "wifi",
           static_cast<unsigned long>(fix.accuracyM));
   selected = 0;
   state = State::Result;
@@ -282,8 +221,8 @@ void LocateMeActivity::save() {
     fail(Failure::SaveFailed);
     return;
   }
-  record.source = fix.source == geolocate::FixSource::Wifi ? sleepcards::LocationSource::Wifi
-                                                           : sleepcards::LocationSource::Internet;
+  record.source =
+      fix.source == geolocate::FixSource::Phone ? sleepcards::LocationSource::Phone : sleepcards::LocationSource::Wifi;
   record.accuracyM = fix.accuracyM > sleepcards::MAX_FIX_ACCURACY_M ? sleepcards::MAX_FIX_ACCURACY_M : fix.accuracyM;
   time_t now = 0;
   struct tm local{};
@@ -306,8 +245,7 @@ void LocateMeActivity::loop() {
     case State::Joining:
       return;  // WifiSelectionActivity is on top
     case State::Working:
-      // First pass: paint the status, then block on the lookup (it repaints each step).
-      requestUpdateAndWait();
+      // The lookup blocks the loop; it repaints the status at each step.
       runLookup();
       return;
     case State::Intro:
@@ -361,9 +299,6 @@ void LocateMeActivity::buildScreen(UiScreen& screen) {
   body.bold = false;
   auto bold = body;
   bold.bold = true;
-  auto small = screen.theme().smallText;
-  small.align = fui::TextAlign::Center;
-  small.bold = false;
 
   fui::ListItem actions[2];
   if (state == State::Intro) {
@@ -371,68 +306,72 @@ void LocateMeActivity::buildScreen(UiScreen& screen) {
     actions[0].label = tr(STR_LOCATE);
     actions[1].label = tr(STR_CANCEL);
   } else if (state == State::Result) {
-    char place[96];
-    const bool named = fix.place[0] != '\0';
-    if (named) {
-      std::snprintf(place, sizeof(place), "%s", fix.place);
-    } else {
-      char coords[40];
-      shortCoordinates(fix.lat, fix.lon, coords, sizeof(coords));
-      std::snprintf(place, sizeof(place), tr(STR_LOCATE_NEAR), coords);
-    }
+    char coords[40];
+    shortCoordinates(fix.lat, fix.lon, coords, sizeof(coords));
+    char place[64];
+    std::snprintf(place, sizeof(place), tr(STR_LOCATE_NEAR), coords);
     char accuracy[96];
-    const bool fromWifi = fix.source == geolocate::FixSource::Wifi;
-    if (fromWifi) {
-      char amount[16];
-      sleepcards::formatAccuracy(fix.accuracyM, amount, sizeof(amount));
+    char amount[16];
+    sleepcards::formatAccuracy(fix.accuracyM, amount, sizeof(amount));
+    if (fix.source == geolocate::FixSource::Wifi) {
       std::snprintf(accuracy, sizeof(accuracy), tr(STR_LOCATE_ABOUT_WIFI), amount);
+    } else if (fix.accuracyM > 0) {
+      std::snprintf(accuracy, sizeof(accuracy), tr(STR_LOCATE_ABOUT_PHONE), amount);
     } else {
-      std::snprintf(accuracy, sizeof(accuracy), "%s", tr(STR_LOCATE_CITY_LEVEL));
+      std::snprintf(accuracy, sizeof(accuracy), "%s", tr(STR_LOCATION_FROM_PHONE));  // no HDOP: not known
     }
 
     textBlock(place, bold, 2, screen.theme().spaceSm);
     textBlock(accuracy, body, 2, screen.theme().spaceSm);
-    // An address lookup names the carrier's or the VPN's city as readily as the reader's own.
-    if (!fromWifi) textBlock(tr(STR_LOCATE_IP_CAUTION), small, 2, screen.theme().spaceSm);
-    // "Near 47.62, -122.35" already says where; a named place gets its coordinates too.
-    if (named) {
-      char exact[40];
-      std::snprintf(exact, sizeof(exact), "%.4f, %.4f", fix.lat, fix.lon);
-      textBlock(exact, small, 1, screen.theme().spaceSm);
-    }
     screen.spacer(screen.theme().spaceLg);
     actions[0].label = tr(STR_LOCATE_SAVE);
     actions[1].label = tr(STR_CANCEL);
   } else if (state == State::Failed) {
-    StrId title = StrId::STR_LOCATE_UNREACHABLE;
-    StrId hint = StrId::STR_LOCATE_UNREACHABLE_HINT;
+    char title[160];
+    const char* hint = tr(STR_LOCATE_PHONE_HINT);
     switch (failure) {
       case Failure::NoWifi:
-        title = StrId::STR_LOCATE_NO_WIFI;
-        hint = StrId::STR_LOCATE_NO_WIFI_HINT;
-        break;
-      case Failure::TooFew:
-        title = StrId::STR_LOCATE_TOO_FEW;
-        hint = StrId::STR_LOCATE_TOO_FEW_HINT;
-        break;
-      case Failure::NotFound:
-        title = StrId::STR_LOCATE_NOT_FOUND;
-        hint = StrId::STR_LOCATE_NOT_FOUND_HINT;
+        std::snprintf(title, sizeof(title), "%s", tr(STR_LOCATE_NO_WIFI));
+        hint = tr(STR_LOCATE_NO_WIFI_HINT);
         break;
       case Failure::NoMemory:
-        title = StrId::STR_LOCATE_NO_MEMORY;
-        hint = StrId::STR_LOCATE_NO_MEMORY_HINT;
+        std::snprintf(title, sizeof(title), "%s", tr(STR_LOCATE_NO_MEMORY));
+        hint = tr(STR_LOCATE_NO_MEMORY_HINT);
         break;
       case Failure::SaveFailed:
-        title = StrId::STR_LOCATE_SAVE_FAILED;
-        hint = StrId::STR_LOCATE_SAVE_FAILED_HINT;
+        std::snprintf(title, sizeof(title), "%s", tr(STR_LOCATE_SAVE_FAILED));
+        hint = tr(STR_LOCATE_SAVE_FAILED_HINT);
         break;
-      case Failure::Unreachable:
+      case Failure::NoLocation: {
+        // "No location: phone GPS not found and not enough known Wi-Fi nearby."
+        const char* phonePart = phoneVerdict == LocateRun::PhoneVerdict::NoFix ? tr(STR_LOCATE_WHY_PHONE_NO_FIX)
+                                                                               : tr(STR_LOCATE_WHY_PHONE_NONE);
+        const char* wifiPart = tr(STR_LOCATE_WHY_WIFI_FEW);
+        switch (wifiVerdict) {
+          case geolocate::WifiVerdict::Unreachable:
+            wifiPart = tr(STR_LOCATE_WHY_WIFI_UNREACHABLE);
+            break;
+          case geolocate::WifiVerdict::Vague:
+            wifiPart = tr(STR_LOCATE_WHY_WIFI_ROUGH);
+            break;
+          case geolocate::WifiVerdict::Disagree:
+            wifiPart = tr(STR_LOCATE_WHY_WIFI_DISAGREE);
+            break;
+          default:
+            break;
+        }
+        std::snprintf(title, sizeof(title), tr(STR_LOCATE_NONE_FORMAT), phonePart, wifiPart);
+        if (offerNetwork()) {
+          hint = tr(STR_LOCATE_UNREACHABLE_HINT);
+        } else if (phoneVerdict == LocateRun::PhoneVerdict::NoFix) {
+          hint = tr(STR_LOCATE_PHONE_NO_FIX_HINT);
+        }
         break;
+      }
     }
-    textBlock(I18N.get(title), bold, 2, screen.theme().spaceSm);
-    textBlock(I18N.get(hint), body, 4, screen.theme().spaceLg);
-    if (failure == Failure::Unreachable) {
+    textBlock(title, bold, 3, screen.theme().spaceSm);
+    textBlock(hint, body, 4, screen.theme().spaceLg);
+    if (offerNetwork()) {
       actions[0].label = tr(STR_LOCATE_CHOOSE_NETWORK);
       actions[1].label = tr(STR_DONE);
     } else {
@@ -484,7 +423,7 @@ void LocateMeActivity::render(RenderLock&&) {
     case State::Joining:
     case State::Working: {
       renderer.drawCenteredText(UI_12_FONT_ID, midY, I18N.get(status));
-      // The lookup blocks the buttons until it is done (see GeolocateClient's timeouts).
+      // The lookup blocks the buttons until it is done (see LocateRun and GeolocateClient's timeouts).
       if (state == State::Working) {
         renderer.drawCenteredText(UI_10_FONT_ID, midY + renderer.getLineHeight(UI_12_FONT_ID) * 2,
                                   tr(STR_LOCATE_WAIT_HINT));

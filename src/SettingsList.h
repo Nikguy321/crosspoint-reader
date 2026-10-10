@@ -18,6 +18,7 @@
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
 #include "components/UITheme.h"
+#include "sleepcards/LocationFix.h"
 #include "sleepcards/SleepCardSettings.h"
 #include "util/DictionaryRegistry.h"
 
@@ -464,9 +465,14 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             },
             "koSyncBehavior", StrId::STR_KOREADER_SYNC),
         // --- Sleep Screen Cards (X4 Pro; device UI is SleepCardSettingsActivity under Display) ---
+        // An internet-address location from older firmware is not used, so the web page shows it as not set,
+        // as the device's own Location row does.
         SettingInfo::String(StrId::STR_LOCATION, &SETTINGS.sleepCardLocation[0], sizeof(SETTINGS.sleepCardLocation),
                             "sleepCardLocation", StrId::STR_SLEEP_CARDS)
-            .withNormalizer(&sleepcards::normalizeLocation),
+            .withNormalizer(&sleepcards::normalizeLocation)
+            .withShownAs([] {
+              return std::string(sleepcards::usableLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation));
+            }),
         SettingInfo::Toggle(StrId::STR_AUTO_LOCATE, &CrossPointSettings::autoLocateOnSync, "autoLocateOnSync",
                             StrId::STR_SLEEP_CARDS),
         SettingInfo::Toggle(StrId::STR_WEATHER, &CrossPointSettings::weatherEnabled, "weatherEnabled",

@@ -21,9 +21,9 @@ battery carries a lightning bolt. On the charger the sleep screen stays live and
 | Row | Stored as | Notes |
 |---|---|---|
 | Location | `sleepCardLocation` | decimal degrees, latitude first: `51.4779, -0.0015`, `51.48 N 0.00 W`. Empty = not set; sun and moon times then read "Set location in Settings" (the moon's phase needs no place). |
-| (under Location) | `sleepCardLocationFix` | where the location came from, shown as the Location row's second line ("From Wi-Fi, ±80 m, Sep 29", "From Wi-Fi (auto), ±80 m, Sep 29", "From internet address, city level, Sep 29", "Typed in, Sep 29"). Stored as `wifi 80 2026-09-29 47.6205,-122.3493` (source `typed` / `wifi` / `ip` / `wifi-auto`, accuracy in m, date saved, the location it describes): a location changed anywhere else reads as typed in, and one confirmed unchanged on the keyboard keeps its record. An internal key: saved in `settings.json` but not shown on the web settings page. |
-| Locate Me | - | finds the location from the internet; see below |
-| Update Location When Syncing | `autoLocateOnSync` | Off by default. While a book sync or Sync clock now already has Wi-Fi up, refreshes a location not saved today from nearby Wi-Fi (beaconDB only; replaces a typed location), at most once a day; see below |
+| (under Location) | `sleepCardLocationFix` | where the location came from, shown as the Location row's second line ("From Wi-Fi, ±80 m, Sep 29", "From Wi-Fi (auto), ±80 m, Sep 29", "From phone GPS, Oct 10", "Typed in, Sep 29"). Stored as `wifi 80 2026-09-29 47.6205,-122.3493` (source `typed` / `wifi` / `wifi-auto` / `phone`, accuracy in m, date saved, the location it describes): a location changed anywhere else reads as typed in, and one confirmed unchanged on the keyboard keeps its record. Older firmware could also store `ip` (an internet-address lookup): such a record is still read, but the location it names counts as **not set** everywhere (the cards, the weather, Update Location When Syncing), the Location row reads "Not set" with the line "Not used: found from an internet address, which can be far off", the web settings page shows the Location empty, and typing that same location back in on the reader records it as typed. An internal key: saved in `settings.json` but not shown on the web settings page. |
+| Locate Me | - | finds the location from the phone's GPS over its hotspot, else from nearby Wi-Fi when two beaconDB lookups agree, else not at all (never from the internet address); see below |
+| Update Location When Syncing | `autoLocateOnSync` | Off by default. While a book sync or Sync clock now already has Wi-Fi up, refreshes a location not saved today as Locate Me finds one: the phone's GPS over its hotspot (a connection to the network's gateway on ports 10110 and 11123), else nearby Wi-Fi when two beaconDB lookups agree (never an internet-address lookup; replaces a typed location), at most once a day; see below |
 | Weather | `weatherEnabled` | Off by default: the opt-in for the Weather card. Sends the location, rounded to about 1 km, to Open-Meteo and, for US points, the National Weather Service, only while Wi-Fi is already up for something else; see Weather below |
 | Weather Units | `weatherUnits` | Metric (°C, km/h, hPa) or US (°F, mph, inHg); the cache is metric, so a change needs no new fetch |
 | Hunting Season | `huntingSeason` | Off / On / Between Dates |
@@ -50,57 +50,109 @@ Inverted was chosen for pictures or covers, and it stays.)
 
 ### Locate Me
 
-A screen says what will be sent where (beaconDB, and ipwho.is for the fallback) and that the
-reader restarts afterwards, before anything leaves the reader; nothing is sent without the
-Locate tap, and nothing runs in the background (the one opt-in exception is Update Location
-When Syncing, below, which rides a sync's own Wi-Fi).
+A screen says what will be asked and sent where (the phone's GPS over its hotspot, then
+beaconDB) and that the reader restarts afterwards, before anything leaves the reader; nothing is
+sent without the Locate tap, and nothing runs in the background (the one opt-in exception is
+Update Location When Syncing, below, which rides a sync's own Wi-Fi). There is **no
+internet-address lookup**: on a phone hotspot a carrier's exit address sits in a city hundreds of
+km away, and a wrong location is worse than none (`scripts/check_radio_power.py` fails if any file
+names an IP-geolocation service).
+
+The order is the phone's GPS, then Wi-Fi only when it is genuinely local, else nothing
+(`network/LocateRun`, shared with Update Location When Syncing and the bench's `LOCTEST`):
 
 1. **Join** a saved Wi-Fi network through `WifiSelectionActivity`'s auto-connect (a scan first,
    then the last network when it is in view, else the strongest other saved one in view:
    `network/WifiJoinOrder.h`; the network list only when none is). Every radio start
    goes through `RadioPower` (full clock, no light sleep while it is up).
-2. **Scan** (a blocking station scan on the joined radio) and send up to 20 access points, the
-   strongest first, to [beaconDB](https://beacondb.net) (`POST https://api.beacondb.net/v1/geolocate`,
-   the MLS / Ichnaea geolocate API, `considerIp:false`, a `CrossPoint-X4Pro/<version>` user agent
-   as beaconDB asks). Hidden networks, SSIDs ending in `_nomap` or `_optout`, and locally
-   administered (randomised / hotspot) or group BSSIDs are never sent; fewer than two left means
-   no Wi-Fi lookup. beaconDB keeps no record of the access points queried or the location
-   returned ([privacy notice](https://beacondb.net/privacy/)); its web logs (with the IP address)
-   go after 28 days.
-3. **Fall back** to the internet address when beaconDB fails, has too few access points, or
-   answers vaguer than 5 km: [ipwho.is](https://ipwhois.io/docs) (`GET https://ipwho.is/?fields=...`,
-   free, no key, HTTPS, commercial use allowed, 1,000 requests a day per address). It gives a
-   city and region but no accuracy, so it is shown as "city level", never as a distance: on a
-   phone hotspot or a VPN the address belongs to the carrier's or the VPN's city, which can be
-   100 km or more away, and the result screen says so.
-4. **Result**: the place ("Seattle, Washington" with its coordinates, or "Near 47.62, -122.35" for
-   a Wi-Fi fix) and how sure it is ("About 80 m, from Wi-Fi" / "City level, from your internet
-   address"). **Save** stores the location in the usual `sleepCardLocation` form (the same check a
-   typed entry passes) and the source record above; **Cancel** changes nothing.
-5. **Failures** (`geolocate::classifyFailure`, host-tested): "No saved Wi-Fi in range" (the
-   network list was left without joining); "Couldn't reach the location service" (neither
-   service was heard from: the network may not reach the internet, e.g. a sync peer's or a
-   hub's hotspot - **Choose Wi-Fi Network** opens the list and tries again on the one picked);
-   "Not enough Wi-Fi networks nearby" (the internet works, fewer than two access points);
-   "No location found" (the services answered without a location); "Not enough memory".
+2. **Phone GPS** (`network/PhoneGps`, the pure gates in `network/PhoneNmea`, host-tested in
+   `test/phone_nmea`): a TCP connection to the network's gateway - on a phone's hotspot, the
+   phone - at port 10110 (gpsdRelay, Share GPS), then 11123 (GPS 2 IP's default on iPhone), each
+   connect bounded to 1.5 s, then up to 8 s of NMEA. Nothing is sent to the phone; no Bluetooth.
+   A fix's figures come from **one GGA sentence** that:
+   - has a correct checksum and arrived at least 2 s after the connect (gpsdRelay replays a
+     shared queue of old lines to every new client);
+   - says fix quality 1, 2, 4 or 5 (not 0 none, 3 PPS, 6 dead reckoning, 7 manual, 8 simulated);
+   - has 4 or more satellites and an HDOP of 10 or less, each checked when the sentence carries
+     it (gpsdRelay's own generated GGA puts the accuracy in metres in the HDOP field; the same
+     limit applies). With neither (iPhone apps), an RMC with status A, a mode other than
+     E/N/M/S and the same hhmmss must vouch for it;
+   - when the clock has been set from the internet, is within 5 s of the clock's UTC time of day
+     (across midnight too), widened by 1 s for every 10,000 s since the last NTP sync (100 ppm:
+     the RTC crystal drifts a second or two a day, more in the cold), at most 15 minutes; when
+     the time of the last sync is not known (it is kept in RTC memory, lost with the power), 15
+     minutes;
+   - spells its coordinates strictly (`ddmm.mmmm` digits and a hemisphere letter: a sign or an
+     exponent refuses the sentence);
+   - agrees with a GGA of another second before it that passed the same gates: within the larger
+     of 30 m and their accuracies, plus 50 m for each second between them, at most 8 s apart.
+     gpsdRelay's generated coordinates go through Kotlin's `Double.toString` and are cut to six
+     characters, so within ~1.85 m of a whole degree "6.0000001E-5" minutes print as
+     `06.000000`: a well-formed sentence ~11 km off. A position moving through such a strip
+     jumps and is refused; one standing still inside it is not, which is why the setup notes say
+     to relay the receiver's own NMEA rather than generated sentences.
+   Its accuracy is shown as HDOP x 5 m (at least 5 m), or not at all without an HDOP.
+3. **Wi-Fi** only when the phone gave nothing: a blocking station scan on the joined radio, then
+   the usable access points at -85 dBm or stronger - never hidden networks, SSIDs ending in
+   `_nomap` or `_optout`, locally administered (randomised / hotspot) or group BSSIDs, VRRP
+   virtual routers (`00:00:5e:00:01:xx`, `00:00:5e:00:02:xx`), or the joined access point (and
+   its other addresses) when anything accepted a connection on the phone ports of this network.
+   One router broadcasts several BSSIDs (2.4 and 5 GHz, guest networks) from neighbouring
+   addresses and beaconDB counts BSSIDs, so they are grouped into devices first (the same OUI
+   and less than 256 apart, `geolocate::sameDevice`): **at least four devices**, ranked by their
+   strongest access point and dealt alternately into two halves, every address of a device in
+   the same half. Each half goes to [beaconDB](https://beacondb.net) on its own (`POST
+   https://api.beacondb.net/v1/geolocate`, the MLS / Ichnaea geolocate API, `considerIp:false`
+   and `fallbacks: {ipf:false, lacf:false}`, `Content-Type: application/json`, a
+   `CrossPoint-X4Pro/<version>` user agent as beaconDB asks). beaconDB averages whichever access
+   points it knows and reports how far they are usually heard, not whether they agree, so one
+   that has moved can drag its answer kilometres while it still reads "50 m": the location
+   counts only when **both** halves answer HTTP 200 with a location (no `fallback` key), each
+   within 1-100 m, and the two lie within the larger of their accuracies of each other. The
+   location is their midpoint, shown with an accuracy of the largest of 50 m, both accuracies
+   and their distance apart. When the first half fails the second is not asked. beaconDB keeps
+   no record of the access points queried or the location returned ([privacy
+   notice](https://beacondb.net/privacy/)); its web logs (with the IP address) go after 28 days.
+4. **Result**: "Near 47.62, -122.35" and how sure it is ("About 15 m, from phone GPS", "From
+   phone GPS" without an HDOP, "About 60 m, from Wi-Fi"). **Save** stores the location in the
+   usual `sleepCardLocation` form (the same check a typed entry passes) and the source record
+   above (`phone` or `wifi`); **Cancel** changes nothing.
+5. **Failures**, one plain line from what each source said: "No location: phone GPS not found
+   and not enough known Wi-Fi nearby." (or "phone GPS has no fix", "nearby Wi-Fi gave answers
+   that disagree", "nearby Wi-Fi is too rough to trust", "the Wi-Fi location service is
+   unreachable"), with a hint: run gpsdRelay, Share GPS or GPS 2 IP on the phone; try outdoors;
+   or, when beaconDB was never heard from (the network may not reach the internet, e.g. a sync
+   peer's or a hub's hotspot), **Choose Wi-Fi Network** opens the list and tries again on the
+   one picked. Also "No saved Wi-Fi in range" (the network list was left without joining) and
+   "Not enough memory".
 6. After the lookups the RF is stopped (`RadioPower::stop()`) for the result screen, or the radio
    is turned fully off (`RadioPower::off()`) on a failure. Leaving reboots back to Sleep Screen
    Cards (over Settings) like every network activity, and the Location row shows the new line.
-   The lookup logs only `located: wifi|ip, accuracy N m`, the scan's network count and, on a
-   failed connect, the error class (DNS, TCP, TLS, certificate flags). The dev build's Wi-Fi join
+   The lookup logs only `located: phone|wifi, accuracy N m`, the phone's sentence counts and
+   verdict (`phone: port 10110, ok, 12 lines ...`), the Wi-Fi verdict with its counts, HTTP
+   statuses, accuracies and distance apart, and on a failed connect the error class (DNS, TCP,
+   TLS, certificate flags). Never a position. The dev build's Wi-Fi join
    (`WifiSelectionActivity`, every network activity) additionally logs the joined network's name
    and BSSID at debug level, and the last lines of the log are kept in `/crash_report.txt` after
    a panic; the release build (`LOG_LEVEL=1`) logs neither.
 
-Both requests use `esp_http_client` with the framework's certificate bundle
+The beaconDB requests use `esp_http_client` with the framework's certificate bundle
 (`esp_crt_bundle_attach`): the chain and the host name are verified. The fork's wolfSSL client
-is not used here because it has no CA bundle and checks no host name. The client is compiled
-for the X4 Pro only (`FREEINK_DEVICE_X4PRO`), so the other boards link no TLS stack or bundle
-for it. Limits: 10 s for the connect and for each blocking handshake read, 15 s from the
-connect for the rest of the request, a 4 KB response cap, and the request is not started below
-56 KB of free internal RAM (mbedTLS's record buffers live there). DNS comes before those
-timeouts, so on a network that does not reach the internet one request can take ~30 s and the
-two about a minute; the buttons wait meanwhile, and the screen says it can take up to a minute.
+is not used here because it has no CA bundle and checks no host name. The client and the phone
+socket are compiled for the X4 Pro only (`FREEINK_DEVICE_X4PRO`), so the other boards link no
+TLS stack or bundle for them. Limits: 10 s for the connect and for each blocking handshake read,
+15 s from the connect for the rest of a request, a 4 KB response cap, and no request starts
+below 56 KB of free internal RAM (mbedTLS's record buffers live there). DNS comes before those
+timeouts, so on a network that does not reach the internet one request can take ~30 s; with the
+phone's 11 s the buttons can wait about a minute, and the screen says so.
+
+**Bench** (dev builds, `scripts/x4bench.py`): `locphone <a.b.c.d>[:port]` makes `loctest`'s phone
+source read NMEA from a computer on the same network instead of the gateway (RAM only; `locphone
+off`; Locate Me and Update Location When Syncing never use it, so a stand-in is never saved), and
+`loctest` runs the whole pipeline on the station already up (the live sleep screen on the
+cable) and prints the verdict - `phone ok ±5m`, `wifi agree ±62m` or `nothing: phone not-found,
+wifi too-few-aps` - with the counts behind it, saving nothing (`loctest coords` adds the position
+at two decimals).
 
 ### Update Location When Syncing
 
@@ -133,32 +185,41 @@ hotspot (`BookSync` Peer / Hub Wi-Fi Name: no internet behind them); the clock i
 been tried today (the day of the last try is kept in RTC memory across the reboot that ends every
 sync and across deep sleep; a cold boot forgets it); and the location was not saved today (its
 record's date, a typed location's too; an unset or undated location counts as due). "Older than
-a day" is "not saved today", because the record keeps the date only. A try counts from the scan
-on, whatever comes of it, so an area beaconDB does not cover costs one scan and one request a
-day, not one per sync. Deep sleep that has already started skips it.
+a day" is "not saved today", because the record keeps the date only. A try counts from the phone's
+connect on, whatever comes of it, so an area beaconDB does not cover costs one scan and one or
+two requests a day, not one per sync - except when the Wi-Fi half could not start for want of
+TLS heap (nothing scanned or sent): a later sync that day may try again. Deep sleep that has
+already started skips it.
 
-The lookup is Locate Me's Wi-Fi half and nothing else: the TLS heap is checked first, then a
-scan through `RadioPower`, then up to 20 access points (their hardware addresses and signal
-strengths, never their names; the same hidden / `_nomap` / `_optout` / randomised-address
-filters) to beaconDB. Fewer than two usable access points: skipped. The internet-address lookup
-(ipwho.is) is never used (`scripts/check_radio_power.py` fails if `AutoLocate.cpp` names it or
-passes anything but `BEACONDB_URL`), and beaconDB's own IP/cell "fallback" answers are refused by
-the parser. A fix is saved only within 1,000 m, recorded as `wifi-auto` with today's date. It
-replaces a typed location. A stored Wi-Fi fix (Locate Me or an earlier refresh) at least as tight
-as the answer and within the two accuracies of it is kept instead - its place and accuracy,
-re-dated today as `wifi-auto` - so a ±30 m Locate Me fix is not traded for a ±900 m one.
+The lookup is Locate Me's (`network/LocateRun`): the phone's GPS over its hotspot first (it needs
+no TLS, so it is asked however short the heap is), then the two-half Wi-Fi check - the TLS heap
+is checked first, then a scan through `RadioPower`, then two beaconDB requests of separate halves
+of the usable access points (their hardware addresses and signal strengths, never their names;
+the same filters, the -85 dBm floor and the grouping by device). Fewer than four usable devices:
+skipped. There is no internet-address lookup (`scripts/check_radio_power.py`
+fails if `LocateRun.cpp` passes anything but `BEACONDB_URL`, if `AutoLocate.cpp` makes a request
+of its own, or if any file names an IP-geolocation host), and beaconDB's own IP/cell "fallback"
+answers are refused by the parser. A phone fix is saved as `phone`; an agreed Wi-Fi location as
+`wifi-auto` with today's date (it is never vaguer than 100 m; the 1,000 m limit is kept as a
+backstop). It replaces a typed location. A stored Wi-Fi fix (Locate Me or an earlier refresh) at
+least as tight as the Wi-Fi answer and within the two accuracies of it is kept instead - its place
+and accuracy, re-dated today as `wifi-auto` - and a stored phone fix that the Wi-Fi answer agrees
+with is left exactly as it is (only the phone writes a phone fix).
 
-The run is bounded by `AutoLocate::BUDGET_MS` (14 s): the scan, a name lookup of
-`api.beacondb.net` capped at `DNS_MS` (3 s, lwIP's `dns_gethostbyname` under the core lock; the
-answer sits in lwIP's cache for the request), then one request cut to what is left with a 4 s
-connect timeout. Only a server that answers the TCP connect and then stalls mid-handshake can
-hold it a few seconds past the budget (each blocking handshake read may wait the connect
-timeout). Any failure leaves the settings as they were and the calling job carries on. The log
-gets one line per sync and nothing about the place: `autolocate: saved`, `autolocate: skipped
+The phone half is bounded on its own (two 1.5 s connects and one 8 s read at most; on a home
+router the connects are refused in milliseconds). The Wi-Fi half is bounded by
+`AutoLocate::BUDGET_MS` (18 s): the scan, a name lookup of `api.beacondb.net` capped at 3 s
+(lwIP's `dns_gethostbyname` under the core lock; the answer sits in lwIP's cache for the
+requests), then the two requests cut to what is left with a 4 s connect timeout each. Only a
+server that answers the TCP connect and then stalls mid-handshake can hold it a few seconds past
+the budget (each blocking handshake read may wait the connect timeout). Any failure leaves the
+settings as they were and the calling job carries on. The log gets one line per sync and nothing
+about the place: `autolocate: saved phone|wifi`, `autolocate: kept phone`, `autolocate: skipped
 <reason>` (`job-offline`, `not-connected`, `device-network`, `no-clock`, `tried-today`, `fresh`,
 `sleeping`, `too-few-aps`) or `autolocate: failed <reason>` (`no-memory`, `dns`, `unreachable`,
-`no-fix`, `too-vague`, `timeout`, `save`). ESP-IDF's own error lines (esp-tls, HTTP_CLIENT) can
-add a line on a connect failure; they name the host, never a place or a network.
+`no-fix`, `too-vague`, `disagree`, `save`), after the lookup's own `phone:` and `locate:` lines.
+ESP-IDF's own error lines (esp-tls, HTTP_CLIENT) can add a line on a connect failure; they name
+the host, never a place or a network.
 
 ## Weather
 
@@ -240,8 +301,9 @@ it not rechecked. A damaged file reads as no cache.
   hour before its time) and each temperature on its own hour's tick;
 - wind is where it comes FROM ("from SSW 21 km/h, gusts 37"; the day rows' column says "Wind
   from"); the drawn arrow points downwind, where scent goes;
-- the place line says where the Location came from ("Wi-Fi fix Nov 2", "typed location", "IP
-  location (city level)").
+- the place line says where the Location came from ("Wi-Fi fix Nov 2", "phone GPS fix Oct 10",
+  "typed location"; a cache from an older firmware's internet-address location still reads "IP
+  location (city level)", though the card declines it while that location counts as not set).
 
 It declines (the logo, or Shuffle's next card) without Weather on, a set clock, a Location or a
 readable cache, when the forecast is over 36 h old or stamped in the future, for a place more than

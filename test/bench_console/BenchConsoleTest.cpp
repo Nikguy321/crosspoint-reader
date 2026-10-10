@@ -832,6 +832,48 @@ TEST(BenchWifiLast, SsidIsTheRestOfTheLine) {
   EXPECT_FALSE(isValidSsid("del\x7f"));
 }
 
+TEST(BenchLocPhone, ShowOffOrAnAddress) {
+  // Addresses from the documentation block (RFC 5737).
+  LocPhoneArgs a;
+  ASSERT_TRUE(parseLocPhoneArgs("", a));
+  EXPECT_EQ(a.op, LocPhoneOp::Show);
+  ASSERT_TRUE(parseLocPhoneArgs(nullptr, a));
+  EXPECT_EQ(a.op, LocPhoneOp::Show);
+  ASSERT_TRUE(parseLocPhoneArgs(" OFF ", a));
+  EXPECT_EQ(a.op, LocPhoneOp::Off);
+  ASSERT_TRUE(parseLocPhoneArgs("192.0.2.10", a));
+  EXPECT_EQ(a.op, LocPhoneOp::Set);
+  EXPECT_EQ(a.ip[0], 192);
+  EXPECT_EQ(a.ip[1], 0);
+  EXPECT_EQ(a.ip[2], 2);
+  EXPECT_EQ(a.ip[3], 10);
+  EXPECT_EQ(a.port, 0);
+  ASSERT_TRUE(parseLocPhoneArgs("192.0.2.10:10110", a));
+  EXPECT_EQ(a.port, 10110);
+  ASSERT_TRUE(parseLocPhoneArgs("  198.51.100.255:65535  ", a));
+  EXPECT_EQ(a.ip[3], 255);
+  EXPECT_EQ(a.port, 65535);
+  for (const char* bad :
+       {"192.0.2", "192.0.2.10.1", "192.0.2.256", "192.0.2.1000", "192.0.2.-1", "192..2.10",
+        "192.0.2.10:", "192.0.2.10:0", "192.0.2.10:65536", "192.0.2.10:123456", "192.0.2.10:80x", "192.0.2.10 off",
+        "0.0.0.0", "255.255.255.255", "phone.local", "of", "offf", "+192.0.2.10", "192.0.2.10/24"}) {
+    EXPECT_FALSE(parseLocPhoneArgs(bad, a)) << bad;
+  }
+}
+
+TEST(BenchLocTest, PlainOrWithCoordinates) {
+  bool coords = true;
+  EXPECT_TRUE(parseLocTestArgs("", coords));
+  EXPECT_FALSE(coords);
+  EXPECT_TRUE(parseLocTestArgs(nullptr, coords));
+  EXPECT_FALSE(coords);
+  EXPECT_TRUE(parseLocTestArgs(" Coords ", coords));
+  EXPECT_TRUE(coords);
+  EXPECT_FALSE(parseLocTestArgs("coord", coords));
+  EXPECT_FALSE(parseLocTestArgs("coords now", coords));
+  EXPECT_FALSE(parseLocTestArgs("coordinates", coords));
+}
+
 TEST(BenchWeather, ShowFetchOrClear) {
   WeatherOp op = WeatherOp::Fetch;
   EXPECT_TRUE(parseWeatherArgs("", op));

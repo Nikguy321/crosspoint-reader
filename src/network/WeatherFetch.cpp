@@ -56,7 +56,8 @@ constexpr size_t OUTCOME_CAP = 48;
 static_assert(static_cast<uint8_t>(sleepcards::LocationSource::Typed) == weather::PLACE_TYPED &&
                   static_cast<uint8_t>(sleepcards::LocationSource::Wifi) == weather::PLACE_WIFI &&
                   static_cast<uint8_t>(sleepcards::LocationSource::Internet) == weather::PLACE_INTERNET &&
-                  static_cast<uint8_t>(sleepcards::LocationSource::WifiAuto) == weather::PLACE_WIFI_AUTO,
+                  static_cast<uint8_t>(sleepcards::LocationSource::WifiAuto) == weather::PLACE_WIFI_AUTO &&
+                  static_cast<uint8_t>(sleepcards::LocationSource::Phone) == weather::PLACE_PHONE,
               "the cache's place sources are LocationFix's");
 
 // The last attempt and its outcome, kept across the silent reboot that ends every sync and across
@@ -105,7 +106,9 @@ Here readHere() {
     h.clockValid = true;
     h.utc = static_cast<int64_t>(utc);
   }
-  h.located = sleepcards::parseLocation(SETTINGS.sleepCardLocation, h.lat, h.lon);
+  // An internet-address location (older firmware) counts as not set.
+  h.located = sleepcards::parseLocation(
+      sleepcards::usableLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation), h.lat, h.lon);
   h.fix = sleepcards::describeLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation);
   return h;
 }
@@ -459,14 +462,15 @@ void benchShow(void (*line)(void* ctx, const char* text), void* ctx) {
     return;
   }
   const weather::Forecast& f = record->forecast;
-  static constexpr const char* PLACES[] = {"typed", "wifi", "ip", "wifi-auto"};
+  static constexpr const char* PLACES[] = {"typed", "wifi", "ip", "wifi-auto", "phone"};
   // How far the cache's point is from the saved location: no coordinates on the wire.
   const double km = here.located ? weather::distanceKm(record->lat, record->lon, here.lat, here.lon) : -1.0;
   std::snprintf(text, sizeof(text),
                 "cache=1 fetched_utc=%" PRId64 " age_s=%" PRId64 " trusted=%d place=%s fixdate=%" PRIu32
                 " dist_km=%.1f offset_s=%" PRId32,
                 record->fetchUtc, here.clockValid ? here.utc - record->fetchUtc : static_cast<int64_t>(-1),
-                record->clockTrusted ? 1 : 0, PLACES[record->placeSource < 4 ? record->placeSource : 0],
+                record->clockTrusted ? 1 : 0,
+                PLACES[record->placeSource < sizeof(PLACES) / sizeof(PLACES[0]) ? record->placeSource : 0],
                 record->placeYmd, km, f.utcOffsetS);
   line(ctx, text);
   std::snprintf(text, sizeof(text),

@@ -217,7 +217,9 @@ void SleepCardSettingsActivity::activateIndex(const int index) {
       double lat = 0;
       double lon = 0;
       char initial[40] = "";
-      if (sleepcards::parseLocation(SETTINGS.sleepCardLocation, lat, lon)) {
+      // An internet-address location (older firmware) is not offered for editing: it counts as not set.
+      if (sleepcards::parseLocation(
+              sleepcards::usableLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation), lat, lon)) {
         std::snprintf(initial, sizeof(initial), "%.4f, %.4f", lat, lon);
       }
       editText(index, tr(STR_LOCATION_ENTRY), initial, 31);
@@ -326,7 +328,9 @@ void SleepCardSettingsActivity::buildScreen(UiScreen& screen) {
   };
   const auto textOrNotSet = [](const char* value) -> std::string { return value[0] ? value : tr(STR_NOT_SET); };
 
-  rowValues_[LOCATION] = locationLabel(SETTINGS.sleepCardLocation);
+  // An internet-address location reads "Not set", its line saying why.
+  rowValues_[LOCATION] =
+      locationLabel(sleepcards::usableLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation));
   sleepcards::formatFixLine(sleepcards::describeLocation(SETTINGS.sleepCardLocationFix, SETTINGS.sleepCardLocation),
                             locationSource_, sizeof(locationSource_));
   rowItems_[LOCATION].subtitle = locationSource_[0] != '\0' ? locationSource_ : nullptr;

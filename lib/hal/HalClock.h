@@ -57,4 +57,8 @@ class HalClock {
   // Debouncing (skip if already synced once) is enforced by the caller, not here,
   // so the HAL stays free of any app-layer settings dependency.
   bool syncFromNTP();
+
+  // The UTC epoch at which syncFromNTP() last set the RTC. Kept in RTC memory: it survives deep
+  // sleep and soft restarts, not a power loss. False when not known.
+  bool lastSyncUtc(time_t& out) const;
 };

@@ -1,6 +1,7 @@
 // Where the sleep-card location came from: the stored record (sleepCardLocationFix), what it
-// refuses, which location it applies to, and the "source, accuracy, date" line under the Location
-// row. Public Seattle landmarks only.
+// refuses, which location it applies to, the "source, accuracy, date" line under the Location
+// row, and the rule that an internet-address location (older firmware) counts as not set. Public
+// Seattle landmarks only.
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -64,6 +65,35 @@ TEST(SleepCardLocation, RecordRoundTrips) {
   ASSERT_TRUE(parseLocationFix("typed 0 - -33.8568,151.2153", back));  // Sydney Opera House
   EXPECT_EQ(back.year, 0);
   EXPECT_STREQ(back.location, "-33.8568,151.2153");
+}
+
+TEST(SleepCardLocation, APhoneFixHasItsOwnRecord) {
+  EXPECT_EQ(record(fixOf(LocationSource::Phone, 15, 2026, 10, 10)), "phone 15 2026-10-10 47.6205,-122.3493");
+  EXPECT_EQ(record(fixOf(LocationSource::Phone, 0, 2026, 10, 10)), "phone 0 2026-10-10 47.6205,-122.3493");
+  LocationFix back;
+  ASSERT_TRUE(parseLocationFix("phone 15 2026-10-10 47.6205,-122.3493", back));
+  EXPECT_EQ(back.source, LocationSource::Phone);
+  EXPECT_EQ(back.accuracyM, 15u);
+  EXPECT_FALSE(parseLocationFix("Phone 15 2026-10-10 47.6205,-122.3493", back));
+  EXPECT_FALSE(parseLocationFix("phone-auto 15 2026-10-10 47.6205,-122.3493", back));
+}
+
+TEST(SleepCardLocation, AnInternetAddressLocationCountsAsNotSet) {
+  // Still read (nothing crashes on an old settings file), never used.
+  const char* ip = "ip 25000 2026-09-29 47.6205,-122.3493";
+  LocationFix f;
+  ASSERT_TRUE(parseLocationFix(ip, f));
+  EXPECT_EQ(f.source, LocationSource::Internet);
+  EXPECT_STREQ(usableLocation(ip, NEEDLE), "");
+  // Every other source, no record, or a record for another place: the location stands.
+  EXPECT_STREQ(usableLocation("wifi 80 2026-09-29 47.6205,-122.3493", NEEDLE), NEEDLE);
+  EXPECT_STREQ(usableLocation("phone 15 2026-09-29 47.6205,-122.3493", NEEDLE), NEEDLE);
+  EXPECT_STREQ(usableLocation("typed 0 - 47.6205,-122.3493", NEEDLE), NEEDLE);
+  EXPECT_STREQ(usableLocation("", NEEDLE), NEEDLE);
+  EXPECT_STREQ(usableLocation(nullptr, NEEDLE), NEEDLE);
+  EXPECT_STREQ(usableLocation("ip 25000 2026-09-29 47.6097,-122.3422", NEEDLE), NEEDLE);  // retyped on the web page
+  EXPECT_STREQ(usableLocation(ip, ""), "");
+  EXPECT_STREQ(usableLocation(ip, nullptr), "");
 }
 
 TEST(SleepCardLocation, TheLongestRecordFits) {
@@ -138,9 +168,14 @@ TEST(SleepCardLocation, TheLineUnderTheLocationRow) {
   EXPECT_EQ(line(fixOf(LocationSource::Wifi, 80, 2026, 9, 29)),
             "From Wi-Fi, \xC2\xB1"
             "80 m, Sep 29");
-  // An address lookup measures nothing: "city level", never an invented distance.
-  EXPECT_EQ(line(fixOf(LocationSource::Internet, 25000, 2026, 10, 1)), "From internet address, city level, Oct 1");
-  EXPECT_EQ(line(fixOf(LocationSource::Internet, 25000, 0, 0, 0)), "From internet address, city level");
+  // An address lookup names a carrier's city as readily as the reader's own: it is not used.
+  EXPECT_EQ(line(fixOf(LocationSource::Internet, 25000, 2026, 10, 1)),
+            "Not used: found from an internet address, which can be far off");
+  EXPECT_EQ(line(fixOf(LocationSource::Internet, 25000, 0, 0, 0)),
+            "Not used: found from an internet address, which can be far off");
+  // The phone's GPS: no accuracy figure on the line.
+  EXPECT_EQ(line(fixOf(LocationSource::Phone, 15, 2026, 10, 10)), "From phone GPS, Oct 10");
+  EXPECT_EQ(line(fixOf(LocationSource::Phone, 0, 0, 0, 0)), "From phone GPS");
   EXPECT_EQ(line(fixOf(LocationSource::Wifi, 2500, 0, 0, 0)),
             "From Wi-Fi, \xC2\xB1"
             "2.5 km");
@@ -162,7 +197,9 @@ std::string retyped(const char* before, const char* after, const char* rec, cons
 TEST(SleepCardLocation, ConfirmingTheSameLocationKeepsWhereItCameFrom) {
   // Opened the keyboard on a Wi-Fi fix and pressed OK without changing it.
   EXPECT_EQ(retyped(NEEDLE, NEEDLE, "wifi 80 2026-09-29 47.6205,-122.3493"), "wifi 80 2026-09-29 47.6205,-122.3493");
-  EXPECT_EQ(retyped(NEEDLE, NEEDLE, "ip 25000 2026-09-29 47.6205,-122.3493"), "ip 25000 2026-09-29 47.6205,-122.3493");
+  EXPECT_EQ(retyped(NEEDLE, NEEDLE, "phone 15 2026-09-29 47.6205,-122.3493"), "phone 15 2026-09-29 47.6205,-122.3493");
+  // Typing an internet-address location back in vouches for it: typed in, today.
+  EXPECT_EQ(retyped(NEEDLE, NEEDLE, "ip 25000 2026-09-29 47.6205,-122.3493"), "typed 0 2026-09-30 47.6205,-122.3493");
   // No record for it (set before records existed, or on the web page): typed in, date unknown.
   EXPECT_EQ(retyped(NEEDLE, NEEDLE, ""), "typed 0 - 47.6205,-122.3493");
   EXPECT_EQ(retyped(NEEDLE, NEEDLE, "wifi 80 2026-09-29 47.6097,-122.3422"), "typed 0 - 47.6205,-122.3493");
@@ -266,6 +303,11 @@ TEST(SleepCardLocation, AutoLocateAgeCountsWholeDaysOfAnyRecord) {
   EXPECT_EQ(autolocate::decide(s), Decision::Run);
   s.record = "ip 25000 2025-12-31 47.6205,-122.3493";
   EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  // An internet-address location saved today is still due: it counts as not set.
+  s.record = "ip 25000 2026-09-30 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Run);
+  s.record = "phone 15 2026-09-30 47.6205,-122.3493";
+  EXPECT_EQ(autolocate::decide(s), Decision::Fresh);
   // Unknown age: no date, no record, a record for another place, no location at all.
   s.record = "typed 0 - 47.6205,-122.3493";
   EXPECT_EQ(autolocate::decide(s), Decision::Run);
@@ -287,29 +329,40 @@ TEST(SleepCardLocation, AutoLocateAgeCountsWholeDaysOfAnyRecord) {
   EXPECT_FALSE(autolocate::locationAgeDays("", "", 2026, 9, 30, days));
 }
 
-TEST(SleepCardLocation, AutoLocateSavesOnlyATightWifiFix) {
+TEST(SleepCardLocation, AutoLocateSavesOnlyAMeasuredFix) {
   using autolocate::Verdict;
-  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 80), Verdict::Save);
-  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 1000), Verdict::Save);
-  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 1001), Verdict::TooVague);
-  // Never an internet-address fix, however it is dressed up.
-  EXPECT_EQ(autolocate::judgeFix(false, 47.6205, -122.3493, 80), Verdict::NotWifi);
-  EXPECT_EQ(autolocate::judgeFix(true, 0.0, 0.0, 80), Verdict::Invalid);
-  EXPECT_EQ(autolocate::judgeFix(true, 91.0, 0.5, 80), Verdict::Invalid);
-  EXPECT_EQ(autolocate::judgeFix(true, 47.6205, -122.3493, 0), Verdict::Invalid);
-  EXPECT_EQ(autolocate::judgeFix(true, std::nan(""), 1.0, 80), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, 47.6205, -122.3493, 80), Verdict::Save);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Wifi, 47.6205, -122.3493, 1000), Verdict::Save);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, 47.6205, -122.3493, 1001), Verdict::TooVague);
+  // The phone's GPS, with or without an accuracy figure.
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Phone, 47.6205, -122.3493, 15), Verdict::Save);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Phone, 47.6205, -122.3493, 0), Verdict::Save);
+  // Never an internet-address fix or a typed one, however it is dressed up.
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Internet, 47.6205, -122.3493, 80), Verdict::NotMeasured);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Typed, 47.6205, -122.3493, 80), Verdict::NotMeasured);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, 0.0, 0.0, 80), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::Phone, 0.0, 0.0, 15), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, 91.0, 0.5, 80), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, 47.6205, -122.3493, 0), Verdict::Invalid);
+  EXPECT_EQ(autolocate::judgeFix(LocationSource::WifiAuto, std::nan(""), 1.0, 80), Verdict::Invalid);
 
   char location[32], rec[LOCATION_FIX_CAP];
-  ASSERT_TRUE(
-      autolocate::autoRecord(47.62051, -122.34929, 80, 2026, 9, 30, location, sizeof(location), rec, sizeof(rec)));
+  ASSERT_TRUE(autolocate::autoRecord(LocationSource::WifiAuto, 47.62051, -122.34929, 80, 2026, 9, 30, location,
+                                     sizeof(location), rec, sizeof(rec)));
   EXPECT_STREQ(location, NEEDLE);
   EXPECT_STREQ(rec, "wifi-auto 80 2026-09-30 47.6205,-122.3493");
   // The record describes the location saved beside it: the Location row reads it back.
   EXPECT_EQ(line(describeLocation(rec, location)),
             "From Wi-Fi (auto), \xC2\xB1"
             "80 m, Sep 30");
-  EXPECT_FALSE(autolocate::autoRecord(47.6, -122.3, 80, 2026, 9, 30, location, sizeof(location), rec, 10));
-  EXPECT_FALSE(autolocate::autoRecord(147.6, -122.3, 80, 2026, 9, 30, location, sizeof(location), rec, sizeof(rec)));
+  ASSERT_TRUE(autolocate::autoRecord(LocationSource::Phone, 47.62051, -122.34929, 15, 2026, 9, 30, location,
+                                     sizeof(location), rec, sizeof(rec)));
+  EXPECT_STREQ(rec, "phone 15 2026-09-30 47.6205,-122.3493");
+  EXPECT_EQ(line(describeLocation(rec, location)), "From phone GPS, Sep 30");
+  EXPECT_FALSE(autolocate::autoRecord(LocationSource::WifiAuto, 47.6, -122.3, 80, 2026, 9, 30, location,
+                                      sizeof(location), rec, 10));
+  EXPECT_FALSE(autolocate::autoRecord(LocationSource::WifiAuto, 147.6, -122.3, 80, 2026, 9, 30, location,
+                                      sizeof(location), rec, sizeof(rec)));
   EXPECT_STREQ(location, "");
 }
 
@@ -329,22 +382,25 @@ TEST(SleepCardLocation, AutoLocateKeepsATighterWifiFixOfTheSamePlace) {
   double lat = 47.6205 + 400.0 / 111195.0;
   double lon = -122.3493;
   uint32_t acc = 900;
-  ASSERT_TRUE(autolocate::keepTighterFix(NEEDLE, locateMe, lat, lon, acc));
+  LocationSource source = LocationSource::WifiAuto;
+  ASSERT_TRUE(autolocate::keepTighterFix(NEEDLE, locateMe, lat, lon, acc, source));
   EXPECT_DOUBLE_EQ(lat, 47.6205);
   EXPECT_DOUBLE_EQ(lon, -122.3493);
   EXPECT_EQ(acc, 30u);
+  EXPECT_EQ(source, LocationSource::WifiAuto);  // saved re-dated, as an automatic refresh
   // An earlier automatic fix counts as measured too.
   lat = 47.6205;
   acc = 900;
-  EXPECT_TRUE(autolocate::keepTighterFix(NEEDLE, "wifi-auto 200 2026-09-28 47.6205,-122.3493", lat, lon, acc));
+  EXPECT_TRUE(autolocate::keepTighterFix(NEEDLE, "wifi-auto 200 2026-09-28 47.6205,-122.3493", lat, lon, acc, source));
   EXPECT_EQ(acc, 200u);
 
   // Replaced: the new fix is tighter, or elsewhere (5 km east), or the old one is not measured.
   const auto replaced = [](const char* record, const double newLat, const double newLon, const uint32_t newAcc) {
     double la = newLat, lo = newLon;
     uint32_t ac = newAcc;
-    const bool kept = autolocate::keepTighterFix(NEEDLE, record, la, lo, ac);
-    return !kept && la == newLat && lo == newLon && ac == newAcc;
+    LocationSource src = LocationSource::WifiAuto;
+    const bool kept = autolocate::keepTighterFix(NEEDLE, record, la, lo, ac, src);
+    return !kept && la == newLat && lo == newLon && ac == newAcc && src == LocationSource::WifiAuto;
   };
   EXPECT_TRUE(replaced(locateMe, 47.6205, -122.3493, 20));
   EXPECT_TRUE(replaced(locateMe, 47.6205,
@@ -356,5 +412,25 @@ TEST(SleepCardLocation, AutoLocateKeepsATighterWifiFixOfTheSamePlace) {
   EXPECT_TRUE(replaced("wifi 30 2026-09-28 47.6097,-122.3422", 47.6205, -122.3493, 900));
   double la = 47.6205, lo = -122.3493;
   uint32_t ac = 900;
-  EXPECT_FALSE(autolocate::keepTighterFix("", locateMe, la, lo, ac));
+  EXPECT_FALSE(autolocate::keepTighterFix("", locateMe, la, lo, ac, source));
+}
+
+TEST(SleepCardLocation, AutoLocateLeavesAnAgreeingPhoneFixAlone) {
+  // The phone's GPS fix stands while Wi-Fi agrees with it, with or without its accuracy figure.
+  for (const char* phone : {"phone 12 2026-09-28 47.6205,-122.3493", "phone 0 2026-09-28 47.6205,-122.3493"}) {
+    double lat = 47.6205 + 40.0 / 111195.0;  // within the Wi-Fi fix's own 50 m
+    double lon = -122.3493;
+    uint32_t acc = 50;
+    LocationSource source = LocationSource::WifiAuto;
+    ASSERT_TRUE(autolocate::keepTighterFix(NEEDLE, phone, lat, lon, acc, source)) << phone;
+    EXPECT_EQ(source, LocationSource::Phone);  // the caller leaves the record as it is
+    EXPECT_DOUBLE_EQ(lat, 47.6205);
+  }
+  // Wi-Fi somewhere else (2 km away): the phone fix is replaced.
+  double lat = 47.6205 + 2000.0 / 111195.0;
+  double lon = -122.3493;
+  uint32_t acc = 60;
+  LocationSource source = LocationSource::WifiAuto;
+  EXPECT_FALSE(autolocate::keepTighterFix(NEEDLE, "phone 12 2026-09-28 47.6205,-122.3493", lat, lon, acc, source));
+  EXPECT_EQ(source, LocationSource::WifiAuto);
 }

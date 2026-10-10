@@ -22,7 +22,7 @@ bool locationAgeDays(const char* location, const char* record, const int year, c
   days = 0;
   if (location == nullptr || location[0] == '\0') return false;
   const LocationFix fix = describeLocation(record, location);
-  if (fix.year == 0) return false;
+  if (fix.year == 0 || fix.source == LocationSource::Internet) return false;
   days = static_cast<int>(daysFromCivil(year, month, day) - daysFromCivil(fix.year, fix.month, fix.day));
   return true;
 }
@@ -63,21 +63,26 @@ const char* decisionName(const Decision d) {
   return "?";
 }
 
-Verdict judgeFix(const bool fromWifi, const double lat, const double lon, const uint32_t accuracyM) {
-  if (!fromWifi) return Verdict::NotWifi;
+Verdict judgeFix(const LocationSource source, const double lat, const double lon, const uint32_t accuracyM) {
+  const bool phone = source == LocationSource::Phone;
+  if (!phone && source != LocationSource::Wifi && source != LocationSource::WifiAuto) return Verdict::NotMeasured;
   if (!std::isfinite(lat) || !std::isfinite(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0 ||
-      (lat == 0.0 && lon == 0.0) || accuracyM == 0) {
+      (lat == 0.0 && lon == 0.0) || (!phone && accuracyM == 0)) {
     return Verdict::Invalid;
   }
   if (accuracyM > MAX_ACCURACY_M) return Verdict::TooVague;
   return Verdict::Save;
 }
 
-bool keepTighterFix(const char* location, const char* record, double& lat, double& lon, uint32_t& accuracyM) {
+bool keepTighterFix(const char* location, const char* record, double& lat, double& lon, uint32_t& accuracyM,
+                    LocationSource& source) {
   if (location == nullptr || location[0] == '\0') return false;
   const LocationFix old = describeLocation(record, location);
-  if ((old.source != LocationSource::Wifi && old.source != LocationSource::WifiAuto) || old.accuracyM == 0 ||
-      old.accuracyM > accuracyM) {
+  if (old.source == LocationSource::Phone) {
+    // The phone's GPS (HDOP 10 or better, ~50 m at worst) is at least as tight as any Wi-Fi fix.
+  } else if (old.source != LocationSource::Wifi && old.source != LocationSource::WifiAuto) {
+    return false;
+  } else if (old.accuracyM == 0 || old.accuracyM > accuracyM) {
     return false;
   }
   double oldLat = 0.0;
@@ -93,16 +98,18 @@ bool keepTighterFix(const char* location, const char* record, double& lat, doubl
   lat = oldLat;
   lon = oldLon;
   accuracyM = old.accuracyM;
+  source = old.source == LocationSource::Wifi ? LocationSource::WifiAuto : old.source;
   return true;
 }
 
-bool autoRecord(const double lat, const double lon, const uint32_t accuracyM, const int year, const int month,
-                const int day, char* location, const size_t locationCap, char* record, const size_t recordCap) {
+bool autoRecord(const LocationSource source, const double lat, const double lon, const uint32_t accuracyM,
+                const int year, const int month, const int day, char* location, const size_t locationCap, char* record,
+                const size_t recordCap) {
   if (location == nullptr || locationCap == 0 || record == nullptr || recordCap == 0) return false;
   location[0] = '\0';
   record[0] = '\0';
   LocationFix fix;
-  fix.source = LocationSource::WifiAuto;
+  fix.source = source;
   fix.accuracyM = accuracyM;
   fix.year = static_cast<uint16_t>(year);
   fix.month = static_cast<uint8_t>(month);

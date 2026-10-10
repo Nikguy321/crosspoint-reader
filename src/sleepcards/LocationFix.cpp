@@ -10,7 +10,7 @@
 namespace sleepcards {
 namespace {
 
-constexpr const char* SOURCE_WORDS[] = {"typed", "wifi", "ip", "wifi-auto"};
+constexpr const char* SOURCE_WORDS[] = {"typed", "wifi", "ip", "wifi-auto", "phone"};
 constexpr size_t SOURCE_COUNT = sizeof(SOURCE_WORDS) / sizeof(SOURCE_WORDS[0]);
 
 bool validDate(const LocationFix& fix) {
@@ -135,7 +135,8 @@ bool recordForTypedLocation(const char* before, const char* after, const char* r
   if (after == nullptr || after[0] == '\0') return true;
   if (before != nullptr && std::strcmp(before, after) == 0) {
     // Confirmed as it was: where it came from has not changed.
-    return formatLocationFix(describeLocation(record, after), out, cap);
+    const LocationFix kept = describeLocation(record, after);
+    if (kept.source != LocationSource::Internet) return formatLocationFix(kept, out, cap);
   }
   LocationFix typed;
   std::snprintf(typed.location, sizeof(typed.location), "%s", after);
@@ -154,6 +155,11 @@ LocationFix describeLocation(const char* record, const char* location) {
   }
   std::snprintf(fix.location, sizeof(fix.location), "%s", location);
   return fix;
+}
+
+const char* usableLocation(const char* record, const char* location) {
+  if (location == nullptr || location[0] == '\0') return "";
+  return describeLocation(record, location).source == LocationSource::Internet ? "" : location;
 }
 
 void formatAccuracy(const uint32_t meters, char* out, const size_t cap) {
@@ -178,18 +184,20 @@ void formatFixLine(const LocationFix& fix, char* out, const size_t cap) {
   if (out == nullptr || cap == 0) return;
   out[0] = '\0';
   if (fix.location[0] == '\0') return;
+  // An internet-address lookup names a carrier's or VPN's city as readily as the reader's own.
+  if (fix.source == LocationSource::Internet) {
+    std::snprintf(out, cap, "%s", tr(STR_LOCATION_IP_IGNORED));
+    return;
+  }
 
   const char* source = tr(STR_LOCATION_TYPED);
   if (fix.source == LocationSource::Wifi) source = tr(STR_LOCATION_FROM_WIFI);
   if (fix.source == LocationSource::WifiAuto) source = tr(STR_LOCATION_FROM_WIFI_AUTO);
-  if (fix.source == LocationSource::Internet) source = tr(STR_LOCATION_FROM_IP);
+  if (fix.source == LocationSource::Phone) source = tr(STR_LOCATION_FROM_PHONE);
   const char* separator = tr(STR_LIST_SEPARATOR);
 
-  // An address lookup measures nothing: it reads "city level", never a distance.
   char accuracy[32] = "";
-  if (fix.source == LocationSource::Internet) {
-    std::snprintf(accuracy, sizeof(accuracy), "%s%s", separator, tr(STR_LOCATION_CITY_LEVEL));
-  } else if ((fix.source == LocationSource::Wifi || fix.source == LocationSource::WifiAuto) && fix.accuracyM > 0) {
+  if ((fix.source == LocationSource::Wifi || fix.source == LocationSource::WifiAuto) && fix.accuracyM > 0) {
     char amount[16];
     formatAccuracy(fix.accuracyM, amount, sizeof(amount));
     char withSign[24];

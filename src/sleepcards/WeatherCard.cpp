@@ -766,6 +766,17 @@ void placeLine(const weather::Record& rec, char* out, const size_t cap) {
         std::snprintf(out, cap, "%s", tr(STR_WX_PLACE_WIFI_UNDATED));
       }
       return;
+    case weather::PLACE_PHONE:
+      if (rec.placeYmd != 0) {
+        char date[24];
+        const int month = static_cast<int>(rec.placeYmd / 100 % 100);
+        std::snprintf(date, sizeof(date), tr(STR_MONTH_DAY_FORMAT), monthShortName(month),
+                      static_cast<unsigned>(rec.placeYmd % 100));
+        std::snprintf(out, cap, tr(STR_WX_PLACE_PHONE), date);
+      } else {
+        std::snprintf(out, cap, "%s", tr(STR_WX_PLACE_PHONE_UNDATED));
+      }
+      return;
     case weather::PLACE_INTERNET:
       std::snprintf(out, cap, "%s", tr(STR_WX_PLACE_IP));
       return;

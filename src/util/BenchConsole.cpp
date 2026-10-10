@@ -25,6 +25,7 @@
 #include <Memory.h>
 #include <PowerPolicy.h>
 #include <Sudoku.h>
+#include <WiFi.h>
 #include <WordSearch.h>
 #include <driver/gpio.h>
 #include <soc/gpio_reg.h>
@@ -47,6 +48,9 @@
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
+#include "network/GeolocateProtocol.h"
+#include "network/LocateRun.h"
+#include "network/PhoneGps.h"
 #include "network/StationKeeper.h"
 #include "network/WeatherFetch.h"
 #include "sleepcards/SleepCard.h"
@@ -1938,6 +1942,86 @@ void cmdWeather(const char* args, const bool exclusive) {
   }
 }
 
+// LOCPHONE's stand-in for the phone (address 0 = the gateway). Only LOCTEST reads it: Locate Me
+// and AutoLocate always ask the gateway, so a bench stand-in is never saved as the location.
+PhoneGps::Target locPhoneTarget;
+
+// LOCPHONE [off|<a.b.c.d>[:port]]: LOCTEST's phone source read from a computer on this network
+// instead of the gateway (network/PhoneGps), so the bench can stand in for a phone. RAM only.
+void cmdLocPhone(const char* args) {
+  bench::LocPhoneArgs parsed;
+  if (!bench::parseLocPhoneArgs(args, parsed)) {
+    reply("ERR LOCPHONE usage");
+    return;
+  }
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR LOCPHONE board");
+    return;
+  }
+  if (parsed.op == bench::LocPhoneOp::Off) {
+    locPhoneTarget = PhoneGps::Target{};
+  } else if (parsed.op == bench::LocPhoneOp::Set) {
+    uint32_t address = 0;
+    memcpy(&address, parsed.ip, sizeof(address));  // network byte order: the first octet first
+    locPhoneTarget.address = address;
+    locPhoneTarget.port = parsed.port;
+  }
+  char text[48];
+  PhoneGps::describeTarget(locPhoneTarget, text, sizeof(text));
+  reply("OK LOCPHONE %s", text);
+}
+
+// LOCTEST [coords]: the whole locate pipeline (network/LocateRun: the phone - LOCPHONE's stand-in
+// when set - then Wi-Fi) on the station already up, its verdict printed and nothing saved. It
+// never starts the radio. No position unless asked for, and then at two decimals.
+void cmdLocTest(const char* args) {
+  bool coords = false;
+  if (!bench::parseLocTestArgs(args, coords)) {
+    reply("ERR LOCTEST usage");
+    return;
+  }
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR LOCTEST board");
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    reply("ERR LOCTEST nowifi");
+    return;
+  }
+  LocateRun::Options options;
+  options.phoneTarget = locPhoneTarget;
+  LocateRun::Outcome out;
+  LocateRun::run(out, options);
+  const phonenmea::Stats& st = out.phoneStats;
+  reply(
+      "LOCTEST phone port=%u why=%s lines=%u bad=%u malformed=%u settling=%u stale=%u nofix=%u weak=%u gga=%u rmc=%u "
+      "disagree=%u skew_s=%ld",
+      static_cast<unsigned>(out.phonePort), out.phoneWhy, static_cast<unsigned>(st.lines),
+      static_cast<unsigned>(st.badChecksum), static_cast<unsigned>(st.malformed), static_cast<unsigned>(st.settling),
+      static_cast<unsigned>(st.stale), static_cast<unsigned>(st.noFix), static_cast<unsigned>(st.weak),
+      static_cast<unsigned>(st.gga), static_cast<unsigned>(st.rmc), static_cast<unsigned>(st.disagree),
+      static_cast<long>(out.phoneSkewS));
+  if (out.wifi != geolocate::WifiVerdict::NotAsked) {
+    reply("LOCTEST wifi verdict=%s seen=%d usable=%u devices=%u http=%d/%d acc_m=%lu/%lu apart_m=%lu dns_failed=%d",
+          geolocate::wifiVerdictName(out.wifi), static_cast<int>(out.seen), static_cast<unsigned>(out.usable),
+          static_cast<unsigned>(out.devices), out.statusA, out.statusB, static_cast<unsigned long>(out.accuracyA),
+          static_cast<unsigned long>(out.accuracyB), static_cast<unsigned long>(out.apartM), out.dnsFailed ? 1 : 0);
+  }
+  char at[40] = "";
+  if (coords && out.fix.valid()) snprintf(at, sizeof(at), " at %.2f,%.2f", out.fix.lat, out.fix.lon);
+  if (out.fix.source == geolocate::FixSource::Phone) {
+    if (out.fix.accuracyM > 0) {
+      reply("OK LOCTEST phone ok \xC2\xB1%lum%s", static_cast<unsigned long>(out.fix.accuracyM), at);
+    } else {
+      reply("OK LOCTEST phone ok \xC2\xB1?m%s", at);
+    }
+  } else if (out.fix.source == geolocate::FixSource::Wifi) {
+    reply("OK LOCTEST wifi agree \xC2\xB1%lum%s", static_cast<unsigned long>(out.fix.accuracyM), at);
+  } else {
+    reply("OK LOCTEST nothing: phone %s, wifi %s", out.phoneWhy, geolocate::wifiVerdictName(out.wifi));
+  }
+}
+
 void cmdLegacyScreenshot() {
   const uint32_t bufferSize = display.getBufferSize();
   logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
@@ -2046,6 +2130,10 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdWifiLast(args, exclusive);
   } else if (strcmp(verb, "WEATHER") == 0) {
     cmdWeather(args, exclusive);
+  } else if (strcmp(verb, "LOCPHONE") == 0) {
+    cmdLocPhone(args);
+  } else if (strcmp(verb, "LOCTEST") == 0) {
+    cmdLocTest(args);
   } else if (strcmp(verb, "POWER") == 0) {
     cmdPower(args);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {

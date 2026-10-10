@@ -409,6 +409,81 @@ bool parsePowerArgs(const char* args, PowerOp& out) {
   return false;
 }
 
+namespace {
+// Digits only, 1..maxDigits of them, at most maxValue; p moves past them.
+bool takeNumber(const char*& p, const size_t maxDigits, const uint32_t maxValue, uint32_t& out) {
+  size_t n = 0;
+  uint32_t v = 0;
+  while (p[n] >= '0' && p[n] <= '9') {
+    if (n == maxDigits) return false;
+    v = v * 10 + static_cast<uint32_t>(p[n] - '0');
+    ++n;
+  }
+  if (n == 0 || v > maxValue) return false;
+  p += n;
+  out = v;
+  return true;
+}
+}  // namespace
+
+bool parseLocPhoneArgs(const char* args, LocPhoneArgs& out) {
+  out = LocPhoneArgs{};
+  if (args == nullptr) args = "";
+  while (isSpace(*args)) ++args;
+  size_t n = 0;
+  while (args[n] != '\0' && !isSpace(args[n])) ++n;
+  for (const char* rest = args + n; *rest != '\0'; ++rest) {
+    if (!isSpace(*rest)) return false;
+  }
+  if (n == 0) return true;  // Show
+  if (n == 3 && toLower(args[0]) == 'o' && toLower(args[1]) == 'f' && toLower(args[2]) == 'f') {
+    out.op = LocPhoneOp::Off;
+    return true;
+  }
+  const char* p = args;
+  for (int i = 0; i < 4; ++i) {
+    uint32_t octet = 0;
+    if (!takeNumber(p, 3, 255, octet)) return false;
+    out.ip[i] = static_cast<uint8_t>(octet);
+    if (i < 3) {
+      if (*p != '.') return false;
+      ++p;
+    }
+  }
+  if (*p == ':') {
+    ++p;
+    uint32_t port = 0;
+    if (!takeNumber(p, 5, 65535, port) || port == 0) return false;
+    out.port = static_cast<uint16_t>(port);
+  }
+  if (p != args + n) return false;
+  const bool zero = out.ip[0] == 0 && out.ip[1] == 0 && out.ip[2] == 0 && out.ip[3] == 0;
+  const bool broadcast = out.ip[0] == 255 && out.ip[1] == 255 && out.ip[2] == 255 && out.ip[3] == 255;
+  if (zero || broadcast) return false;
+  out.op = LocPhoneOp::Set;
+  return true;
+}
+
+bool parseLocTestArgs(const char* args, bool& coords) {
+  coords = false;
+  if (args == nullptr) args = "";
+  while (isSpace(*args)) ++args;
+  char word[8] = {};
+  size_t n = 0;
+  while (args[n] != '\0' && !isSpace(args[n])) {
+    if (n + 1 >= sizeof(word)) return false;
+    word[n] = args[n];
+    ++n;
+  }
+  for (const char* rest = args + n; *rest != '\0'; ++rest) {
+    if (!isSpace(*rest)) return false;
+  }
+  if (n == 0) return true;
+  if (!tokenIs(word, "coords")) return false;
+  coords = true;
+  return true;
+}
+
 bool parseAppArgs(const char* args, AppTarget& out) {
   if (args == nullptr) return false;
   while (isSpace(*args)) ++args;

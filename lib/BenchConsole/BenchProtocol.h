@@ -97,6 +97,24 @@ bool parseWeatherArgs(const char* args, WeatherOp& out);
 enum class PowerOp : uint8_t { Show, FakeAbsent, Real };
 bool parsePowerArgs(const char* args, PowerOp& out);
 
+// LOCPHONE [off | <a.b.c.d>[:<port>]]: LOCTEST's phone source (network/PhoneGps) read from this
+// address instead of the network's gateway - a computer on the same network stands in for the
+// phone - or the gateway again (off), or the setting shown (no argument). RAM only; Locate Me and
+// AutoLocate never use it. The address is
+// four decimal octets, not 0.0.0.0 or 255.255.255.255; the port 1..65535 (none: 10110, then
+// 11123). Case ignored for "off".
+enum class LocPhoneOp : uint8_t { Show, Off, Set };
+struct LocPhoneArgs {
+  LocPhoneOp op = LocPhoneOp::Show;
+  uint8_t ip[4] = {};
+  uint16_t port = 0;
+};
+bool parseLocPhoneArgs(const char* args, LocPhoneArgs& out);
+
+// LOCTEST [coords]: the locate pipeline (network/LocateRun) on the station already up, its verdict
+// printed and nothing saved; "coords" adds the position at two decimals. Case ignored.
+bool parseLocTestArgs(const char* args, bool& coords);
+
 // WS                                         the puzzle on screen, dumped
 // WS new <seed> [easy|medium|hard] [key]     a deterministic new puzzle; the key (a built-in
 //                                            theme or "file:<name>.words") is the rest of the

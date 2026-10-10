@@ -34,10 +34,18 @@ So this fails on:
   MUTATIONS each of those guards removed from the real source, one at a time: the check must
             then fail (a guard deleted with the suite still green is the failure this exists for).
 
-  AUTO-LOCATE "Update location when syncing" (src/network/AutoLocate.cpp) rides a sync's Wi-Fi
-            and must never ask the internet-address lookup: the file names no ipwho.is /
-            parseIpWhoisResponse / FixSource::Ip / IP_ACCURACY, and every GeolocateClient::request
-            in it is passed BEACONDB_URL, which is beaconDB's geolocate endpoint. Mutated too.
+  LOCATE    the location lookup (src/network/LocateRun.cpp, shared by Locate Me, "Update location
+            when syncing" and the bench's LOCTEST) asks beaconDB only, never an internet-address
+            lookup: it names no ipwho / parseIpWhois / FixSource::Ip / IP_ACCURACY, and every
+            GeolocateClient::request in it is passed BEACONDB_URL, which is beaconDB's geolocate
+            endpoint. AutoLocate.cpp and LocateMeActivity.cpp make no request of their own and name
+            no internet-address lookup either. Mutated too.
+
+  IP-GEO    no file in the repository (tracked or new, this script aside) names an IP-geolocation
+            host: ipwho.is, ip-api.com, ipinfo.io, (get.)geojs.io, freeipapi.com, ipapi.co/.com,
+            ipgeolocation.io, ipstack.com, ipdata.co, geoplugin.net, ip2location.io. Host names only:
+            "geojson" or a bare "ipinfo" is fine. A carrier's or VPN's exit city is worse than no
+            location (Nick's rule). Mutated too.
 
   WEATHER   the Weather card's fetch (src/network/WeatherFetch.cpp) rides a station already up and
             sends the location only to the two weather services: the file names no radio start or
@@ -59,6 +67,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -346,23 +355,94 @@ def contract_failures(owner: str, power: str, policy: str):
     return fails
 
 
-AUTOLOCATE = ROOT / "src" / "network" / "AutoLocate.cpp"
-AUTOLOCATE_IP = re.compile(r"ipwho|FixSource\s*::\s*Ip\b|IP_ACCURACY", re.I)
+LOCATE_RUN = ROOT / "src" / "network" / "LocateRun.cpp"
+LOCATE_RUN_REL = "src/network/LocateRun.cpp"
+# The two callers of the lookup: neither asks a service itself.
+LOCATE_CALLERS = [
+    (ROOT / "src" / "network" / "AutoLocate.cpp", "src/network/AutoLocate.cpp"),
+    (ROOT / "src" / "activities" / "settings" / "LocateMeActivity.cpp",
+     "src/activities/settings/LocateMeActivity.cpp"),
+]
+ADDRESS_LOOKUP = re.compile(r"ipwho|parseIpWhois|FixSource\s*::\s*Ip\b|IP_ACCURACY", re.I)
 BEACONDB_DEF = 'constexpr const char* BEACONDB_URL = "https://api.beacondb.net/v1/geolocate";'
+GEOLOCATE_REQUEST = re.compile(r"GeolocateClient\s*::\s*request\s*\(\s*([^,\s)]+)")
 
 
-def autolocate_failures(text: str):
-    """AutoLocate.cpp asks beaconDB only (never the internet-address lookup)."""
-    rel = "src/network/AutoLocate.cpp"
+def locate_failures(run: str, callers):
+    """LocateRun.cpp asks beaconDB only; its callers ask nothing themselves."""
     fails = []
-    if AUTOLOCATE_IP.search(text):
-        fails.append(f"{rel}: names the internet-address lookup (auto-locate is beaconDB only)")
-    if BEACONDB_DEF not in text:
-        fails.append(f"{rel}: BEACONDB_URL is not beaconDB's geolocate endpoint")
-    urls = re.findall(r"GeolocateClient\s*::\s*request\s*\(\s*([^,\s)]+)", strip_code(text))
+    if ADDRESS_LOOKUP.search(run):
+        fails.append(f"{LOCATE_RUN_REL}: names an internet-address lookup (the lookup is beaconDB only)")
+    if BEACONDB_DEF not in run:
+        fails.append(f"{LOCATE_RUN_REL}: BEACONDB_URL is not beaconDB's geolocate endpoint")
+    urls = GEOLOCATE_REQUEST.findall(strip_code(run))
     if not urls or any(u != "BEACONDB_URL" for u in urls):
-        fails.append(f"{rel}: a GeolocateClient::request not passed BEACONDB_URL ({', '.join(urls) or 'none'})")
+        fails.append(f"{LOCATE_RUN_REL}: a GeolocateClient::request not passed BEACONDB_URL ({', '.join(urls) or 'none'})")
+    for rel, text in callers:
+        if ADDRESS_LOOKUP.search(text):
+            fails.append(f"{rel}: names an internet-address lookup")
+        if GEOLOCATE_REQUEST.search(strip_code(text)):
+            fails.append(f"{rel}: makes a GeolocateClient::request of its own (the lookup is LocateRun's)")
     return fails
+
+
+# IP-geolocation services, by host name (a subdomain counts: api.ipinfo.io).
+IP_GEO_HOSTS = re.compile(
+    r"(?<![A-Za-z0-9-])(?:ipwho\.is|ip-api\.com|ipinfo\.io|(?:get\.)?geojs\.io|freeipapi\.com|ipapi\.com?|"
+    r"ipgeolocation\.io|ipstack\.com|ipdata\.co|geoplugin\.net|ip2location\.io)(?![A-Za-z0-9-])",
+    re.I)
+SELF_REL = "scripts/check_radio_power.py"
+# Larger files are fonts, books and images, not code or prose.
+IP_GEO_MAX_BYTES = 2 * 1024 * 1024
+
+
+def repo_files():
+    """(repo-relative path, absolute path) of every tracked or new (not ignored) file."""
+    try:
+        out = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=ROOT,
+                             capture_output=True, check=True).stdout
+        rels = sorted({r for r in out.decode("utf-8", "surrogateescape").split("\0") if r})
+    except (OSError, subprocess.CalledProcessError):
+        rels = sorted(p.relative_to(ROOT).as_posix() for d in ("src", "lib", "test", "scripts", "docs", "data")
+                      for p in (ROOT / d).rglob("*") if p.is_file())
+        rels += [p.name for p in ROOT.glob("*.md")]
+    return [(r, ROOT / r) for r in rels]
+
+
+# Every IP_GEO_HOSTS spelling contains one of these (lower case): a text with none skips the regex.
+IP_GEO_NEEDLES = ("ipwho", "ip-api", "ipinfo", "geojs", "ipapi", "ipgeolocation", "ipstack", "ipdata", "geoplugin",
+                  "ip2location")
+
+
+def ip_geo_failures(sources):
+    """No text names an IP-geolocation host."""
+    fails = []
+    for rel, text in sources:
+        if rel == SELF_REL:
+            continue
+        lower = text.lower()
+        if not any(n in lower for n in IP_GEO_NEEDLES):
+            continue
+        for m in IP_GEO_HOSTS.finditer(text):
+            fails.append(f"{rel}:{text.count(chr(10), 0, m.start()) + 1}: names the IP-geolocation host "
+                         f"{m.group(0)} (no internet-address lookup, anywhere)")
+    return fails
+
+
+def repo_texts():
+    """(rel, text) of every small text file in the repository."""
+    out = []
+    for rel, path in repo_files():
+        try:
+            if not path.is_file() or path.stat().st_size > IP_GEO_MAX_BYTES:
+                continue
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        if b"\0" in raw[:8192]:
+            continue  # binary
+        out.append((rel, raw.decode("utf-8", "replace")))
+    return out
 
 
 WEATHER = ROOT / "src" / "network" / "WeatherFetch.cpp"
@@ -474,7 +554,15 @@ def self_test():
         ("src/main.cpp", "setCpuFrequencyMhz(80);"), (OWNER_REL, "setCpuFrequencyMhz(80);"),
         ("src/main.cpp", "powerManager.releaseRadioLock();"), (POWER_CPP_REL, "WiFi.begin(a);"),
     ]
-    bad = [s for s in must_hit if not findings(s)] + [s for s in must_pass if findings(s)]
+    geo_hit = ["https://ipwho.is/?fields=a", "http://ip-api.com/json", "api.ipinfo.io/lite/me", "IPINFO.IO",
+               "https://get.geojs.io/v1/ip/geo.json", "geojs.io", "https://freeipapi.com/api/json",
+               "https://ipapi.co/json/", "ipapi.com", "ipgeolocation.io", "ipstack.com", "ipdata.co",
+               "geoplugin.net", "ip2location.io"]
+    geo_pass = ["tests/fixtures/wx/nws_alerts.geojson", "geojson", "ipinfo", "ip-api", "ipwho", "myipinfo.iox",
+                "notipwho.is", "ipapi.co-op", "freeipapi", "WiFi.localIP()", "beacondb.net"]
+    bad = [s for s in geo_hit if not ip_geo_failures([("x.cpp", s)])]
+    bad += [s for s in geo_pass if ip_geo_failures([("x.cpp", s)])]
+    bad += [s for s in must_hit if not findings(s)] + [s for s in must_pass if findings(s)]
     bad += [f"{r}: {s}" for r, s in must_pass_in if findings(s, r)]
     bad += [f"{r}: {s}" for r, s in must_hit_in if not findings(s, r)]
     if bad:
@@ -581,24 +669,45 @@ def main() -> int:
         print(f)
         failed = True
 
-    autolocate = AUTOLOCATE.read_text(encoding="utf-8")
-    for f in autolocate_failures(autolocate):
+    run = LOCATE_RUN.read_text(encoding="utf-8")
+    callers = [(rel, path.read_text(encoding="utf-8")) for path, rel in LOCATE_CALLERS]
+    for f in locate_failures(run, callers):
         print(f)
         failed = True
-    ip_request = "GeolocateClient::request(IPWHOIS_URL, nullptr"
+    auto_rel, auto_text = callers[0]
     auto_muts = [
-        ("auto-locate asks the address lookup", autolocate.replace("GeolocateClient::request(BEACONDB_URL,", ip_request + ",", 1)),
-        ("auto-locate parses an address answer",
-         autolocate.replace("geolocate::parseBeaconDbResponse(", "geolocate::parseIpWhoisResponse(", 1)),
-        ("auto-locate's URL points elsewhere", autolocate.replace("api.beacondb.net/v1/geolocate", "ipwho.is/", 1)),
+        ("the lookup asks the address lookup",
+         run.replace("GeolocateClient::request(BEACONDB_URL,", "GeolocateClient::request(IPWHOIS_URL,", 1), callers),
+        ("the lookup parses an address answer",
+         run.replace("geolocate::parseBeaconDbResponse(", "geolocate::parseIpWhoisResponse(", 1), callers),
+        ("the lookup's URL points elsewhere", run.replace("api.beacondb.net/v1/geolocate", "ipwho.is/", 1), callers),
+        ("auto-locate asks a service itself",
+         run, [(auto_rel, auto_text.replace("  LocateRun::run(outcome, options);\n",
+                                            "  LocateRun::run(outcome, options);\n"
+                                            "  GeolocateClient::request(BEACONDB_URL, nullptr, nullptr, 0, n, s);\n", 1)),
+               callers[1]]),
     ]
-    for desc, text in auto_muts:
-        if text == autolocate:
+    for desc, r, c in auto_muts:
+        if (r, c) == (run, callers):
             print(f"mutation did not apply (the source changed; update the check): {desc}")
             failed = True
-        elif not autolocate_failures(text):
+        elif not locate_failures(r, c):
             print(f"mutation NOT caught: {desc}")
             failed = True
+
+    texts = repo_texts()
+    for f in ip_geo_failures(texts):
+        print(f)
+        failed = True
+    geo_mut = [(rel, t.replace('BEACONDB_URL = "https://api.beacondb.net/v1/geolocate";',
+                               'BEACONDB_URL = "https://api.ipinfo.io/lite/me";', 1)) for rel, t in texts
+               if rel == LOCATE_RUN_REL]
+    if not geo_mut or geo_mut[0][1] == run:
+        print("mutation did not apply (the source changed; update the check): an IP-geolocation host in the tree")
+        failed = True
+    elif not ip_geo_failures(geo_mut):
+        print("mutation NOT caught: an IP-geolocation host in the tree")
+        failed = True
 
     wfetch = WEATHER.read_text(encoding="utf-8")
     wh = WEATHER_PROTOCOL_H.read_text(encoding="utf-8")
@@ -661,7 +770,8 @@ def main() -> int:
 
     if failed:
         return 1
-    print(f"check_radio_power: OK ({len(muts) + len(auto_muts) + len(weather_muts) + 1} mutations caught)")
+    print(f"check_radio_power: OK ({len(muts) + len(auto_muts) + len(weather_muts) + 2} mutations caught, "
+          f"{len(texts)} files free of IP-geolocation hosts)")
     return 0
 
 

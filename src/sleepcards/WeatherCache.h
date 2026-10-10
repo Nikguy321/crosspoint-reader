@@ -33,6 +33,7 @@ constexpr uint8_t PLACE_TYPED = 0;
 constexpr uint8_t PLACE_WIFI = 1;
 constexpr uint8_t PLACE_INTERNET = 2;
 constexpr uint8_t PLACE_WIFI_AUTO = 3;
+constexpr uint8_t PLACE_PHONE = 4;
 
 struct Record {
   int64_t fetchUtc = 0;       // when the forecast was fetched (the reader's clock)

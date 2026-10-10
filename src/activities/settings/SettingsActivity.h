@@ -80,6 +80,13 @@ struct SettingInfo {
     return *this;
   }
 
+  // A char[] string setting the web page shows as this instead of the stored text (what is typed
+  // there is still stored as usual, through the normalizer).
+  SettingInfo& withShownAs(std::function<std::string()> getter) {
+    stringGetter = std::move(getter);
+    return *this;
+  }
+
   std::span<const StrId> enumLabels() const {
     return staticEnumValues.empty() ? std::span<const StrId>(enumValues) : staticEnumValues;
   }

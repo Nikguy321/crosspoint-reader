@@ -72,8 +72,8 @@ void putText(Writer& w, const char tag, const char* text) {
   w.put("%c %s\n", tag, clean);
 }
 
-constexpr const char* PLACE_WORDS[] = {"typed", "wifi", "ip", "wifi-auto"};
-constexpr uint8_t PLACE_COUNT = 4;
+constexpr const char* PLACE_WORDS[] = {"typed", "wifi", "ip", "wifi-auto", "phone"};
+constexpr uint8_t PLACE_COUNT = 5;
 
 // ---- reading -----------------------------------------------------------------------------------
 

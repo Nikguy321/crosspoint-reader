@@ -552,6 +552,18 @@ TEST(WeatherCache, RoundTripsUnderFourKilobytes) {
   EXPECT_STREQ(back->alerts.list[0].event, "Flash Flood Warning");
   EXPECT_EQ(back->alerts.list[1].ends, r->alerts.list[1].ends);
 
+  // A forecast for the phone's GPS fix, and one from an older firmware's internet-address location
+  // (still read; the card declines it, as the location it names counts as not set).
+  for (const uint8_t place : {PLACE_PHONE, PLACE_INTERNET}) {
+    auto other = seattleRecord();
+    other->placeSource = place;
+    const std::string otherText = encoded(*other);
+    EXPECT_NE(otherText.find(place == PLACE_PHONE ? "\nP phone " : "\nP ip "), std::string::npos);
+    auto otherBack = std::make_unique<Record>();
+    ASSERT_TRUE(decodeCache(otherText.data(), otherText.size(), *otherBack));
+    EXPECT_EQ(otherBack->placeSource, place);
+  }
+
   Header h;
   ASSERT_TRUE(decodeHeader(text.data(), text.size(), h));
   EXPECT_EQ(h.fetchUtc, 1791066622);

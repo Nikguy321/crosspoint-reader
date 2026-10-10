@@ -7,11 +7,9 @@
 #include <BookSyncStore.h>
 #include <HalClock.h>
 #include <Logging.h>
-#include <Memory.h>
 #include <WiFi.h>
 #include <esp_attr.h>
 
-#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -19,8 +17,8 @@
 
 #include "CrossPointSettings.h"
 #include "SilentRestart.h"
-#include "network/GeolocateClient.h"
 #include "network/GeolocateProtocol.h"
+#include "network/LocateRun.h"
 #include "sleepcards/AutoLocatePolicy.h"
 #include "sleepcards/CardTime.h"
 #include "util/TaskWatchdog.h"
@@ -32,14 +30,6 @@ namespace AutoLocate {
 namespace {
 
 namespace policy = sleepcards::autolocate;
-
-constexpr const char* BEACONDB_URL = "https://api.beacondb.net/v1/geolocate";
-constexpr const char* BEACONDB_HOST = "api.beacondb.net";
-constexpr uint32_t CONNECT_TIMEOUT_MS = 4000;
-// Not worth starting a TLS request with less than this left of the budget.
-constexpr uint32_t MIN_REQUEST_MS = 3000;
-// Scan results kept for the request (the strongest 20 are sent), as Locate Me.
-constexpr size_t MAX_SCAN = 48;
 
 // The day of the last try, kept across the silent reboot that ends every sync and across deep
 // sleep (RTC memory; a cold boot forgets it, which costs at most one more try that day).
@@ -54,80 +44,78 @@ policy::Situation now;  // what due() saw, for run() (points at the settings' ow
 void skipped(const char* why) { LOG_INF("GEO", "autolocate: skipped %s", why); }
 void failed(const char* why) { LOG_INF("GEO", "autolocate: failed %s", why); }
 
-// The lookup itself; returns the log word of a failure, nullptr when saved.
-const char* lookUpAndSave(const unsigned long started, bool& tooFew) {
+// The lookup itself; returns the log word of a failure (tooFew: a skip, not a failure), or nullptr
+// with what was saved in `saved`.
+const char* lookUpAndSave(bool& tooFew, const char*& saved) {
   tooFew = false;
-  // Heap, freed on return (as Locate Me): the scan copy (48 x 40 B), the request (1.3 KB) and the
-  // response (4 KB), only for this one run.
-  auto aps = makeUniqueNoThrow<geolocate::AccessPoint[]>(MAX_SCAN);
-  auto request = makeUniqueNoThrow<char[]>(geolocate::REQUEST_CAP);
-  auto response = makeUniqueNoThrow<char[]>(geolocate::RESPONSE_CAP + 1);
-  // The TLS session's heap is checked before the scan, which would be wasted without it.
-  if (!aps || !request || !response || !GeolocateClient::enoughHeap()) return "no-memory";
-
-  // From here on this is the day's one try, whatever comes of it.
+  saved = "";
+  // From here on this is the day's one try, whatever comes of it - except a Wi-Fi half that could
+  // not start for want of TLS heap (below). The phone needs no TLS, so it is always asked.
+  const uint32_t triedBefore = triedYmd;
+  const uint32_t magicBefore = triedMagic;
   triedYmd = policy::ymd(now.year, now.month, now.day);
   triedMagic = TRIED_MAGIC;
 
-  // A blocking station scan on the joined radio (RadioPower: the radio lock is already held).
-  int16_t found = 0;
-  const size_t apCount = GeolocateClient::scanAccessPoints(aps.get(), MAX_SCAN, found);
-  const size_t sent = geolocate::buildRequestBody(aps.get(), apCount, request.get(), geolocate::REQUEST_CAP);
-  aps.reset();
-  if (sent < geolocate::MIN_REQUEST_APS) {
-    tooFew = true;
-    return "too-few-aps";
-  }
-  resetTaskWatchdogIfSubscribed();
-
-  unsigned long elapsed = millis() - started;
-  if (elapsed + MIN_REQUEST_MS > BUDGET_MS) return "timeout";
-  const uint32_t dnsMs = std::min<uint32_t>(DNS_MS, BUDGET_MS - MIN_REQUEST_MS - elapsed);
-  if (!GeolocateClient::resolveWithin(BEACONDB_HOST, dnsMs)) return "dns";
-  resetTaskWatchdogIfSubscribed();
-  elapsed = millis() - started;
-  if (elapsed + MIN_REQUEST_MS > BUDGET_MS) return "timeout";
-  GeolocateClient::Options options;
-  options.requestTimeoutMs = static_cast<uint32_t>(BUDGET_MS - elapsed);
-  options.connectTimeoutMs = std::min<uint32_t>(options.requestTimeoutMs, CONNECT_TIMEOUT_MS);
+  LocateRun::Options options;
+  options.wifiBudgetMs = BUDGET_MS;
   options.quiet = true;
-  size_t length = 0;
-  int httpStatus = 0;
-  const auto result = GeolocateClient::request(BEACONDB_URL, request.get(), response.get(), geolocate::RESPONSE_CAP + 1,
-                                               length, httpStatus, options);
-  request.reset();
+  LocateRun::Outcome outcome;
+  LocateRun::run(outcome, options);
   resetTaskWatchdogIfSubscribed();
-  if (result == GeolocateClient::Result::NoMemory) return "no-memory";
-  if (result == GeolocateClient::Result::Transport) return "unreachable";
-  if (result != GeolocateClient::Result::Ok || httpStatus != 200) return "no-fix";
 
-  // beaconDB's own Wi-Fi estimate only: parseBeaconDbResponse refuses its IP/cell "fallback".
-  geolocate::Fix fix;
-  if (!geolocate::parseBeaconDbResponse(response.get(), length, fix)) return "no-fix";
-  switch (policy::judgeFix(fix.source == geolocate::FixSource::Wifi, fix.lat, fix.lon, fix.accuracyM)) {
+  if (!outcome.fix.valid()) {
+    switch (outcome.wifi) {
+      case geolocate::WifiVerdict::TooFew:
+        tooFew = true;
+        return "too-few-aps";
+      case geolocate::WifiVerdict::NoMemory:
+        // Nothing was scanned or sent: a later sync today may try again.
+        triedYmd = triedBefore;
+        triedMagic = magicBefore;
+        return "no-memory";
+      case geolocate::WifiVerdict::Unreachable:
+        return outcome.dnsFailed ? "dns" : "unreachable";
+      case geolocate::WifiVerdict::Vague:
+        return "too-vague";
+      case geolocate::WifiVerdict::Disagree:
+        return "disagree";
+      default:
+        return "no-fix";
+    }
+  }
+
+  const bool fromPhone = outcome.fix.source == geolocate::FixSource::Phone;
+  sleepcards::LocationSource source =
+      fromPhone ? sleepcards::LocationSource::Phone : sleepcards::LocationSource::WifiAuto;
+  switch (policy::judgeFix(source, outcome.fix.lat, outcome.fix.lon, outcome.fix.accuracyM)) {
     case policy::Verdict::Save:
       break;
     case policy::Verdict::TooVague:
       return "too-vague";
-    case policy::Verdict::NotWifi:
+    case policy::Verdict::NotMeasured:
     case policy::Verdict::Invalid:
       return "no-fix";
   }
 
-  // A tighter stored Wi-Fi fix of the same place is kept (re-dated) rather than traded down.
-  double lat = fix.lat;
-  double lon = fix.lon;
-  uint32_t accuracyM = fix.accuracyM;
-  policy::keepTighterFix(now.location, now.record, lat, lon, accuracyM);
+  double lat = outcome.fix.lat;
+  double lon = outcome.fix.lon;
+  uint32_t accuracyM = outcome.fix.accuracyM;
+  // A Wi-Fi answer does not replace a tighter stored fix of the same place.
+  if (!fromPhone && policy::keepTighterFix(now.location, now.record, lat, lon, accuracyM, source) &&
+      source == sleepcards::LocationSource::Phone) {
+    saved = "kept phone";  // the phone's own record stands as it is
+    return nullptr;
+  }
   char location[sizeof(SETTINGS.sleepCardLocation)];
   char record[sizeof(SETTINGS.sleepCardLocationFix)];
-  if (!policy::autoRecord(lat, lon, accuracyM, now.year, now.month, now.day, location, sizeof(location), record,
+  if (!policy::autoRecord(source, lat, lon, accuracyM, now.year, now.month, now.day, location, sizeof(location), record,
                           sizeof(record))) {
     return "no-fix";
   }
   std::snprintf(SETTINGS.sleepCardLocation, sizeof(SETTINGS.sleepCardLocation), "%s", location);
   std::snprintf(SETTINGS.sleepCardLocationFix, sizeof(SETTINGS.sleepCardLocationFix), "%s", record);
   if (!SETTINGS.saveToFile()) return "save";
+  saved = fromPhone ? "saved phone" : "saved wifi";
   return nullptr;
 }
 
@@ -181,11 +169,11 @@ void rearm() {
 void run() {
   if (!approved) return;
   approved = false;
-  const unsigned long started = millis();
   bool tooFew = false;
-  const char* failure = lookUpAndSave(started, tooFew);
+  const char* saved = "";
+  const char* failure = lookUpAndSave(tooFew, saved);
   if (failure == nullptr) {
-    LOG_INF("GEO", "autolocate: saved");
+    LOG_INF("GEO", "autolocate: %s", saved);
   } else if (tooFew) {
     skipped(failure);
   } else {

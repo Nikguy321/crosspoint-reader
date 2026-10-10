@@ -413,8 +413,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // personal default: the location starts unset and the owner lines empty.
   // Decimal degrees "lat,lon" (sleepcards::normalizeLocation), "" = not set.
   char sleepCardLocation[32] = "";
-  // Where that location came from: typed in, or "Locate me" (Wi-Fi / internet address) with its
+  // Where that location came from: typed in, or "Locate me" (the phone's GPS / Wi-Fi) with its
   // accuracy and date, naming the location it describes (sleepcards::LocationFix). "" = typed in.
+  // An older firmware's internet-address record ("ip") makes the location count as not set.
   char sleepCardLocationFix[48] = "";
   // While a book sync or "Sync clock now" already has Wi-Fi up, refresh a location not saved today
   // from nearby Wi-Fi networks, at most once a day (beaconDB only; network/AutoLocate). Off unless

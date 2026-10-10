@@ -64,98 +64,6 @@ bool parseJsonNumber(const char* text, const size_t len, double& out) {
   return true;
 }
 
-void appendUtf8(char* out, size_t& n, const size_t cap, const uint32_t cp) {
-  char enc[4];
-  size_t k = 0;
-  if (cp < 0x80) {
-    enc[k++] = static_cast<char>(cp);
-  } else if (cp < 0x800) {
-    enc[k++] = static_cast<char>(0xC0 | (cp >> 6));
-    enc[k++] = static_cast<char>(0x80 | (cp & 0x3F));
-  } else {
-    enc[k++] = static_cast<char>(0xE0 | (cp >> 12));
-    enc[k++] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
-    enc[k++] = static_cast<char>(0x80 | (cp & 0x3F));
-  }
-  if (n + k >= cap) return;
-  std::memcpy(out + n, enc, k);
-  n += k;
-}
-
-int hexValue(const char c) {
-  if (c >= '0' && c <= '9') return c - '0';
-  const char l = lowerAscii(c);
-  if (l >= 'a' && l <= 'f') return l - 'a' + 10;
-  return -1;
-}
-
-// A place name for the screen: the parser leaves \uXXXX escapes as text, so they are decoded here
-// (a surrogate becomes '?'); control characters are dropped, runs of spaces collapsed, and the
-// result is cut at a whole UTF-8 character.
-void cleanPlace(const char* text, const size_t len, char* out, const size_t cap) {
-  size_t n = 0;
-  out[0] = '\0';
-  for (size_t i = 0; i < len && n + 1 < cap;) {
-    const auto c = static_cast<unsigned char>(text[i]);
-    if (c == '\\' && i + 5 < len && text[i + 1] == 'u') {
-      uint32_t cp = 0;
-      bool ok = true;
-      for (size_t k = 0; k < 4; k++) {
-        const int h = hexValue(text[i + 2 + k]);
-        if (h < 0) ok = false;
-        cp = cp * 16 + static_cast<uint32_t>(h < 0 ? 0 : h);
-      }
-      if (ok) {
-        if (cp >= 0xD800 && cp <= 0xDFFF) cp = '?';
-        if (cp >= 0x20) appendUtf8(out, n, cap, cp);
-        i += 6;
-        continue;
-      }
-    }
-    if (c < 0x20 || c == 0x7F) {
-      i++;
-      continue;
-    }
-    if (c == ' ' && (n == 0 || out[n - 1] == ' ')) {
-      i++;
-      continue;
-    }
-    // Copy one whole UTF-8 sequence, or stop.
-    size_t seq = 1;
-    if (c >= 0xF0) {
-      seq = 4;
-    } else if (c >= 0xE0) {
-      seq = 3;
-    } else if (c >= 0xC0) {
-      seq = 2;
-    }
-    if (i + seq > len || n + seq >= cap) break;
-    std::memcpy(out + n, text + i, seq);
-    n += seq;
-    i += seq;
-  }
-  while (n > 0 && out[n - 1] == ' ') n--;
-  out[n] = '\0';
-}
-
-// After a cut: drop a trailing UTF-8 sequence that lost its tail.
-void trimPartialUtf8(char* s) {
-  const size_t n = std::strlen(s);
-  size_t lead = n;
-  while (lead > 0 && (static_cast<unsigned char>(s[lead - 1]) & 0xC0) == 0x80) lead--;
-  if (lead == 0) return;
-  const auto c = static_cast<unsigned char>(s[lead - 1]);
-  size_t want = 1;
-  if (c >= 0xF0) {
-    want = 4;
-  } else if (c >= 0xE0) {
-    want = 3;
-  } else if (c >= 0xC0) {
-    want = 2;
-  }
-  if (n - (lead - 1) < want) s[lead - 1] = '\0';
-}
-
 bool validCoordinates(const double lat, const double lon) {
   if (!(lat >= -90.0 && lat <= 90.0) || !(lon >= -180.0 && lon <= 180.0)) return false;
   // 0,0 is what a lookup that found nothing tends to report.
@@ -262,17 +170,6 @@ struct BeaconCtx {
   double accuracy = 0;
 };
 
-struct IpCtx {
-  PathTracker path;
-  bool haveLat = false;
-  bool haveLon = false;
-  bool success = false;
-  double lat = 0;
-  double lon = 0;
-  char city[PLACE_CAP] = "";
-  char region[PLACE_CAP] = "";
-};
-
 template <typename Ctx>
 bool runParser(const char* body, const size_t len, Ctx& ctx, void (*onKey)(void*, const char*, size_t),
                void (*onString)(void*, const char*, size_t), void (*onNumber)(void*, const char*, size_t),
@@ -303,56 +200,116 @@ bool usableAccessPoint(const AccessPoint& ap) {
   if ((ap.mac[0] & 0x03) != 0) return false;  // locally administered or group address
   static constexpr uint8_t ZERO[6] = {};
   if (sameMac(ap.mac, ZERO)) return false;
+  // VRRP's virtual router addresses (RFC 5798: IPv4 00:00:5e:00:01:xx, IPv6 00:00:5e:00:02:xx).
+  if (ap.mac[0] == 0x00 && ap.mac[1] == 0x00 && ap.mac[2] == 0x5e && ap.mac[3] == 0x00 &&
+      (ap.mac[4] == 0x01 || ap.mac[4] == 0x02)) {
+    return false;
+  }
   // The SSID is at most 32 bytes; an unterminated one is refused rather than read past.
   if (std::memchr(ap.ssid, '\0', SSID_CAP) == nullptr) return false;
   return !endsWithNoCase(ap.ssid, "_nomap") && !endsWithNoCase(ap.ssid, "_optout");
 }
 
-size_t buildRequestBody(const AccessPoint* aps, const size_t count, char* out, const size_t cap) {
-  if (out == nullptr || cap == 0) return 0;
-  out[0] = '\0';
-  if (aps == nullptr) return 0;
+bool sameDevice(const uint8_t* a, const uint8_t* b) {
+  if (a[0] != b[0] || a[1] != b[1] || a[2] != b[2]) return false;
+  const uint32_t x = (static_cast<uint32_t>(a[3]) << 16) | (static_cast<uint32_t>(a[4]) << 8) | a[5];
+  const uint32_t y = (static_cast<uint32_t>(b[3]) << 16) | (static_cast<uint32_t>(b[4]) << 8) | b[5];
+  return (x > y ? x - y : y - x) < SAME_DEVICE_SPAN;
+}
 
-  // Pick the strongest usable access point not already taken, up to the limit; a BSSID already
-  // taken (at an equal or stronger reading) is skipped.
-  size_t chosen[MAX_REQUEST_APS];
+Split buildSplitRequests(const AccessPoint* aps, const size_t count, const uint8_t* exclude, char* bodyA, char* bodyB,
+                         const size_t cap) {
+  Split split;
+  if (bodyA == nullptr || bodyB == nullptr || cap == 0) return split;
+  bodyA[0] = '\0';
+  bodyB[0] = '\0';
+  if (aps == nullptr) return split;
+
+  // Rank: the strongest eligible access point not already taken, then the next; a BSSID already
+  // taken (at an equal or stronger reading) is skipped, and so is every address of the device left
+  // out.
+  constexpr size_t MAX_RANKED = 2 * MAX_REQUEST_APS;
+  size_t ranked[MAX_RANKED];
   size_t picked = 0;
-  while (picked < MAX_REQUEST_APS) {
+  while (picked < MAX_RANKED) {
     size_t best = count;
     for (size_t i = 0; i < count; i++) {
-      if (!usableAccessPoint(aps[i])) continue;
+      if (!usableAccessPoint(aps[i]) || aps[i].rssi < MIN_RSSI_DBM) continue;
+      if (exclude != nullptr && sameDevice(aps[i].mac, exclude)) continue;
       bool taken = false;
-      for (size_t k = 0; k < picked && !taken; k++) taken = sameMac(aps[chosen[k]].mac, aps[i].mac);
+      for (size_t k = 0; k < picked && !taken; k++) taken = sameMac(aps[ranked[k]].mac, aps[i].mac);
       if (taken) continue;
       if (best == count || aps[i].rssi > aps[best].rssi) best = i;
     }
     if (best == count) break;
-    chosen[picked++] = best;
+    ranked[picked++] = best;
   }
-  if (picked < MIN_REQUEST_APS) return 0;
+  split.usable = picked;
 
-  size_t n = 0;
-  int w = std::snprintf(out, cap, "%s", "{\"considerIp\":false,\"wifiAccessPoints\":[");
-  for (size_t k = 0; k < picked && w >= 0; k++) {
+  // Devices: rank positions joined when their BSSIDs are one device's (and through a shared
+  // neighbour), each named by its strongest member, the first in rank order.
+  static_assert(MAX_RANKED <= 255, "rank positions fit a byte");
+  uint8_t device[MAX_RANKED];
+  for (size_t k = 0; k < picked; k++) device[k] = static_cast<uint8_t>(k);
+  for (size_t k = 1; k < picked; k++) {
+    for (size_t j = 0; j < k; j++) {
+      if (!sameDevice(aps[ranked[j]].mac, aps[ranked[k]].mac)) continue;
+      const uint8_t from = device[k] > device[j] ? device[k] : device[j];
+      const uint8_t to = device[k] > device[j] ? device[j] : device[k];
+      for (size_t m = 0; m <= k; m++) {
+        if (device[m] == from) device[m] = to;
+      }
+    }
+  }
+  // The half of each device: its order among the devices (by strongest member), alternately.
+  bool inB[MAX_RANKED] = {};
+  size_t devices = 0;
+  for (size_t k = 0; k < picked; k++) {
+    if (device[k] != k) continue;  // not a device's strongest member
+    for (size_t m = k; m < picked; m++) {
+      if (device[m] == k) inB[m] = devices % 2 == 1;
+    }
+    devices++;
+  }
+  split.devices = devices;
+  if (devices < MIN_REQUEST_APS) return split;
+
+  // One body from one half's ranks, strongest first.
+  const auto build = [&](const bool half, char* out) -> size_t {
+    size_t n = 0;
+    size_t written = 0;
+    int w = std::snprintf(out, cap, "%s",
+                          "{\"considerIp\":false,\"fallbacks\":{\"ipf\":false,\"lacf\":false},\"wifiAccessPoints\":[");
+    for (size_t k = 0; k < picked && w >= 0 && written < MAX_REQUEST_APS; k++) {
+      if (inB[k] != half) continue;
+      n += static_cast<size_t>(w);
+      if (n >= cap) return 0;
+      const AccessPoint& ap = aps[ranked[k]];
+      const int rssi = ap.rssi > 0 ? 0 : ap.rssi;
+      w = std::snprintf(out + n, cap - n, "%s{\"macAddress\":\"%02x:%02x:%02x:%02x:%02x:%02x\",\"signalStrength\":%d}",
+                        written == 0 ? "" : ",", static_cast<unsigned>(ap.mac[0]), static_cast<unsigned>(ap.mac[1]),
+                        static_cast<unsigned>(ap.mac[2]), static_cast<unsigned>(ap.mac[3]),
+                        static_cast<unsigned>(ap.mac[4]), static_cast<unsigned>(ap.mac[5]), rssi);
+      written++;
+    }
+    if (w < 0) return 0;
     n += static_cast<size_t>(w);
-    if (n >= cap) break;
-    const AccessPoint& ap = aps[chosen[k]];
-    const int rssi = ap.rssi > 0 ? 0 : (ap.rssi < -127 ? -127 : ap.rssi);
-    w = std::snprintf(out + n, cap - n, "%s{\"macAddress\":\"%02x:%02x:%02x:%02x:%02x:%02x\",\"signalStrength\":%d}",
-                      k == 0 ? "" : ",", static_cast<unsigned>(ap.mac[0]), static_cast<unsigned>(ap.mac[1]),
-                      static_cast<unsigned>(ap.mac[2]), static_cast<unsigned>(ap.mac[3]),
-                      static_cast<unsigned>(ap.mac[4]), static_cast<unsigned>(ap.mac[5]), rssi);
+    if (n >= cap) return 0;
+    w = std::snprintf(out + n, cap - n, "%s", "]}");
+    if (w < 0 || n + static_cast<size_t>(w) >= cap) return 0;
+    return written;
+  };
+  const size_t inA = build(false, bodyA);
+  const size_t inBody = build(true, bodyB);
+  if (inA == 0 || inBody == 0) {
+    bodyA[0] = '\0';
+    bodyB[0] = '\0';
+    return split;
   }
-  if (w >= 0 && n < cap) {
-    n += static_cast<size_t>(w);
-    if (n < cap) w = std::snprintf(out + n, cap - n, "%s", "]}");
-    if (w >= 0) n += static_cast<size_t>(w);
-  }
-  if (w < 0 || n >= cap) {
-    out[0] = '\0';
-    return 0;
-  }
-  return picked;
+  split.halfA = inA;
+  split.halfB = inBody;
+  split.built = true;
+  return split;
 }
 
 bool parseBeaconDbResponse(const char* body, const size_t len, Fix& out) {
@@ -394,70 +351,90 @@ bool parseBeaconDbResponse(const char* body, const size_t len, Fix& out) {
   return true;
 }
 
-bool parseIpWhoisResponse(const char* body, const size_t len, Fix& out) {
-  out = Fix{};
-  if (body == nullptr || len == 0) return false;
-  auto ctx = makeUniqueNoThrow<IpCtx>();
-  if (!ctx) return false;
-  const bool parsed = runParser(
-      body, len, *ctx, [](void* c, const char* k, const size_t n) { static_cast<IpCtx*>(c)->path.key(k, n); },
-      [](void* c, const char* v, const size_t n) {
-        auto* x = static_cast<IpCtx*>(c);
-        if (!x->path.scalar()) return;
-        if (x->path.at("", "city")) {
-          cleanPlace(v, n, x->city, sizeof(x->city));
-        } else if (x->path.at("", "region")) {
-          cleanPlace(v, n, x->region, sizeof(x->region));
-        }
-      },
-      [](void* c, const char* v, const size_t n) {
-        auto* x = static_cast<IpCtx*>(c);
-        if (!x->path.scalar()) return;
-        double value = 0;
-        const bool ok = parseJsonNumber(v, n, value);
-        if (x->path.at("", "latitude")) {
-          x->haveLat = ok;
-          x->lat = value;
-        } else if (x->path.at("", "longitude")) {
-          x->haveLon = ok;
-          x->lon = value;
-        }
-      },
-      [](void* c, const bool value) {
-        auto* x = static_cast<IpCtx*>(c);
-        if (!x->path.scalar()) return;
-        if (x->path.at("", "success")) x->success = value;
-      });
-  if (!parsed || !ctx->success || !ctx->haveLat || !ctx->haveLon) return false;
-  if (!validCoordinates(ctx->lat, ctx->lon)) return false;
-  out.source = FixSource::Ip;
-  out.lat = ctx->lat;
-  out.lon = ctx->lon;
-  out.accuracyM = IP_ACCURACY_M;
-  if (ctx->city[0] != '\0' && ctx->region[0] != '\0' && std::strcmp(ctx->city, ctx->region) != 0) {
-    std::snprintf(out.place, sizeof(out.place), "%s, %s", ctx->city, ctx->region);
-  } else {
-    std::snprintf(out.place, sizeof(out.place), "%s", ctx->city[0] != '\0' ? ctx->city : ctx->region);
+double distanceM(const double lat1, const double lon1, const double lat2, const double lon2) {
+  constexpr double EARTH_RADIUS_M = 6371008.8;
+  constexpr double RAD_PER_DEG = 0.017453292519943295;
+  const double p1 = lat1 * RAD_PER_DEG;
+  const double p2 = lat2 * RAD_PER_DEG;
+  const double dp = (lat2 - lat1) * RAD_PER_DEG;
+  const double dl = (lon2 - lon1) * RAD_PER_DEG;
+  const double s1 = std::sin(dp / 2);
+  const double s2 = std::sin(dl / 2);
+  double h = s1 * s1 + std::cos(p1) * std::cos(p2) * s2 * s2;
+  if (h > 1.0) h = 1.0;
+  return 2.0 * EARTH_RADIUS_M * std::asin(std::sqrt(h));
+}
+
+namespace {
+
+// One half on its own: NotAsked when it is a usable, tight location (so far, so good), else why not.
+WifiVerdict judgeHalf(const HalfAnswer& h) {
+  if (h.reply == Reply::NoMemory) return WifiVerdict::NoMemory;
+  if (h.reply != Reply::Answered) return WifiVerdict::Unreachable;
+  if (h.status != 200 || h.fix.source != FixSource::Wifi || !validCoordinates(h.fix.lat, h.fix.lon) ||
+      h.fix.accuracyM < 1) {
+    return WifiVerdict::NotFound;
   }
-  trimPartialUtf8(out.place);
-  return true;
+  if (h.fix.accuracyM > MAX_HALF_ACCURACY_M) return WifiVerdict::Vague;
+  return WifiVerdict::NotAsked;
 }
 
-bool needsIpLookup(const Fix& wifi) { return !wifi.valid() || wifi.accuracyM > WIFI_GOOD_ACCURACY_M; }
+}  // namespace
 
-const Fix* chooseFix(const Fix& wifi, const Fix& ip) {
-  if (wifi.valid() && wifi.accuracyM <= WIFI_GOOD_ACCURACY_M) return &wifi;
-  if (wifi.valid() && ip.valid()) return wifi.accuracyM <= ip.accuracyM ? &wifi : &ip;
-  if (wifi.valid()) return &wifi;
-  if (ip.valid()) return &ip;
-  return nullptr;
+bool secondHalfNeeded(const HalfAnswer& first) { return judgeHalf(first) == WifiVerdict::NotAsked; }
+
+WifiVerdict judgeWifi(const Split& split, const HalfAnswer& a, const HalfAnswer& b, Fix& out, uint32_t& apartM) {
+  out = Fix{};
+  apartM = 0;
+  if (!split.built || split.devices < MIN_REQUEST_APS) return WifiVerdict::TooFew;
+  // The first half decides alone when it fails (the second is then not asked).
+  const WifiVerdict first = judgeHalf(a);
+  if (first != WifiVerdict::NotAsked) return first;
+  const WifiVerdict second = judgeHalf(b);
+  if (second != WifiVerdict::NotAsked) return second;
+
+  const double apart = distanceM(a.fix.lat, a.fix.lon, b.fix.lat, b.fix.lon);
+  const uint32_t reach = a.fix.accuracyM > b.fix.accuracyM ? a.fix.accuracyM : b.fix.accuracyM;
+  apartM = apart >= 4.0e9 ? 4000000000u : static_cast<uint32_t>(std::ceil(apart));
+  if (apart > static_cast<double>(reach)) return WifiVerdict::Disagree;
+
+  // The midpoint (across the date line too: the longitudes differ by at most a few hundred metres).
+  double dLon = b.fix.lon - a.fix.lon;
+  if (dLon > 180.0) dLon -= 360.0;
+  if (dLon < -180.0) dLon += 360.0;
+  double lon = a.fix.lon + dLon / 2.0;
+  if (lon > 180.0) lon -= 360.0;
+  if (lon < -180.0) lon += 360.0;
+  uint32_t accuracy = MIN_REPORTED_ACCURACY_M;
+  if (reach > accuracy) accuracy = reach;
+  if (apartM > accuracy) accuracy = apartM;
+  out.source = FixSource::Wifi;
+  out.lat = (a.fix.lat + b.fix.lat) / 2.0;
+  out.lon = lon;
+  out.accuracyM = accuracy;
+  return WifiVerdict::Located;
 }
 
-LookupFailure classifyFailure(const size_t apsSent, const Reply beacon, const Reply ip) {
-  if (ip == Reply::Answered) return apsSent < MIN_REQUEST_APS ? LookupFailure::TooFew : LookupFailure::NotFound;
-  if (ip == Reply::NoMemory || beacon == Reply::NoMemory) return LookupFailure::NoMemory;
-  if (beacon == Reply::Answered) return LookupFailure::NotFound;
-  return LookupFailure::Unreachable;
+const char* wifiVerdictName(const WifiVerdict v) {
+  switch (v) {
+    case WifiVerdict::NotAsked:
+      return "not-asked";
+    case WifiVerdict::Located:
+      return "located";
+    case WifiVerdict::TooFew:
+      return "too-few-aps";
+    case WifiVerdict::NoMemory:
+      return "no-memory";
+    case WifiVerdict::Unreachable:
+      return "unreachable";
+    case WifiVerdict::NotFound:
+      return "no-fix";
+    case WifiVerdict::Vague:
+      return "too-vague";
+    case WifiVerdict::Disagree:
+      return "disagree";
+  }
+  return "?";
 }
 
 }  // namespace geolocate

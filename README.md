@@ -23,8 +23,9 @@ Pro. CrossPoint's own README follows further down.
   An X4 Pro logo replaces the CrossPoint one, and the cards can be white on black.
 - **A live sleep screen on the charger:** the card is redrawn on the minute (every 2 minutes by default) and can deal
   a new Shuffle card each time (Card Cycle When Charging); unplugged, the reader sleeps as usual.
-- **Locate Me** sets the cards' location from nearby Wi-Fi (beaconDB), or from your internet address as a fallback.
-  Nothing is sent until you press Locate. It can also refresh the location once a day during a sync.
+- **Locate Me** sets the cards' location from your phone's GPS over its hotspot, else from nearby Wi-Fi (beaconDB)
+  when it is genuinely local, else not at all - never from your internet address. Nothing is sent until you press
+  Locate. It can also refresh the location once a day during a sync. See [Locate Me's sources](#locate-mes-sources).
 - **Battery behaviour like the stock firmware:**
   - Auto Power Off turns the reader fully off after a set time asleep.
   - The awake reader naps between key presses, with the light on too.
@@ -52,6 +53,38 @@ Pro. CrossPoint's own README follows further down.
 
 More: [sleep screen cards](docs/sleep-screen-cards.md), [awake power](docs/awake-power.md) and the
 [user guide](USER_GUIDE.md).
+
+## Locate Me's sources
+
+Locate Me (and Update Location When Syncing) uses the first of these that gives a trustworthy answer, and nothing
+otherwise - a wrong location is worse than none:
+
+1. **The phone's own GPS, over its Wi-Fi hotspot.** With the reader joined to the phone's hotspot, it opens a TCP
+   connection to the hotspot's gateway (the phone) on port 10110, then 11123, and reads NMEA for a few seconds. It only
+   listens: nothing is sent to the phone and no Bluetooth is involved. A fix counts only from a checksummed GGA
+   sentence that is current (newer than the replayed backlog, and matching the reader's clock, allowing for its drift
+   since the last sync), a real fix (quality 1, 2, 4 or 5), strong enough (4+ satellites, HDOP 10 or less, when
+   given) and in agreement with another such sentence a second or so before it. Phone apps that serve this:
+   - **gpsdRelay** (Android, [F-Droid](https://f-droid.org/packages/io.github.project_kaat.gpsdrelay/)): a TCP server
+     on 0.0.0.0, port 10110, relaying the receiver's own NMEA with sentence generation off (generation alone sends
+     RMC only, which is not enough, and its generated coordinates can be kilometres off near a whole degree).
+   - **Share GPS** (Android, Google Play): NMEA over TCP, set to port 10110.
+   - **GPS 2 IP** (iPhone, App Store): its TCP server on its default port 11123.
+2. **Nearby Wi-Fi, only when it is genuinely local:** access points at -85 dBm or stronger from at least four separate
+   devices (a router's several networks count as one), looked up at [beaconDB](https://beacondb.net) as two separate
+   halves with each device in one half; used only when both halves answer within 100 m and agree with each other.
+   Randomised addresses (which most phone hotspots use) are never sent, and the network the reader is joined to is
+   left out whenever a phone app answers on it.
+3. **Nothing**, with a one-line reason on screen. There is no internet-address (IP) lookup anywhere in this firmware
+   (a static check enforces it): on a phone hotspot that names the carrier's exit city, often hundreds of km away.
+
+Setting up an Android phone with gpsdRelay, in short: turn on the phone's Wi-Fi hotspot (the reader needs 2.4 GHz) and
+join it from the reader like any network; in gpsdRelay, allow precise location, set its battery use to Unrestricted,
+and add the TCP server above (filter `RMC;GGA` is enough); start it, then run Locate Me outdoors or by a window. The
+[WiPhone](https://github.com/Nikguy321/wiphone-meshtastic) README ("Phone location") covers the same apps for the
+WiPhone. With the `x4pro` dev build, `scripts/x4bench.py locphone <address>` lets a computer on the same network stand
+in for the phone for `scripts/x4bench.py loctest`, which prints what the pipeline would find without saving it (Locate
+Me itself always asks the network's gateway).
 
 ## Installing it
 

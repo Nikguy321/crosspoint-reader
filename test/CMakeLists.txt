@@ -93,6 +93,7 @@ add_subdirectory(sleep_card_shuffle)
 add_subdirectory(sleep_card_location)
 add_subdirectory(sleep_card_weather)
 add_subdirectory(geolocate)
+add_subdirectory(phone_nmea)
 add_subdirectory(weather_protocol)
 # Word Search: the pure half, then its drawing (links SleepCardHost above).
 add_subdirectory(word_search)

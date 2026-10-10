@@ -21,6 +21,8 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py redraw               # the live sleep screen redraws now
   scripts/x4bench.py wifilast "Some Network"  # test the Wi-Fi fallback (dev builds)
   scripts/x4bench.py weather              # the Weather card's cache (or: weather fetch|clear)
+  scripts/x4bench.py locphone 192.0.2.10  # Locate Me reads "phone" NMEA from this computer (or: off)
+  scripts/x4bench.py loctest              # the locate pipeline's verdict, nothing saved
   scripts/x4bench.py app wordsearch       # open Word Search (or: app apps / crossword / sudoku / guide)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
@@ -302,6 +304,34 @@ Verbs
                            and deep sleep (the port drops). "fake real" (or
                            "real") ends it: from the hold, fully live again
                            ("holdend x=0"). A reboot clears it.
+  LOCPHONE [off|<a.b.c.d>[:port]]
+                           dev only: LOCTEST's phone source (an NMEA server,
+                           normally the phone at the network's gateway, port
+                           10110 then 11123) read from this address instead,
+                           so a computer on the same network can stand in for
+                           the phone: e.g. serve RMC/GGA sentences with
+                           correct checksums and current UTC times on port
+                           10110. Locate Me and Update Location When Syncing
+                           never use it (they always ask the gateway), so a
+                           stand-in is never saved as the location. OK
+                           LOCPHONE 192.0.2.10 ports=10110,11123 |
+                           192.0.2.10:10110 | off (no argument: the setting).
+                           RAM only: a reboot (every Locate Me exit) clears it.
+  LOCTEST [coords]         dev only: the locate pipeline on the station
+                           already up (STATE wifi=up, the live sleep screen on
+                           this cable; it never starts the radio): the phone
+                           first (LOCPHONE's stand-in when set), then two
+                           beaconDB lookups of the Wi-Fi scan's two halves.
+                           Prints LOCTEST phone port= why= lines= bad=
+                           malformed= settling= stale= nofix= weak= gga= rmc=
+                           disagree= skew_s= (the clock allowance; -1 = no
+                           trusted clock), LOCTEST wifi verdict= seen= usable=
+                           devices= http=a/b acc_m=a/b apart_m= dns_failed=
+                           (when Wi-Fi was asked), then OK LOCTEST phone ok
+                           ±<N>m | wifi agree ±<N>m | nothing: phone <why>,
+                           wifi <verdict>.
+                           Nothing is saved. No position unless "coords"
+                           (then " at 48.86,2.29": two decimals).
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).
@@ -347,6 +377,7 @@ import glob
 import hashlib
 import os
 import random
+import re
 import struct
 import sys
 import time
@@ -924,6 +955,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("ssid")
     s = sub.add_parser("weather", help="dev: the Weather card's cache: show (default), fetch now, or clear")
     s.add_argument("action", nargs="?", default="show", choices=("show", "fetch", "clear"))
+    s = sub.add_parser("locphone", help="dev: LOCTEST's phone NMEA from <a.b.c.d>[:port] instead of the gateway, or 'off'")
+    s.add_argument("target", nargs="?", default="", metavar="a.b.c.d[:port]|off")
+    s = sub.add_parser("loctest", help="dev: run Locate Me's pipeline on the station up and print the verdict (no save)")
+    s.add_argument("coords", nargs="?", choices=("coords",), help="also print the position at two decimals")
     s = sub.add_parser("power", help="dev: read external power, or 'fake absent' / 'fake real' (live screen)")
     s.add_argument("words", nargs="*", metavar="fake absent|fake real")
     s = sub.add_parser("app", help="open the Apps list, Word Search, Crossword, Sudoku or the survival guide")
@@ -1081,6 +1116,18 @@ def run(args, link: Link, out=sys.stdout) -> int:
         rest, body = link.command(f"WEATHER {args.action}", t or (45 if args.action == "fetch" else 15))
         for line in body:
             print(line[8:] if line.startswith("WEATHER ") else line, file=out)
+        print(rest, file=out)
+    elif op == "locphone":
+        target = check_arg(args.target.strip())
+        if target and target.lower() != "off" and not re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}(:\d{1,5})?", target):
+            raise BenchError("LOCPHONE", f"bad address {target!r}: a.b.c.d[:port] or off")
+        rest, _ = link.command(f"LOCPHONE {target}".rstrip(), t or 10)
+        print(rest, file=out)
+    elif op == "loctest":
+        # The phone (11 s at most), a scan and two HTTPS requests on the reader's loop.
+        rest, body = link.command(f"LOCTEST {args.coords or ''}".rstrip(), t or 90)
+        for line in body:
+            print(line[8:] if line.startswith("LOCTEST ") else line, file=out)
         print(rest, file=out)
     elif op == "put":
         data = read_local(args.local)

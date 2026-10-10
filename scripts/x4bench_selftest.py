@@ -57,6 +57,8 @@ class FakeDevice(threading.Thread):
         self.redraw_lands = True  # False: REDRAW is accepted but the draw never comes
         self.sleeps = []
         self.wifi_last = None
+        self.loc_phone = "off"
+        self.loc_tests = []
         self.weather_ops = []
         self.power_ops = []
         self.fake_absent = False
@@ -421,6 +423,35 @@ class FakeDevice(threading.Thread):
                       f"holdable={int(self.soc >= 97)} hold={int(self.hold)}", noise=True)
             if self.fake_absent and self.soc >= 97:
                 self.hold = True  # what the reader does 20 s later
+        elif verb == "LOCPHONE":
+            arg = rest.strip()
+            if arg.lower() == "off":
+                self.loc_phone = "off"
+            elif arg:
+                if arg.startswith("0.") or arg == "255.255.255.255":
+                    self.emit("ERR LOCPHONE usage")
+                    return
+                self.loc_phone = arg if ":" in arg else f"{arg} ports=10110,11123"
+            self.emit(f"OK LOCPHONE {self.loc_phone}")
+        elif verb == "LOCTEST":
+            arg = rest.strip().lower()
+            if arg not in ("", "coords"):
+                self.emit("ERR LOCTEST usage")
+                return
+            if not self.live:
+                self.emit("ERR LOCTEST nowifi")
+                return
+            self.loc_tests.append(arg)
+            if self.loc_phone == "off":
+                self.emit("LOCTEST phone port=0 why=not-found lines=0 bad=0 malformed=0 settling=0 stale=0 "
+                          "nofix=0 weak=0 gga=0 rmc=0 disagree=0 skew_s=5", noise=True)
+                self.emit("LOCTEST wifi verdict=too-few-aps seen=3 usable=2 devices=2 http=0/0 acc_m=0/0 apart_m=0 "
+                          "dns_failed=0")
+                self.emit("OK LOCTEST nothing: phone not-found, wifi too-few-aps")
+            else:
+                self.emit("LOCTEST phone port=10110 why=ok lines=36 bad=0 malformed=0 settling=30 stale=0 "
+                          "nofix=0 weak=0 gga=2 rmc=2 disagree=0 skew_s=5")
+                self.emit("OK LOCTEST phone ok \u00b15m" + (" at 48.86,2.29" if arg else ""), noise=True)
         elif verb == "WIFILAST":
             if not rest or len(rest.encode()) > 32:
                 self.emit("ERR WIFILAST usage")
@@ -794,6 +825,38 @@ class BenchSelfTest(unittest.TestCase):
         code, _ = self.cli("power", "fake", "absent", "now")
         self.assertEqual(code, x4bench.EXIT_ERR)
         self.assertEqual(self.dev.power_ops, ["show", "fake absent", "fake real", "real"])
+
+    def test_locphone_and_loctest(self):
+        self.ser.close()
+        code, out = self.cli("locphone")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "off\n"))
+        code, out = self.cli("locphone", "192.0.2.10")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "192.0.2.10 ports=10110,11123\n"))
+        code, out = self.cli("locphone", "192.0.2.10:10110")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "192.0.2.10:10110\n"))
+        # A bad address never reaches the reader.
+        code, _ = self.cli("locphone", "phone.local")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.assertEqual(self.dev.loc_phone, "192.0.2.10:10110")
+        # LOCTEST needs a station up: the live sleep screen on this cable.
+        code, _ = self.cli("loctest")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.cli("sleep")
+        code, out = self.cli("loctest")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertTrue(lines[0].startswith("phone port=10110 why=ok"))
+        self.assertEqual(lines[-1], "phone ok \u00b15m")
+        code, out = self.cli("loctest", "coords")
+        self.assertEqual(out.splitlines()[-1], "phone ok \u00b15m at 48.86,2.29")
+        code, out = self.cli("locphone", "OFF")
+        self.assertEqual(out, "off\n")
+        code, out = self.cli("loctest")
+        self.assertIn("wifi verdict=too-few-aps", out)
+        self.assertEqual(out.splitlines()[-1], "nothing: phone not-found, wifi too-few-aps")
+        self.assertEqual(self.dev.loc_tests, ["", "coords", ""])
+        with self.assertRaises(SystemExit):  # argparse refuses anything but "coords"
+            x4bench.main(["--port", self.dev.url, "loctest", "now"], out=io.StringIO())
 
     def test_wifilast_sets_the_last_network(self):
         self.ser.close()
