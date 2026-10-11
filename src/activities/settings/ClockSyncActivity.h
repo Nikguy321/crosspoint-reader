@@ -23,6 +23,8 @@ class ClockSyncActivity final : public Activity {
   bool shouldTearDownWifiOnExit = false;
 
   void runSync();
+  // Formats the clock's time into syncedTime; true when that changed the line.
+  bool readTime();
   void launchWifiSelection();
   void onWifiSelectionComplete(bool connected);
 };

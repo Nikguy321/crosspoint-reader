@@ -1,19 +1,19 @@
 #pragma once
 #include "activities/UiListActivity.h"
 
-// Clock configuration under System settings: timezone, 12/24-hour format,
-// home-header display, and manual NTP sync. Only reachable when
-// halClock.isAvailable() — SettingsActivity gates the entry.
+// Clock configuration under System settings: timezone, Time Zone From Location
+// (X4 Pro), DST, 12/24-hour format, home-header display, and manual NTP sync.
+// Only reachable when halClock.isAvailable() — SettingsActivity gates the entry.
 class ClockSettingsActivity final : public UiListActivity {
  public:
   explicit ClockSettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-  static constexpr int ITEM_COUNT = 5;
+  static constexpr int ITEM_COUNT = 6;
 
   void onEnter() override;
 
  private:
-  int listCount() const override { return ITEM_COUNT; }
+  int listCount() const override { return rowCount_; }
   void buildScreen(UiScreen& screen) override;
   void activateIndex(int index) override;
   const char* headerTitle() const override;
@@ -22,5 +22,8 @@ class ClockSettingsActivity final : public UiListActivity {
   // the one formatted value (the sync row's live time) lives here so its
   // pointer stays valid across the frame. Fits "HH:MM PM" + NUL.
   char syncTime_[9] = {0};
+  // The rows shown, in order (MenuItem values): Time Zone From Location is X4 Pro only.
+  int rows_[ITEM_COUNT] = {};
+  int rowCount_ = 0;
   freeink::ui::ListItem rowItems_[ITEM_COUNT]{};
 };

@@ -22,6 +22,7 @@
 #include "sleepcards/AutoLocatePolicy.h"
 #include "sleepcards/CardTime.h"
 #include "util/TaskWatchdog.h"
+#include "util/Timezones.h"
 #endif
 
 namespace AutoLocate {
@@ -45,10 +46,14 @@ void skipped(const char* why) { LOG_INF("GEO", "autolocate: skipped %s", why); }
 void failed(const char* why) { LOG_INF("GEO", "autolocate: failed %s", why); }
 
 // The lookup itself; returns the log word of a failure (tooFew: a skip, not a failure), or nullptr
-// with what was saved in `saved`.
-const char* lookUpAndSave(bool& tooFew, const char*& saved) {
+// with what was saved in `saved`. `zone` is the clock zone decision for the fix (Time Zone From
+// Location; Off when none was made): set with the saved location, or put back when the save
+// failed after it was made.
+const char* lookUpAndSave(bool& tooFew, const char*& saved, clockzone::Decision& zone) {
   tooFew = false;
   saved = "";
+  zone = clockzone::Decision{};
+  zone.verdict = clockzone::Verdict::Off;
   // From here on this is the day's one try, whatever comes of it - except a Wi-Fi half that could
   // not start for want of TLS heap (below). The phone needs no TLS, so it is always asked.
   const uint32_t triedBefore = triedYmd;
@@ -56,11 +61,13 @@ const char* lookUpAndSave(bool& tooFew, const char*& saved) {
   triedYmd = policy::ymd(now.year, now.month, now.day);
   triedMagic = TRIED_MAGIC;
 
-  LocateRun::Options options;
-  options.wifiBudgetMs = BUDGET_MS;
-  options.quiet = true;
   LocateRun::Outcome outcome;
-  LocateRun::run(outcome, options);
+  {
+    LocateRun::Options options;
+    options.wifiBudgetMs = BUDGET_MS;
+    options.quiet = true;
+    LocateRun::run(outcome, options);
+  }
   resetTaskWatchdogIfSubscribed();
 
   if (!outcome.fix.valid()) {
@@ -106,15 +113,42 @@ const char* lookUpAndSave(bool& tooFew, const char*& saved) {
     saved = "kept phone";  // the phone's own record stands as it is
     return nullptr;
   }
+  // The clock zone from this run's own measurement comes first, so the record (and the day's try)
+  // is dated in the zone the clock now keeps, as Locate Me's is. A failure below puts it back:
+  // the clock keeps what the stored settings say.
+  const uint8_t zoneBefore = SETTINGS.clockTimezone;
+  zone = timezones::zoneForFix(outcome.fix);
+  const bool zoneSet = timezones::applyZoneForFix(zone);
+  const auto putZoneBack = [&] {
+    if (!zoneSet) return;
+    SETTINGS.clockTimezone = zoneBefore;
+    timezones::applyToClock();
+  };
+  int year = now.year;
+  int month = now.month;
+  int day = now.day;
+  if (zoneSet) {
+    struct tm local{};
+    if (halClock.localTime(local)) {
+      year = local.tm_year + 1900;
+      month = local.tm_mon + 1;
+      day = local.tm_mday;
+    }
+  }
   char location[sizeof(SETTINGS.sleepCardLocation)];
   char record[sizeof(SETTINGS.sleepCardLocationFix)];
-  if (!policy::autoRecord(source, lat, lon, accuracyM, now.year, now.month, now.day, location, sizeof(location), record,
+  if (!policy::autoRecord(source, lat, lon, accuracyM, year, month, day, location, sizeof(location), record,
                           sizeof(record))) {
+    putZoneBack();
     return "no-fix";
   }
   std::snprintf(SETTINGS.sleepCardLocation, sizeof(SETTINGS.sleepCardLocation), "%s", location);
   std::snprintf(SETTINGS.sleepCardLocationFix, sizeof(SETTINGS.sleepCardLocationFix), "%s", record);
-  if (!SETTINGS.saveToFile()) return "save";
+  if (!SETTINGS.saveToFile()) {
+    putZoneBack();
+    return "save";
+  }
+  triedYmd = policy::ymd(year, month, day);
   saved = fromPhone ? "saved phone" : "saved wifi";
   return nullptr;
 }
@@ -171,11 +205,18 @@ void run() {
   approved = false;
   bool tooFew = false;
   const char* saved = "";
-  const char* failure = lookUpAndSave(tooFew, saved);
-  if (failure == nullptr) {
+  clockzone::Decision zone;
+  const char* failure = lookUpAndSave(tooFew, saved, zone);
+  if (failure == nullptr && zone.verdict == clockzone::Verdict::Set) {
+    LOG_INF("GEO", "autolocate: %s, clock set %s", saved, timezones::table()[zone.entry].name);
+  } else if (failure == nullptr && zone.verdict != clockzone::Verdict::Off) {
+    LOG_INF("GEO", "autolocate: %s, clock %s", saved, clockzone::verdictName(zone.verdict));
+  } else if (failure == nullptr) {
     LOG_INF("GEO", "autolocate: %s", saved);
   } else if (tooFew) {
     skipped(failure);
+  } else if (zone.verdict == clockzone::Verdict::Set) {
+    LOG_INF("GEO", "autolocate: failed %s, clock unchanged", failure);
   } else {
     failed(failure);
   }

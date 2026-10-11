@@ -16,8 +16,11 @@
 // Skipped when the job's own request never reached its server, on the book-sync peer's or hub's
 // hotspot, without a set clock; tried at most once a day (the day of the last try survives the
 // reboot that ends every sync, and deep sleep). A failure keeps the location as it was. The
-// decisions are sleepcards/AutoLocatePolicy (host-tested). Logs one line, "autolocate: skipped|
-// failed <reason>" or "autolocate: saved phone|wifi" (or "kept phone"), and nothing about the place.
+// decisions are sleepcards/AutoLocatePolicy (host-tested). A saved location also sets the clock
+// zone when Time Zone From Location allows it (util/ClockZone, from this run's own fix). Logs one
+// line, "autolocate: skipped|failed <reason>" or "autolocate: saved phone|wifi" (or "kept phone"),
+// with ", clock set <zone entry>" or ", clock <verdict>" after a save (", clock unchanged" after
+// a failed one that had chosen a zone: it is put back), and nothing else about the place.
 namespace AutoLocate {
 
 // The most the Wi-Fi half adds to the job that called it: the scan, a name lookup capped at 3 s,

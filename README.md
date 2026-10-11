@@ -26,6 +26,10 @@ Pro. CrossPoint's own README follows further down.
 - **Locate Me** sets the cards' location from your phone's GPS over its hotspot, else from nearby Wi-Fi (beaconDB)
   when it is genuinely local, else not at all - never from your internet address. Nothing is sent until you press
   Locate. It can also refresh the location once a day during a sync. See [Locate Me's sources](#locate-mes-sources).
+- **The clock follows you across time zones** (Time Zone From Location, Settings > Clock, on by default): a location
+  Locate Me or the daily refresh saves also sets the clock's zone, with its own daylight saving rule, when the
+  location is at least 10 km and a map cell clear of any change of clock in North America; near a zone line, at sea
+  or anywhere else the zone you picked stays. The map is in the firmware, so the lookup sends nothing.
 - **Battery behaviour like the stock firmware:**
   - Auto Power Off turns the reader fully off after a set time asleep.
   - The awake reader naps between key presses, with the light on too.
@@ -98,6 +102,12 @@ over USB. Back up the stock firmware first: this fork has no way back to it on i
 
 The reader, the rendering and the wireless features are CrossPoint's work (MIT License); this fork adds the items
 above. To sync with upstream, `develop` is kept as CrossPoint's own branch.
+
+The time zone map behind Time Zone From Location (`lib/TzGrid`, shared with the
+[WiPhone](https://github.com/Nikguy321/wiphone-meshtastic) and COVEY) is derived from
+[timezone-boundary-builder](https://github.com/evansiroky/timezone-boundary-builder) 2026d, © OpenStreetMap
+contributors, and is available under the [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/);
+see [lib/TzGrid/README.md](lib/TzGrid/README.md).
 
 ---
 

@@ -327,11 +327,17 @@ Verbs
                            disagree= skew_s= (the clock allowance; -1 = no
                            trusted clock), LOCTEST wifi verdict= seen= usable=
                            devices= http=a/b acc_m=a/b apart_m= dns_failed=
-                           (when Wi-Fi was asked), then OK LOCTEST phone ok
+                           (when Wi-Fi was asked), LOCTEST clock verdict=
+                           zone=<IANA> (<name>) entry=<Time Zone entry> (with
+                           a location: what a save would do to the clock
+                           zone, Time Zone From Location; set, same, off,
+                           manual-dst, near-line, at-sea, outside,
+                           unmodelled, no-entry), then OK LOCTEST phone ok
                            ±<N>m | wifi agree ±<N>m | nothing: phone <why>,
                            wifi <verdict>.
-                           Nothing is saved. No position unless "coords"
-                           (then " at 48.86,2.29": two decimals).
+                           Nothing is saved. No position (beyond the clock
+                           zone) unless "coords" (then " at 48.86,2.29": two
+                           decimals).
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).

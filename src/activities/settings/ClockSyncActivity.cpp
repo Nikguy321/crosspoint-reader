@@ -7,6 +7,7 @@
 #include <WiFi.h>
 
 #include <cstdio>
+#include <cstring>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
@@ -79,12 +80,16 @@ void ClockSyncActivity::runSync() {
   SETTINGS.saveToFile();
 
   // Read the freshly synced time back for the user-facing confirmation.
-  char buf[9];
-  if (halClock.formatTime(buf, sizeof(buf), SETTINGS.clockFormat == 1)) {
-    snprintf(syncedTime, sizeof(syncedTime), "%s", buf);
-  }
+  readTime();
   state = SUCCESS;
   requestUpdate();
+}
+
+bool ClockSyncActivity::readTime() {
+  char buf[9];
+  if (!halClock.formatTime(buf, sizeof(buf), SETTINGS.clockFormat == 1) || strcmp(buf, syncedTime) == 0) return false;
+  snprintf(syncedTime, sizeof(syncedTime), "%s", buf);
+  return true;
 }
 
 void ClockSyncActivity::loop() {
@@ -98,6 +103,9 @@ void ClockSyncActivity::loop() {
     if (state == SUCCESS && AutoLocate::due(true)) {
       requestUpdateAndWait();
       AutoLocate::run();
+      // A location it saved may have set the clock zone (Time Zone From Location), and the lookup
+      // takes a while: the line shows the clock as it reads now.
+      if (readTime()) requestUpdate();
     }
     // Then the Weather card's forecast (its own opt-in; a cache over an hour old), for the
     // location just refreshed.

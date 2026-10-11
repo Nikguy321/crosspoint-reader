@@ -274,11 +274,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t clockUtcOffsetQ = 48;
   // Clock display format: 0 = 24-hour, 1 = 12-hour
   uint8_t clockFormat = 0;
-  // Index into the timezone table (src/util/Timezones.cpp, append-only).
+  // Index into the timezone table (src/util/TimezoneTable.cpp, append-only; test/tz_grid pins it).
   // 255 = never chosen; falls back to the legacy UTC offset, then UTC.
   uint8_t clockTimezone = 255;
   // CLOCK_DST_MODE: follow the zone's DST rule, or force it on/off.
   uint8_t clockDst = CLOCK_DST_AUTO;
+  // Time Zone From Location (X4 Pro): a location Locate Me or Update Location When Syncing saves
+  // also sets clockTimezone, when it is clearly inside a zone with another clock
+  // (util/ClockZone). Otherwise clockTimezone stays as picked.
+  uint8_t clockZoneFromLocation = 1;
   // Show the clock opposite the battery in every header band that draws one.
   uint8_t clockShowInHeader = 0;
   // Set once an NTP sync succeeds. Used to skip re-syncing on every WiFi connect.

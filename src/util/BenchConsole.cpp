@@ -30,6 +30,7 @@
 #include <driver/gpio.h>
 #include <soc/gpio_reg.h>
 #include <soc/soc.h>
+#include <tz_grid.h>
 
 #include <algorithm>
 #include <cstdarg>
@@ -58,6 +59,7 @@
 #include "util/LiveSleepPolicy.h"
 #include "util/PowerButtonTiming.h"
 #include "util/TaskWatchdog.h"
+#include "util/Timezones.h"
 
 extern GfxRenderer renderer;                   // defined in main.cpp
 extern MappedInputManager mappedInputManager;  // defined in main.cpp
@@ -1972,8 +1974,9 @@ void cmdLocPhone(const char* args) {
 }
 
 // LOCTEST [coords]: the whole locate pipeline (network/LocateRun: the phone - LOCPHONE's stand-in
-// when set - then Wi-Fi) on the station already up, its verdict printed and nothing saved. It
-// never starts the radio. No position unless asked for, and then at two decimals.
+// when set - then Wi-Fi) on the station already up, its verdict printed and nothing saved, and the
+// clock zone a save would set (Time Zone From Location, util/ClockZone). It never starts the
+// radio. No position unless asked for, and then at two decimals.
 void cmdLocTest(const char* args) {
   bool coords = false;
   if (!bench::parseLocTestArgs(args, coords)) {
@@ -2006,6 +2009,14 @@ void cmdLocTest(const char* args) {
           geolocate::wifiVerdictName(out.wifi), static_cast<int>(out.seen), static_cast<unsigned>(out.usable),
           static_cast<unsigned>(out.devices), out.statusA, out.statusB, static_cast<unsigned long>(out.accuracyA),
           static_cast<unsigned long>(out.accuracyB), static_cast<unsigned long>(out.apartM), out.dnsFailed ? 1 : 0);
+  }
+  if (out.fix.valid()) {
+    // What a save would do to the clock zone (settings as they are; nothing is set).
+    const clockzone::Decision zone = timezones::zoneForFix(out.fix);
+    const TzZone* grid = tzGridZone(zone.gridZone);
+    reply("LOCTEST clock verdict=%s zone=%s (%s) entry=%s", clockzone::verdictName(zone.verdict),
+          grid != nullptr ? grid->iana : "-", grid != nullptr ? grid->display : "-",
+          zone.entry >= 0 ? timezones::table()[zone.entry].name : "-");
   }
   char at[40] = "";
   if (coords && out.fix.valid()) snprintf(at, sizeof(at), " at %.2f,%.2f", out.fix.lat, out.fix.lon);

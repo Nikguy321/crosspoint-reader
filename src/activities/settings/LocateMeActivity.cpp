@@ -21,6 +21,7 @@
 #include "sleepcards/CardTime.h"
 #include "sleepcards/LocationFix.h"
 #include "sleepcards/SleepCardSettings.h"
+#include "util/Timezones.h"
 
 namespace fui = freeink::ui;
 
@@ -30,6 +31,97 @@ constexpr fui::ActionId ACTION_ROW = 1;
 // "47.62, -122.35": two decimals (~1 km) is all a place line needs.
 void shortCoordinates(const double lat, const double lon, char* out, const size_t cap) {
   std::snprintf(out, cap, "%.2f, %.2f", lat, lon);
+}
+
+// The map zone's region in the reader's language ("Eastern", "Mountain, no DST"); the Timezones
+// entry's own name (untranslated, as in the picker) for a zone without one.
+void zoneLabel(const clockzone::Decision& zone, char* out, const size_t cap) {
+  bool noDst = false;
+  const char* region = nullptr;
+  switch (clockzone::zoneRegion(zone.gridZone, &noDst)) {
+    case clockzone::Region::Hawaii:
+      region = tr(STR_TZ_REGION_HAWAII);
+      break;
+    case clockzone::Region::Aleutian:
+      region = tr(STR_TZ_REGION_ALEUTIAN);
+      break;
+    case clockzone::Region::Alaska:
+      region = tr(STR_TZ_REGION_ALASKA);
+      break;
+    case clockzone::Region::Pacific:
+      region = tr(STR_TZ_REGION_PACIFIC);
+      break;
+    case clockzone::Region::Mountain:
+      region = tr(STR_TZ_REGION_MOUNTAIN);
+      break;
+    case clockzone::Region::Central:
+      region = tr(STR_TZ_REGION_CENTRAL);
+      break;
+    case clockzone::Region::Eastern:
+      region = tr(STR_TZ_REGION_EASTERN);
+      break;
+    case clockzone::Region::Atlantic:
+      region = tr(STR_TZ_REGION_ATLANTIC);
+      break;
+    case clockzone::Region::Newfoundland:
+      region = tr(STR_TZ_REGION_NEWFOUNDLAND);
+      break;
+    case clockzone::Region::StPierre:
+      region = tr(STR_TZ_REGION_ST_PIERRE);
+      break;
+    case clockzone::Region::None:
+      break;
+  }
+  if (region == nullptr) {
+    const bool known = zone.entry >= 0 && static_cast<size_t>(zone.entry) < timezones::count();
+    std::snprintf(out, cap, "%s", known ? timezones::table()[zone.entry].name : "");
+  } else if (noDst) {
+    std::snprintf(out, cap, tr(STR_TZ_REGION_NO_DST), region);
+  } else {
+    std::snprintf(out, cap, "%s", region);
+  }
+}
+
+// The clock line under the place: "Clock: Eastern (from this location)", "Clock unchanged: near a
+// time zone line". Empty with Time Zone From Location off.
+void clockLine(const clockzone::Decision& zone, char* out, const size_t cap) {
+  out[0] = '\0';
+  const char* why = nullptr;
+  switch (zone.verdict) {
+    case clockzone::Verdict::Off:
+      return;
+    case clockzone::Verdict::Set:
+    case clockzone::Verdict::Same: {
+      char label[48];
+      zoneLabel(zone, label, sizeof(label));
+      std::snprintf(out, cap,
+                    zone.verdict == clockzone::Verdict::Set ? tr(STR_LOCATE_CLOCK_SET) : tr(STR_LOCATE_CLOCK_SAME),
+                    label);
+      return;
+    }
+    case clockzone::Verdict::ManualDst:
+      why = tr(STR_CLOCK_WHY_MANUAL_DST);
+      break;
+    case clockzone::Verdict::NotMeasured:
+      why = tr(STR_CLOCK_WHY_NOT_MEASURED);
+      break;
+    case clockzone::Verdict::NearLine:
+      why = tr(STR_CLOCK_WHY_NEAR_LINE);
+      break;
+    case clockzone::Verdict::AtSea:
+      why = tr(STR_CLOCK_WHY_AT_SEA);
+      break;
+    case clockzone::Verdict::Outside:
+      why = tr(STR_CLOCK_WHY_OUTSIDE);
+      break;
+    case clockzone::Verdict::Unmodelled:
+      why = tr(STR_CLOCK_WHY_UNMODELLED);
+      break;
+    case clockzone::Verdict::NoEntry:
+      why = tr(STR_CLOCK_WHY_NO_ENTRY);
+      break;
+  }
+  if (why != nullptr) std::snprintf(out, cap, tr(STR_LOCATE_CLOCK_UNCHANGED), why);
 }
 }  // namespace
 
@@ -41,6 +133,7 @@ void LocateMeActivity::onEnter() {
   state = State::Intro;
   selected = 0;
   fix = geolocate::Fix{};
+  clockZone = clockzone::Decision{};
   resetUi();
   app.on(ACTION_ROW, &LocateMeActivity::onRow, this);
   app.setScreen(&LocateMeActivity::screenFn, this);
@@ -200,8 +293,10 @@ void LocateMeActivity::runLookup() {
   // The result screen needs no radio; a session this activity started ends with the reboot.
   if (radioStarted) RadioPower::stop();
   fix = outcome.fix;
-  LOG_INF("LOC", "located: %s, accuracy %lu m", fix.source == geolocate::FixSource::Phone ? "phone" : "wifi",
-          static_cast<unsigned long>(fix.accuracyM));
+  clockZone = timezones::zoneForFix(fix);
+  LOG_INF("LOC", "located: %s, accuracy %lu m; clock zone: %s",
+          fix.source == geolocate::FixSource::Phone ? "phone" : "wifi", static_cast<unsigned long>(fix.accuracyM),
+          clockzone::verdictName(clockZone.verdict));
   selected = 0;
   state = State::Result;
   requestUpdate();
@@ -220,6 +315,10 @@ void LocateMeActivity::save() {
     LOG_ERR("LOC", "Location refused");
     fail(Failure::SaveFailed);
     return;
+  }
+  // The clock zone first, so the record's date below is the new zone's.
+  if (timezones::applyZoneForFix(clockZone)) {
+    LOG_INF("LOC", "Clock zone set: %s", timezones::table()[clockZone.entry].name);
   }
   record.source =
       fix.source == geolocate::FixSource::Phone ? sleepcards::LocationSource::Phone : sleepcards::LocationSource::Wifi;
@@ -306,23 +405,28 @@ void LocateMeActivity::buildScreen(UiScreen& screen) {
     actions[0].label = tr(STR_LOCATE);
     actions[1].label = tr(STR_CANCEL);
   } else if (state == State::Result) {
-    char coords[40];
-    shortCoordinates(fix.lat, fix.lon, coords, sizeof(coords));
-    char place[64];
-    std::snprintf(place, sizeof(place), tr(STR_LOCATE_NEAR), coords);
-    char accuracy[96];
-    char amount[16];
-    sleepcards::formatAccuracy(fix.accuracyM, amount, sizeof(amount));
-    if (fix.source == geolocate::FixSource::Wifi) {
-      std::snprintf(accuracy, sizeof(accuracy), tr(STR_LOCATE_ABOUT_WIFI), amount);
-    } else if (fix.accuracyM > 0) {
-      std::snprintf(accuracy, sizeof(accuracy), tr(STR_LOCATE_ABOUT_PHONE), amount);
-    } else {
-      std::snprintf(accuracy, sizeof(accuracy), "%s", tr(STR_LOCATION_FROM_PHONE));  // no HDOP: not known
+    // Each line is drawn as soon as it is built, so one buffer serves them in turn.
+    char line[96];
+    {
+      char coords[40];
+      shortCoordinates(fix.lat, fix.lon, coords, sizeof(coords));
+      std::snprintf(line, sizeof(line), tr(STR_LOCATE_NEAR), coords);
     }
-
-    textBlock(place, bold, 2, screen.theme().spaceSm);
-    textBlock(accuracy, body, 2, screen.theme().spaceSm);
+    textBlock(line, bold, 2, screen.theme().spaceSm);
+    {
+      char amount[16];
+      sleepcards::formatAccuracy(fix.accuracyM, amount, sizeof(amount));
+      if (fix.source == geolocate::FixSource::Wifi) {
+        std::snprintf(line, sizeof(line), tr(STR_LOCATE_ABOUT_WIFI), amount);
+      } else if (fix.accuracyM > 0) {
+        std::snprintf(line, sizeof(line), tr(STR_LOCATE_ABOUT_PHONE), amount);
+      } else {
+        std::snprintf(line, sizeof(line), "%s", tr(STR_LOCATION_FROM_PHONE));  // no HDOP: not known
+      }
+    }
+    textBlock(line, body, 2, screen.theme().spaceSm);
+    clockLine(clockZone, line, sizeof(line));
+    if (line[0] != '\0') textBlock(line, body, 2, screen.theme().spaceSm);
     screen.spacer(screen.theme().spaceLg);
     actions[0].label = tr(STR_LOCATE_SAVE);
     actions[1].label = tr(STR_CANCEL);

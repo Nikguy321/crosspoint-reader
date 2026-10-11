@@ -112,7 +112,8 @@ struct LocPhoneArgs {
 bool parseLocPhoneArgs(const char* args, LocPhoneArgs& out);
 
 // LOCTEST [coords]: the locate pipeline (network/LocateRun) on the station already up, its verdict
-// printed and nothing saved; "coords" adds the position at two decimals. Case ignored.
+// printed with the clock zone a save would set (util/ClockZone), and nothing saved; "coords" adds
+// the position at two decimals. Case ignored.
 bool parseLocTestArgs(const char* args, bool& coords);
 
 // WS                                         the puzzle on screen, dumped

@@ -4,7 +4,7 @@
 
 #include "activities/UiListActivity.h"
 
-// Timezone selection list (src/util/Timezones.cpp table). Selecting an entry
+// Timezone selection list (src/util/TimezoneTable.cpp table). Selecting an entry
 // persists it, re-applies the clock's TZ rule, and returns.
 class TimezonePickerActivity final : public UiListActivity {
  public:

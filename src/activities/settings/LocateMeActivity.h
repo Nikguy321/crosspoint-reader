@@ -6,6 +6,7 @@
 #include "components/UiAppHost.h"
 #include "network/GeolocateProtocol.h"
 #include "network/LocateRun.h"
+#include "util/ClockZone.h"
 
 /**
  * Display > Sleep Screen Cards > Locate Me (X4 Pro): finds the sleep-card location instead of
@@ -16,8 +17,9 @@
  *           then any saved one in range; the network list only when none is).
  *   Work    network/LocateRun: the phone's GPS over its hotspot, else nearby Wi-Fi when two
  *           beaconDB lookups agree. Never an internet-address lookup.
- *   Result  the place and how sure it is: Save stores it (with its source, accuracy and date),
- *           Cancel leaves the settings as they were.
+ *   Result  the place, how sure it is, and what Save does to the clock zone (Time Zone From
+ *           Location, util/ClockZone): Save stores the place (with its source, accuracy and date)
+ *           and that zone, Cancel leaves the settings as they were.
  *   Failed  why, in one plain line (what the phone and the Wi-Fi each said); when the network may
  *           not reach the internet, Choose Wi-Fi Network opens the network list and tries again on
  *           the one picked.
@@ -56,6 +58,8 @@ class LocateMeActivity final : public Activity, private UiAppHost {
   // The network list was opened from the failure screen: backing out of it returns there.
   bool pickingNetwork = false;
   geolocate::Fix fix;
+  // What Save does to the clock zone, decided with the fix (the result screen says it).
+  clockzone::Decision clockZone;
 
   static void screenFn(UiScreen& screen, void* user);
   static void onRow(const freeink::ui::ActionEvent& event, void* user);

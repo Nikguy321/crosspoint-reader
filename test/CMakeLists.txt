@@ -94,6 +94,8 @@ add_subdirectory(sleep_card_location)
 add_subdirectory(sleep_card_weather)
 add_subdirectory(geolocate)
 add_subdirectory(phone_nmea)
+# Time Zone From Location: the time zone map (lib/TzGrid) and the clock decisions on it.
+add_subdirectory(tz_grid)
 add_subdirectory(weather_protocol)
 # Word Search: the pure half, then its drawing (links SleepCardHost above).
 add_subdirectory(word_search)

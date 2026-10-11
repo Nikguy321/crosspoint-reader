@@ -116,7 +116,10 @@ The order is the phone's GPS, then Wi-Fi only when it is genuinely local, else n
 4. **Result**: "Near 47.62, -122.35" and how sure it is ("About 15 m, from phone GPS", "From
    phone GPS" without an HDOP, "About 60 m, from Wi-Fi"). **Save** stores the location in the
    usual `sleepCardLocation` form (the same check a typed entry passes) and the source record
-   above (`phone` or `wifi`); **Cancel** changes nothing.
+   above (`phone` or `wifi`); **Cancel** changes nothing. With **Time Zone From Location** on
+   (Settings > System > Clock, `clockZoneFromLocation`, on by default) a third line says what Save
+   does to the clock's zone, and Save sets it with the location - see
+   [Time Zone From Location](#time-zone-from-location).
 5. **Failures**, one plain line from what each source said: "No location: phone GPS not found
    and not enough known Wi-Fi nearby." (or "phone GPS has no fix", "nearby Wi-Fi gave answers
    that disagree", "nearby Wi-Fi is too rough to trust", "the Wi-Fi location service is
@@ -151,8 +154,51 @@ source read NMEA from a computer on the same network instead of the gateway (RAM
 off`; Locate Me and Update Location When Syncing never use it, so a stand-in is never saved), and
 `loctest` runs the whole pipeline on the station already up (the live sleep screen on the
 cable) and prints the verdict - `phone ok ±5m`, `wifi agree ±62m` or `nothing: phone not-found,
-wifi too-few-aps` - with the counts behind it, saving nothing (`loctest coords` adds the position
-at two decimals).
+wifi too-few-aps` - with the counts behind it and, with a location, the clock zone a save would
+set (`clock verdict=set zone=America/New_York (Eastern) entry=New York / Toronto`), saving
+nothing (`loctest coords` adds the position at two decimals).
+
+### Time Zone From Location
+
+On by default (Settings > System > Clock, X4 Pro; the row credits the map's data). When Locate
+Me's Save or Update Location When Syncing saves a location, `util/ClockZone` (pure,
+host-tested in `test/tz_grid`) decides the clock's zone from the same measured fix, and
+`timezones::applyZoneForFix` sets `clockTimezone` and hands the zone's POSIX rule to the clock
+before the settings are saved. A wrong clock is worse than an unchanged one, so the zone changes
+only when all of these hold:
+
+1. the fix is the phone's GPS or an agreed two-half Wi-Fi fix (the only kinds `LocateRun`
+   produces), no rougher than 10 km;
+2. the time zone map (`lib/TzGrid`: North America at 0.05 degrees, ~80 KB of flash, no RAM; the
+   WiPhone's map, copied unchanged) answers a zone there - it refuses within one cell (1.7-5.6
+   km) of any change of clock, at sea beyond the territorial waters, outside the map (south of
+   7 N, north of 72 N, east of 50 W), and in zones whose rules it does not model (Cuba,
+   Greenland) - and every cell within 10 km plus the fix's accuracy keeps that clock too. A
+   phone's relayed fix can be kilometres off with nothing in its sentence to say so, and the map's
+   own one-cell band is sized for a receiver metres off; 10 km is the WiPhone's margin for the same
+   phone apps (it keeps every coastal capital and refuses the places near a real line: Knox IN,
+   the Hopi villages, Victoria BC, Atikokan, Dawson Creek);
+3. an entry of the Time Zone list stands for the zone: the one with the same IANA name, else the
+   first whose POSIX rule is the same text (Detroit finds New York / Toronto, Vancouver - one
+   offset all year since 2026 - finds Phoenix). Four North American entries were appended for the
+   zones none kept the clock of (Aleutian Islands, Cancun / Panama / Jamaica, Puerto Rico /
+   Caribbean, St. Pierre & Miquelon); the map's few zones outside North America (Guyana, far-east
+   Russia) have none and change nothing;
+4. Daylight Saving is Auto (forced on or off is the owner's own override of the zone's rule);
+5. the entry keeps a different clock from the zone in use (the rules compared with the zone
+   abbreviations set aside): Detroit and Windsor, or a fixed UTC-5 and Panama, change nothing.
+
+Locate Me's result screen says which: "Clock: Eastern (from this location)", "Clock: Eastern
+(already set)", or "Clock unchanged: " and the reason (near a time zone line, at sea, outside
+the time zone map, this zone's rules are not covered, no clock setting for this zone, Daylight
+Saving is set by hand); the region word ("Eastern", "Mountain, no DST") is a translated string
+(`clockzone::zoneRegion`), and a zone without one is named by its Time Zone entry. **Sync Clock
+Now**'s "Current time" line is read again after the location step, so a zone it set shows at
+once. Update Location When Syncing adds it to its one log line
+(`autolocate: saved wifi, clock set New York / Toronto`, `autolocate: saved phone, clock
+near-line`). The lookup sends nothing anywhere. The map's data is derived from
+timezone-boundary-builder 2026d, © OpenStreetMap contributors, under the ODbL 1.0
+([lib/TzGrid/README.md](../lib/TzGrid/README.md)).
 
 ### Update Location When Syncing
 
@@ -214,10 +260,15 @@ requests), then the two requests cut to what is left with a 4 s connect timeout 
 server that answers the TCP connect and then stalls mid-handshake can hold it a few seconds past
 the budget (each blocking handshake read may wait the connect timeout). Any failure leaves the
 settings as they were and the calling job carries on. The log gets one line per sync and nothing
-about the place: `autolocate: saved phone|wifi`, `autolocate: kept phone`, `autolocate: skipped
+about the place but the clock zone a save set (Time Zone From Location, above): `autolocate:
+saved phone|wifi` (with `, clock set <zone entry>` or `, clock <verdict>` when the setting is on),
+`autolocate: kept phone`, `autolocate: skipped
 <reason>` (`job-offline`, `not-connected`, `device-network`, `no-clock`, `tried-today`, `fresh`,
 `sleeping`, `too-few-aps`) or `autolocate: failed <reason>` (`no-memory`, `dns`, `unreachable`,
-`no-fix`, `too-vague`, `disagree`, `save`), after the lookup's own `phone:` and `locate:` lines.
+`no-fix`, `too-vague`, `disagree`, `save`; `, clock unchanged` after a failed save that had
+chosen a zone, which is put back so the clock keeps what the stored settings say), after the
+lookup's own `phone:` and `locate:` lines. The zone is set before the record is made, so the
+record and the day's try are dated in the zone the clock now keeps, as Locate Me's are.
 ESP-IDF's own error lines (esp-tls, HTTP_CLIENT) can add a line on a connect failure; they name
 the host, never a place or a network.
 

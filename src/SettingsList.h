@@ -561,12 +561,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &CrossPointSettings::clockFormat,
                           {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
                           StrId::STR_CUSTOMISE_STATUS_BAR),
-        // Index into the append-only table in src/util/Timezones.cpp; 255 = unset.
+        // Index into the append-only table in src/util/TimezoneTable.cpp (pinned by test/tz_grid); 255 = unset.
         SettingInfo::Value(StrId::STR_TIMEZONE, &CrossPointSettings::clockTimezone, {0, 255, 1}, "clockTimezone",
                            StrId::STR_CUSTOMISE_STATUS_BAR),
         SettingInfo::Enum(StrId::STR_CLOCK_DST, &CrossPointSettings::clockDst,
                           {StrId::STR_CLOCK_DST_AUTO, StrId::STR_STATE_ON, StrId::STR_STATE_OFF}, "clockDst",
                           StrId::STR_CUSTOMISE_STATUS_BAR),
+        // X4 Pro only (removed below): the locations it follows come from Locate Me.
+        SettingInfo::Toggle(StrId::STR_TZ_FROM_LOCATION, &CrossPointSettings::clockZoneFromLocation,
+                            "clockZoneFromLocation", StrId::STR_CUSTOMISE_STATUS_BAR),
         SettingInfo::Toggle(StrId::STR_CLOCK_IN_HEADER, &CrossPointSettings::clockShowInHeader, "clockShowHeader",
                             StrId::STR_CUSTOMISE_STATUS_BAR),
         // Persistence flag for NTP debounce. Resetting from the web UI forces a re-sync
@@ -583,6 +586,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
     if (!BoardConfig::isX4Pro()) eraseEntry(StrId::STR_DBL_CLICK_PWR_LIGHT);
     // Auto power-off cuts the X4 Pro's peripheral rail latch; no other board has one to cut.
     if (!BoardConfig::isX4Pro()) eraseEntry(StrId::STR_AUTO_POWER_OFF);
+    // Time Zone From Location follows Locate Me, which only the X4 Pro has.
+    if (!BoardConfig::isX4Pro()) eraseEntry(StrId::STR_TZ_FROM_LOCATION);
     // Tilt page turn needs the QMI8658 IMU (X3).
     if (!halTiltSensor.isAvailable()) eraseEntry(StrId::STR_TILT_PAGE_TURN);
     // Sleep-screen cards: X4 Pro only (see the sleepScreen labels above).
