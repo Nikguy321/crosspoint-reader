@@ -84,8 +84,9 @@ otherwise - a wrong location is worse than none:
 
 Setting up an Android phone with gpsdRelay, in short: turn on the phone's Wi-Fi hotspot (the reader needs 2.4 GHz) and
 join it from the reader like any network; in gpsdRelay, allow precise location, set its battery use to Unrestricted,
-and add the TCP server above with NMEA relaying ticked and NMEA generation unticked; turn Monitor default network
-state off in its settings (otherwise it stops whenever the phone loses cell signal); start it, then run Locate Me
+and add the TCP server above with NMEA relaying ticked and NMEA generation unticked, then turn on the switch next to
+the server (gpsdRelay adds it switched off); turn Monitor default network state off in its settings (otherwise it
+stops whenever the phone loses cell signal); start it (after any server change, stop and start it again), then run Locate Me
 outdoors or by a window. The
 [WiPhone guide](https://github.com/Nikguy321/wiphone-meshtastic/blob/main/docs/phone-location.md) has the
 step-by-step setup for each app (hotspot settings, permissions, battery) and applies to the reader unchanged. With
