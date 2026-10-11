@@ -80,14 +80,17 @@ int connectWithin(const uint32_t address, const uint16_t port, const uint32_t ti
   return fd;
 }
 
-// Reads one connection into reader until a fix, the peer closing, or windowMs ending. Returns the
-// time it took.
-unsigned long readStream(const int fd, phonenmea::Reader& reader, const int64_t nowUtcS, const unsigned long windowMs) {
+// Reads one connection into reader until a fix, the peer closing, or windowMs ending - stretched to
+// warmMs while the phone answers "no fix yet". Returns the time it took.
+unsigned long readStream(const int fd, phonenmea::Reader& reader, const int64_t nowUtcS, const unsigned long windowMs,
+                         const unsigned long warmMs) {
   const unsigned long connected = millis();
   char buf[128];
   for (;;) {
     const unsigned long elapsed = millis() - connected;
-    if (elapsed >= windowMs || reader.located()) return elapsed;
+    if (reader.located()) return elapsed;
+    // Past the window, keep reading only while the phone says its GPS has no fix yet (warming up).
+    if (elapsed >= windowMs && (elapsed >= warmMs || !reader.heard() || reader.stats().noFix == 0)) return elapsed;
     const int n = recv(fd, buf, sizeof(buf), MSG_DONTWAIT);
     if (n > 0) {
       // The clock read at the start, moved on by the time since (whole seconds are enough).
@@ -126,7 +129,8 @@ Result read(const int64_t nowUtcS, const int64_t maxSkewS, const Target& target)
     result.accepted = true;
     phonenmea::Reader reader(maxSkewS);
     const int64_t now = nowUtcS < 0 ? -1 : nowUtcS + static_cast<int64_t>(millis() - started) / 1000;
-    readMs += readStream(fd, reader, now, phonenmea::READ_WINDOW_MS - readMs);
+    readMs += readStream(fd, reader, now, phonenmea::READ_WINDOW_MS - readMs,
+                         phonenmea::WARM_WINDOW_MS > readMs ? phonenmea::WARM_WINDOW_MS - readMs : 0);
     close(fd);
     result.port = port;
     result.heard = reader.heard();

@@ -68,7 +68,12 @@ otherwise - a wrong location is worse than none:
    listens: nothing is sent to the phone and no Bluetooth is involved. A fix counts only from a checksummed GGA
    sentence that is current (newer than the replayed backlog, and matching the reader's clock, allowing for its drift
    since the last sync), a real fix (quality 1, 2, 4 or 5), strong enough (4+ satellites, HDOP 10 or less, when
-   given) and in agreement with another such sentence a second or so before it. Phone apps that serve this:
+   given) and in agreement with another such sentence a second or so before it. When the phone answers but its GPS
+   has no fix yet (still warming up), the reader keeps listening for up to 30 s instead of a few. Phone apps that
+   serve this:
+   - **NH Devices Companion** (Android, free, open source, recommended): made for this reader and the WiPhone.
+     One button sets it up; only devices on the phone's hotspot can read the position; the GPS runs only while a
+     device is connected. [Download and setup](https://github.com/Nikguy321/wiphone-meshtastic/blob/main/docs/phone-location.md#3a-android-nh-devices-companion-recommended).
    - **gpsdRelay** (Android, [F-Droid](https://f-droid.org/packages/io.github.project_kaat.gpsdrelay/)): a TCP server
      on 0.0.0.0, port 10110, relaying the receiver's own NMEA with sentence generation off (generation alone sends
      RMC only, which is not enough, and its generated coordinates can be kilometres off near a whole degree).
@@ -82,7 +87,9 @@ otherwise - a wrong location is worse than none:
 3. **Nothing**, with a one-line reason on screen. There is no internet-address (IP) lookup anywhere in this firmware
    (a static check enforces it): on a phone hotspot that names the carrier's exit city, often hundreds of km away.
 
-Setting up an Android phone with gpsdRelay, in short: turn on the phone's Wi-Fi hotspot (the reader needs 2.4 GHz) and
+With NH Companion: install it, tap **Set up everything**, turn on the phone's Wi-Fi hotspot (2.4 GHz) and join it from
+the reader, then run Locate Me outdoors or by a window. Setting up an Android phone with gpsdRelay instead, in short
+(on Samsung phones it stops sending when the screen locks): turn on the phone's Wi-Fi hotspot (the reader needs 2.4 GHz) and
 join it from the reader like any network; in gpsdRelay, allow precise location, set its battery use to Unrestricted,
 and add the TCP server above with NMEA relaying ticked and NMEA generation unticked, then turn on the switch next to
 the server (gpsdRelay adds it switched off); turn Monitor default network state off in its settings (otherwise it

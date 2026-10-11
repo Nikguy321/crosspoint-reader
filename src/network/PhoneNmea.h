@@ -34,6 +34,9 @@ constexpr uint16_t PORT_NMEA = 10110;    // the IANA NMEA-0183 port (gpsdRelay, 
 constexpr uint16_t PORT_GPS2IP = 11123;  // GPS 2 IP's default (iPhone)
 constexpr uint32_t CONNECT_TIMEOUT_MS = 1500;
 constexpr uint32_t READ_WINDOW_MS = 8000;
+// ...or this long when the phone answers "no fix yet": a GPS warming up. NH Companion turns the
+// phone's GPS on only when a device connects, and a first fix can take 5-30 s.
+constexpr uint32_t WARM_WINDOW_MS = 30000;
 constexpr uint32_t SETTLE_MS = 2000;
 // The sentence time against the reader's clock: MAX_SKEW_S right after an NTP sync, plus one
 // second for every SKEW_DRIFT_DIVISOR seconds since (100 ppm: the RTC crystal's drift, cold

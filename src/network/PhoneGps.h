@@ -8,7 +8,8 @@
 // Locate Me's phone source, the socket half (X4 Pro): on a station already joined (it never starts
 // the radio), connects to the network's gateway - on a phone's hotspot, the phone - at port 10110
 // (gpsdRelay, Share GPS), then 11123 (GPS 2 IP), each connect bounded to
-// phonenmea::CONNECT_TIMEOUT_MS, and reads NMEA for up to phonenmea::READ_WINDOW_MS into a
+// phonenmea::CONNECT_TIMEOUT_MS, and reads NMEA for up to phonenmea::READ_WINDOW_MS (WARM_WINDOW_MS
+// while the phone answers "no fix yet") into a
 // phonenmea::Reader, which decides whether a sentence is a fix. Nothing is sent to the phone. A
 // plain TCP socket (lwIP), closed before returning; no task, no heap. Logs no position.
 //
@@ -33,7 +34,8 @@ struct Result {
   const char* why = "not-found";  // "ok", "not-found", "no-station", or phonenmea::Reader::why()
 };
 
-// Blocks the calling (loop) task for at most two connect timeouts plus one read window (~11 s).
+// Blocks the calling (loop) task for at most two connect timeouts plus one read window (~11 s), or
+// ~33 s when the phone answers but its GPS has no fix yet.
 // nowUtcS: the reader's UTC clock at the call when it is set from the internet, else -1;
 // maxSkewS: how far a sentence's time may be from it (phonenmea::skewAllowanceS).
 Result read(int64_t nowUtcS, int64_t maxSkewS, const Target& target = Target{});
