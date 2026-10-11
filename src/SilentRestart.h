@@ -12,6 +12,8 @@ void silentRestartToReader();    // currently-open EPUB (APP_STATE.openEpubPath)
 void silentRestartToSettings();  // settings screen
 // Settings > Display > Sleep Screen Cards, over Settings (Back returns there). Locate Me's exit.
 void silentRestartToSleepCards();
+// The Apps list with the AI row selected: the AI app's exit after it used Wi-Fi.
+void silentRestartToApps();
 
 // True once deep sleep has committed (the outgoing activity's onExit runs after that): an exit
 // path must not start network work then.

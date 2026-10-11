@@ -51,6 +51,9 @@ Pro. CrossPoint's own README follows further down.
   228 pages and 69 line drawings from U.S. Army manuals approved for public release; first aid written fresh from
   current CDC / NPS / NWS guidance. Breadcrumbs, PREV / MENU / NEXT across pages and topics, quick cards, search,
   bookmarks and recent, resumed after sleep. Reviewed by AI reviewers, not by a medical professional: reference only.
+- **AI** (X4 Pro): ask Google's Gemini a question on the on-screen keyboard and read the answer as plain text, with
+  today's date and a Wikipedia lookup sent along so recent things come out right. Your own free key; Wi-Fi only while
+  it answers. See [AI](#ai).
 - **More room**: the stock 16 MB flash layout (two 7.875 MB app slots) for the `x4pro` build.
 - **A USB bench console** (`x4pro` dev build): drive the reader from a computer with `scripts/x4bench.py`, including
   keys, taps, screenshots, files and card previews.
@@ -100,6 +103,61 @@ step-by-step setup for each app (hotspot settings, permissions, battery) and app
 the `x4pro` dev build, `scripts/x4bench.py locphone <address>` lets a computer on the same network stand
 in for the phone for `scripts/x4bench.py loctest`, which prints what the pipeline would find without saving it (Locate
 Me itself always asks the network's gateway).
+
+## AI
+
+**Apps > AI** (X4 Pro) asks Google's Gemini a question and shows the answer as plain text, page by page, the way the
+survival guide shows a page. It needs Wi-Fi and your own free Gemini API key.
+
+**The key, once:**
+
+1. On a computer or phone, open [aistudio.google.com](https://aistudio.google.com) and sign in with a Google account.
+2. Choose **Get API key**, then **Create API key**, and copy the key.
+3. Make a plain text file named `gemini.txt` with one line: `key=YOUR-KEY`. Optional lines: `model=gemini-flash-latest`,
+   and `lookup=off` for no Wikipedia lookup (also `thinking=0..8192`, `fallback=<model>` or `fallback=none`).
+4. Put `gemini.txt` in a folder named `API Keys` at the root of the reader's SD card, with a computer: the card in a
+   card reader, or the reader connected as a **USB Drive** (File Transfer > USB Drive). Both names may be in any case.
+   The Wi-Fi File Transfer page and WebDAV cannot do it: they never show that folder, and refuse to write into it
+   (a key sent over the network could not be kept write-only there, so they do not take one).
+5. Open the AI app again. **Key info & help** says whether the key was found, and its length - never the key.
+
+**What it does:**
+
+- **Ask a question** opens the keyboard. The reader joins a saved Wi-Fi network for the question (the network list
+  only when none is in range) and turns Wi-Fi off as soon as the answer is in. Back, the Cancel button or the left key
+  cancels a question on its way.
+- **Gemini Flash answers first; Flash-Lite when Flash is busy or its free daily limit is used up** (a free key gets
+  about 20 Flash answers a day). The answer says which model gave it. A model that has used its daily limit is
+  remembered until Google says it comes back, so later questions go straight to Flash-Lite.
+- **Today's date and time** (from the clock, once it has been set from the internet) go with every question, so the
+  model knows how old its own knowledge is.
+- **A Wikipedia lookup before each question:** a few keywords of the question (never the question itself) are
+  searched on en.wikipedia.org, and the opening sentences of up to two articles that are actually about them go along
+  as background. Such an answer ends with a "Wikipedia: ..." line naming the articles. `lookup=off` turns it off.
+- **Retry if it times out** (the app's menu, on by default): free-tier Flash can take a minute or more to answer, and
+  the reader waits up to 150 s for each request. When nothing comes in time, it asks Flash once more, then Flash-Lite
+  once. Off: the "did not answer in time" message shows at once.
+- **A topic:** the last four answered questions since a **New topic** (or a two-hour gap) go along, so a follow-up
+  like "and when?" works. The questions of the session stay listed until the app is left; nothing is saved on the card
+  but the remembered daily limits (`/.crosspoint/ai/quota.txt`).
+- **Plain text:** the model is asked for plain ASCII text with no markdown, and anything else is folded or dropped.
+
+**Privacy:** your question (with the topic's earlier questions and answers, the date, and any background) goes to
+Google with your key, in a header over a TLS connection verified against Google Trust Services' roots only. Only the
+question's keywords go to Wikipedia (verified against the ISRG roots only), with no key and no identifier but the
+firmware's name. The key stays in `/API Keys/gemini.txt`: the reader never shows it, the Library never lists that
+folder, the file browser does not open its files and the bench console does not print them. The Wi-Fi File Transfer
+page and WebDAV never list that folder (a folder named `API Keys` anywhere, in any case) and refuse to download, write,
+rename, move or delete anything in it. Anyone with the card - or with the reader in USB Drive mode - has the key, so
+treat the card like the key.
+
+With the `x4pro` dev build, `scripts/x4bench.py aikey` prints what the app reads in `gemini.txt` (never the key) and
+`scripts/x4bench.py ai <question>` asks a question without the keyboard on a station already up (the live sleep
+screen on the cable), printing the stages, the model, the timing and the answer.
+
+The Gemini and Wikipedia rules (`lib/Gemini`, `lib/WikiLookup`) are shared with the
+[WiPhone firmware](https://github.com/Nikguy321/wiphone-meshtastic) by the same author: the same request, parsing,
+retries and keywords on both devices.
 
 ## Installing it
 

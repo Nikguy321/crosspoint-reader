@@ -87,7 +87,7 @@ size_t scanAccessPoints(geolocate::AccessPoint* out, const size_t cap, int16_t& 
   return count;
 }
 
-bool resolveWithin(const char* host, const uint32_t timeoutMs) {
+bool resolveWithin(const char* host, const uint32_t timeoutMs, bool (*tick)(void* ctx), void* ctx) {
   ip_addr_t address;
   LOCK_TCPIP_CORE();  // the answer callback runs on the TCP/IP task
   const uint32_t lookup = dnsLookup + 1;
@@ -100,7 +100,10 @@ bool resolveWithin(const char* host, const uint32_t timeoutMs) {
   if (err == ERR_OK) return true;  // cached already
   if (err != ERR_INPROGRESS) return false;
   const unsigned long started = millis();
-  while (!dnsDone && millis() - started < timeoutMs) delay(20);
+  while (!dnsDone && millis() - started < timeoutMs) {
+    if (tick != nullptr && !tick(ctx)) return false;
+    delay(20);
+  }
   return dnsDone && dnsFound;
 }
 
@@ -244,7 +247,7 @@ size_t scanAccessPoints(geolocate::AccessPoint*, size_t, int16_t& found) {
 
 bool enoughHeap() { return false; }
 
-bool resolveWithin(const char*, uint32_t) { return false; }
+bool resolveWithin(const char*, uint32_t, bool (*)(void*), void*) { return false; }
 
 Result request(const char*, const char*, char* out, const size_t cap, size_t& length, int& status, const Options&) {
   length = 0;

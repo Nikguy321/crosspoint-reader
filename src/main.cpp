@@ -38,6 +38,7 @@
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
+#include "activities/apps/AppsActivity.h"
 #include "activities/apps/CrosswordActivity.h"
 #include "activities/apps/GuideApp.h"
 #include "activities/apps/SudokuActivity.h"
@@ -159,7 +160,9 @@ constexpr uint32_t SILENT_REBOOT_TARGET_SETTINGS = 2;
 constexpr uint32_t SILENT_REBOOT_TARGET_SLEEP_CARDS = 3;
 // The app in APP_STATE.lastSleepApp (a live sleep screen's wake inside an app).
 constexpr uint32_t SILENT_REBOOT_TARGET_APP = 4;
-constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_APP;
+// The Apps list, its AI row selected (the AI app's exit after a question used Wi-Fi).
+constexpr uint32_t SILENT_REBOOT_TARGET_APPS = 5;
+constexpr uint32_t SILENT_REBOOT_TARGET_MAX = SILENT_REBOOT_TARGET_APPS;
 constexpr uint32_t SILENT_REBOOT_LIGHT_ON = 1U << 0;
 // A key on the live sleep screen: the reopen is a wake, so Pull on Open runs as after deep sleep.
 constexpr uint32_t SILENT_REBOOT_LIVE_WAKE = 1U << 1;
@@ -225,6 +228,8 @@ void silentRestartToReader() { silentRestartTo(SILENT_REBOOT_TARGET_READER, "rea
 void silentRestartToSettings() { silentRestartTo(SILENT_REBOOT_TARGET_SETTINGS, "settings"); }
 
 void silentRestartToSleepCards() { silentRestartTo(SILENT_REBOOT_TARGET_SLEEP_CARDS, "sleep cards"); }
+
+void silentRestartToApps() { silentRestartTo(SILENT_REBOOT_TARGET_APPS, "apps"); }
 
 void restartToHomeAfterStorageHandoff() {
   if (deepSleepInProgress) return;  // sleeping supersedes the storage handoff reboot
@@ -1092,6 +1097,11 @@ void setup() {
   } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_APP &&
              APP_STATE.lastSleepApp != 0) {
     resumeLastApp();
+  } else if (resume == BootResume::Silent && snapshotTarget == SILENT_REBOOT_TARGET_APPS) {
+    // Back from the AI app: the Apps list, the AI row selected.
+    clearLastSleepApp();
+    AppsActivity::selectOnNextOpen(AppsActivity::App::Ai);
+    activityManager.goToApps();
   } else if (resume == BootResume::Silent && BookSyncHooks::bootToLibrary()) {
     // A sync on closing a book with the library-bound Back finishes there.
     activityManager.goToFileBrowser(APP_STATE.openEpubPath);

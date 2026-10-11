@@ -107,6 +107,9 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
     doc["sleepCardLocationFix"] = sleepCardLocationFix;
   }
 
+  // Apps > AI's own menu row (network/AiRun), kept off the settings screens: not in SettingsList.
+  doc["aiRetryTimeouts"] = aiRetryTimeouts;
+
   // Language -- managed by LanguageSelectActivity, not in SettingsList.
   // Stored as ISO code string ("EN", "DE", ...) for stability across enum reorders.
   doc["language"] = (language < getLanguageCount()) ? LANGUAGE_CODES[language] : "EN";
@@ -277,6 +280,9 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
                                         sizeof(sleepCardLocationFix))) {
     sleepCardLocationFix[0] = '\0';
   }
+
+  // Absent (a settings file older than the AI app) means on.
+  aiRetryTimeouts = (doc["aiRetryTimeouts"] | static_cast<uint8_t>(1)) != 0 ? 1 : 0;
 
   // Language -- stored as code string for stability across enum reorders.
   if (doc["language"].is<const char*>()) {

@@ -6,13 +6,13 @@
 // replace, and its Back replaces back to this list, so no stack has to survive sleep or a boot
 // (an app resumes on its own: Activity::resumeApp). Back here goes Home with the Apps row
 // selected. The rows are decided when the list is built: Crossword, Sudoku and Survival (the guide)
-// need a touch screen.
+// need a touch screen; AI (Gemini over Wi-Fi) is X4 Pro only.
 class AppsActivity final : public UiListActivity {
  public:
   explicit AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
 
-  enum class App : uint8_t { WordSearch, Crossword, Sudoku, Guide };
-  static constexpr int MAX_APPS = 4;
+  enum class App : uint8_t { WordSearch, Crossword, Sudoku, Guide, Ai };
+  static constexpr int MAX_APPS = 5;
 
   // The app a Back is leaving: the next Apps list opens with its row selected (once).
   static void selectOnNextOpen(App app);

@@ -41,6 +41,7 @@
 #include "LiveSleep.h"
 #include "WifiCredentialStore.h"
 #include "activities/Activity.h"  // ActivityManager and RenderLock, with Activity complete
+#include "activities/apps/AiText.h"
 #include "activities/apps/CrosswordActivity.h"
 #include "activities/apps/GuideApp.h"
 #include "activities/apps/GuidePageActivity.h"
@@ -49,6 +50,7 @@
 #include "activities/apps/WordSearchActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
 #include "activities/boot_sleep/SleepCardPreviewActivity.h"
+#include "network/AiRun.h"
 #include "network/GeolocateProtocol.h"
 #include "network/LocateRun.h"
 #include "network/PhoneGps.h"
@@ -704,6 +706,11 @@ void cmdCat(char* args, const bool exclusive) {
     return;
   }
   if (!fileVerbAllowed("CAT", exclusive)) return;
+  // The AI app's key file is never printed (AIKEY says what it holds, never the key).
+  if (aitext::isKeyFolderPath(path)) {
+    reply("ERR CAT keyfile");
+    return;
+  }
   if (!Storage.exists(path)) {
     reply("ERR CAT notfound");
     return;
@@ -1057,6 +1064,13 @@ void cmdApp(const char* args, const bool exclusive) {
   } else if (target == bench::AppTarget::Guide) {
     activityManager.goToGuide();
     snprintf(pathBuf, sizeof(pathBuf), "%s", GuideScreen::NAME_HOME);
+  } else if (target == bench::AppTarget::Ai) {
+    if (!BoardConfig::isX4Pro()) {
+      reply("ERR APP board");
+      return;
+    }
+    activityManager.goToAi();
+    snprintf(pathBuf, sizeof(pathBuf), "%s", "Ai");
   } else {
     activityManager.goToWordSearch();
     snprintf(pathBuf, sizeof(pathBuf), "%s", WordSearchActivity::NAME);
@@ -2033,6 +2047,105 @@ void cmdLocTest(const char* args) {
   }
 }
 
+// AIASK: the ladder's stages as they come, and the watchdog fed (the question blocks this loop for
+// minutes at most: Gemini's 150 s wait, its retries).
+bool aiBenchTick(void*) {
+  resetTaskWatchdogIfSubscribed();
+  return true;
+}
+
+void aiBenchChanged(const AiRun::Progress& progress, void*) {
+  reply("AIASK stage %s%s%s", progress.stage, progress.model[0] ? " | " : "", progress.model);
+}
+
+// The answer, each line of it in pieces the console's line cap takes.
+void aiBenchText(const char* text) {
+  constexpr size_t PIECE = 180;
+  for (const char* line = text; *line != '\0';) {
+    const char* end = strchr(line, '\n');
+    size_t len = end ? static_cast<size_t>(end - line) : strlen(line);
+    if (len == 0) reply("AIASK |");
+    for (size_t at = 0; at < len; at += PIECE) {
+      const size_t take = std::min(PIECE, len - at);
+      reply("AIASK | %.*s", static_cast<int>(take), line + at);
+    }
+    line += len;
+    if (*line == '\n') ++line;
+  }
+}
+
+// AIASK [--new] <question>: Apps > AI's question without the keyboard (network/AiRun), on the station
+// already up (the live sleep screen on this cable keeps one; it never starts the radio). Prints the
+// stages, the model and timing, the answer (plain text, its "Wikipedia:" line last) and the lookup's
+// outcome - never the key. The question joins the app's topic, as one typed would.
+void cmdAiAsk(char* args, const bool exclusive) {
+  bool fresh = false;
+  char* question = nullptr;
+  if (!bench::parseAiAskArgs(args, fresh, question)) {
+    reply("ERR AIASK usage");
+    return;
+  }
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR AIASK board");
+    return;
+  }
+  if (!fileVerbAllowed("AIASK", exclusive)) return;  // the key file is read from the card
+  if (WiFi.status() != WL_CONNECTED) {
+    reply("ERR AIASK nowifi");
+    return;
+  }
+  AiRun::reloadKey();
+  if (!AiRun::keyInfo().usable) {
+    reply("ERR AIASK nokey");
+    return;
+  }
+  if (fresh) AiRun::newTopic();
+  reply("AIASK asking: %u chars, %s, retry %s", static_cast<unsigned>(strlen(question)),
+        AiRun::topicRunning() ? "with the topic" : "a new topic", AiRun::retryTimeouts() ? "on" : "off");
+  AiRun::Hooks hooks;
+  hooks.tick = &aiBenchTick;
+  hooks.changed = &aiBenchChanged;
+  AiRun::Outcome out;
+  AiRun::ask(question, hooks, out);
+  reply("AIASK model=%s attempts=%d http=%d net=%d ms=%lu", out.label[0] ? out.label : "-", out.attempts,
+        out.lastStatus, out.net, static_cast<unsigned long>(out.ms));
+  if (out.lookupAsked || out.lookupWhy[0]) {
+    reply("AIASK wikipedia pages=%d ms=%lu%s%s", out.lookupPages, static_cast<unsigned long>(out.lookupMs),
+          out.lookupWhy[0] ? " skipped: " : "", out.lookupWhy);
+  }
+  const GeminiChat* chat = AiRun::chat();
+  if (out.ok && chat != nullptr && out.exchange >= 0 && out.exchange < chat->n) {
+    aiBenchText(chat->ex[out.exchange].a);
+    reply("OK AIASK answered %s %lu ms", out.label, static_cast<unsigned long>(out.ms));
+  } else if (out.cancelled) {
+    reply("OK AIASK cancelled");
+  } else {
+    reply("OK AIASK failed: %s", out.fail);
+  }
+}
+
+// AIKEY: what the app reads in /API Keys/gemini.txt - found or not, the key's LENGTH, the model,
+// the fallback, the lookup, the retry setting - and never the key.
+void cmdAiKey(const bool exclusive) {
+  if (!BoardConfig::isX4Pro()) {
+    reply("ERR AIKEY board");
+    return;
+  }
+  if (!fileVerbAllowed("AIKEY", exclusive)) return;
+  AiRun::reloadKey();
+  const AiRun::KeyInfo& key = AiRun::keyInfo();
+  const bool found = key.state == AiRun::KeyState::Ok;
+  reply("AIKEY path=%s", key.path[0] ? key.path : "-");
+  reply("AIKEY line %s", key.line);
+  char note[160];
+  if (AiRun::quotaNote(note, sizeof(note)) > 0) reply("AIKEY quota %s", note);
+  const GeminiChat* chat = AiRun::chat();
+  reply("OK AIKEY found=%d len=%d model=%s fallback=%s lookup=%s retry=%s topic=%s questions=%d", found ? 1 : 0,
+        key.usable ? key.length : 0, key.model[0] ? key.model : "-", key.fallback[0] ? key.fallback : "-",
+        key.lookup ? "on" : "off", AiRun::retryTimeouts() ? "on" : "off", AiRun::topicRunning() ? "running" : "new",
+        chat != nullptr ? chat->n : 0);
+}
+
 void cmdLegacyScreenshot() {
   const uint32_t bufferSize = display.getBufferSize();
   logSerial.printf("SCREENSHOT_START:%d\n", bufferSize);
@@ -2147,6 +2260,10 @@ uint8_t dispatch(char* line, const bool exclusive, const unsigned long lastActiv
     cmdLocTest(args);
   } else if (strcmp(verb, "POWER") == 0) {
     cmdPower(args);
+  } else if (strcmp(verb, "AIASK") == 0) {
+    cmdAiAsk(args, exclusive);
+  } else if (strcmp(verb, "AIKEY") == 0) {
+    cmdAiKey(exclusive);
   } else if (strcmp(verb, "SCREENSHOT") == 0) {
     cmdLegacyScreenshot();
   } else {
@@ -2226,8 +2343,11 @@ void servicePending() {
       return;
     }
     pend.kind = Pending::None;
-    if (strcmp(activityManager.benchCurrentName(), pathBuf) == 0) {
-      reply("OK APP act=%s", pathBuf);
+    // The AI app opens its help page over itself when there is no key yet ("AiPage").
+    const char* current = activityManager.benchCurrentName();
+    const bool ai = strcmp(pathBuf, "Ai") == 0;
+    if (strcmp(current, pathBuf) == 0 || (ai && strncmp(current, "Ai", 2) == 0)) {
+      reply("OK APP act=%s", current);
     } else {
       reply("ERR APP failed act=%s", activityManager.benchCurrentName());
     }

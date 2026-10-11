@@ -203,6 +203,10 @@ bool isHiddenOrSidecar(const char* name) { return name[0] == '.'; }
 // two folders, so an EPUB someone files there is still a book.
 bool isAppDataDir(const char* name) { return strcasecmp(name, "Guides") == 0 || strcasecmp(name, "Puzzles") == 0; }
 
+// The AI app's key folder (/API Keys/gemini.txt holds the owner's Gemini key): nothing in it is ever
+// listed, a book filed there included - opening a key file as a book would put the key on screen.
+bool isKeyDir(const char* name) { return strcasecmp(name, "API Keys") == 0; }
+
 bool isAppDataFileAtRoot(const char* name) {
   return strcasecmp(name, "quotes.txt") == 0 || strcasecmp(name, "crash_report.txt") == 0;
 }
@@ -489,6 +493,7 @@ void walk(WalkState& st, const std::string& path, const int depth, const bool in
     const std::string name(st.nameBuf);
 
     if (isDir) {
+      if (depth == 0 && isKeyDir(name.c_str())) continue;
       const size_t resumePosition = dir.position();
       dir.close();
       walk(st, joinLibraryPath(path, name), depth + 1, inAppData || (depth == 0 && isAppDataDir(name.c_str())));

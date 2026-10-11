@@ -81,8 +81,9 @@ bool parseSleepArgs(const char* args, SleepKind& out);
 constexpr size_t SSID_MAX_BYTES = 32;
 bool isValidSsid(const char* ssid);
 
-// APP apps|wordsearch|crossword|sudoku|guide: open the Apps list or a game / the guide (case ignored).
-enum class AppTarget : uint8_t { Apps, WordSearch, Crossword, Sudoku, Guide };
+// APP apps|wordsearch|crossword|sudoku|guide|ai: open the Apps list, a game, the guide or the AI app
+// (case ignored).
+enum class AppTarget : uint8_t { Apps, WordSearch, Crossword, Sudoku, Guide, Ai };
 bool parseAppArgs(const char* args, AppTarget& out);
 
 // WEATHER [show|fetch|clear]: the Weather card's cache summarised (the default), a fetch now on a
@@ -115,6 +116,13 @@ bool parseLocPhoneArgs(const char* args, LocPhoneArgs& out);
 // printed with the clock zone a save would set (util/ClockZone), and nothing saved; "coords" adds
 // the position at two decimals. Case ignored.
 bool parseLocTestArgs(const char* args, bool& coords);
+
+// AIASK [--new] <question>: Apps > AI's question asked without the keyboard (network/AiRun), on the
+// station already up. The rest of the line is the question, 1..AI_QUESTION_MAX bytes once trimmed
+// (the console's line cap with the verb), no control characters; a leading "--new" (any case,
+// then a space) starts a new topic first. Parses in place: `question` points into args.
+constexpr size_t AI_QUESTION_MAX = 480;
+bool parseAiAskArgs(char* args, bool& newTopic, char*& question);
 
 // WS                                         the puzzle on screen, dumped
 // WS new <seed> [easy|medium|hard] [key]     a deterministic new puzzle; the key (a built-in

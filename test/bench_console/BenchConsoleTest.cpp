@@ -861,6 +861,49 @@ TEST(BenchLocPhone, ShowOffOrAnAddress) {
   }
 }
 
+TEST(BenchAiAsk, QuestionAndNewTopicFlag) {
+  bool fresh = true;
+  char* question = nullptr;
+  char a[] = "  has the new tomb raider come out?  ";
+  ASSERT_TRUE(parseAiAskArgs(a, fresh, question));
+  EXPECT_FALSE(fresh);
+  EXPECT_STREQ(question, "has the new tomb raider come out?");
+  char b[] = "--new and when?";
+  ASSERT_TRUE(parseAiAskArgs(b, fresh, question));
+  EXPECT_TRUE(fresh);
+  EXPECT_STREQ(question, "and when?");
+  char c[] = "--NEW\tWhy is the sky blue";
+  ASSERT_TRUE(parseAiAskArgs(c, fresh, question));
+  EXPECT_TRUE(fresh);
+  EXPECT_STREQ(question, "Why is the sky blue");
+  // "--newer" is the question's own word, not the flag.
+  char d[] = "--newer models";
+  ASSERT_TRUE(parseAiAskArgs(d, fresh, question));
+  EXPECT_FALSE(fresh);
+  EXPECT_STREQ(question, "--newer models");
+  // UTF-8 is a question's (the keyboard types accents).
+  char e[] = "caf\xC3\xA9 opening hours";
+  ASSERT_TRUE(parseAiAskArgs(e, fresh, question));
+  EXPECT_STREQ(question, "caf\xC3\xA9 opening hours");
+}
+
+TEST(BenchAiAsk, Refused) {
+  bool fresh = false;
+  char* question = nullptr;
+  EXPECT_FALSE(parseAiAskArgs(nullptr, fresh, question));
+  char empty[] = "   ";
+  EXPECT_FALSE(parseAiAskArgs(empty, fresh, question));
+  char onlyFlag[] = "--new  ";
+  EXPECT_FALSE(parseAiAskArgs(onlyFlag, fresh, question)) << "a new topic with no question";
+  char control[] = "two\x01lines";
+  EXPECT_FALSE(parseAiAskArgs(control, fresh, question));
+  std::string fits(AI_QUESTION_MAX, 'q');
+  std::string tooLong(AI_QUESTION_MAX + 1, 'q');
+  EXPECT_TRUE(parseAiAskArgs(fits.data(), fresh, question));
+  EXPECT_FALSE(parseAiAskArgs(tooLong.data(), fresh, question));
+  EXPECT_EQ(question, nullptr);
+}
+
 TEST(BenchLocTest, PlainOrWithCoordinates) {
   bool coords = true;
   EXPECT_TRUE(parseLocTestArgs("", coords));
@@ -943,6 +986,9 @@ TEST(BenchApp, AppsOrWordSearch) {
   EXPECT_TRUE(parseAppArgs(" GUIDE ", target));
   EXPECT_EQ(target, AppTarget::Guide);
   EXPECT_FALSE(parseAppArgs("guide home", target));
+  EXPECT_TRUE(parseAppArgs(" AI ", target));
+  EXPECT_EQ(target, AppTarget::Ai);
+  EXPECT_FALSE(parseAppArgs("ai ask", target));
 }
 
 namespace {

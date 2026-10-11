@@ -12,6 +12,8 @@
 
 #include "CrossPointSettings.h"
 #include "OpdsServerStore.h"
+#include "apps/AiActivity.h"
+#include "apps/AiText.h"
 #include "apps/AppsActivity.h"
 #include "apps/CrosswordActivity.h"
 #include "apps/GuideApp.h"
@@ -350,6 +352,20 @@ void ActivityManager::goToGuide(const bool resume) {
   replaceActivity(std::move(activity));
 }
 
+void ActivityManager::goToAi() {
+#if FREEINK_DEVICE_X4PRO
+  auto activity = makeUniqueNoThrow<AiActivity>(renderer, mappedInput);
+  if (!activity) {
+    LOG_ERR("ACT", "OOM: AI activity");
+    return;
+  }
+  replaceActivity(std::move(activity));
+#else
+  // X4 Pro only (its network stack, network/AiHttps): other boards link none of the app.
+  LOG_ERR("ACT", "The AI app is X4 Pro only");
+#endif
+}
+
 void ActivityManager::goToBrowser() {
   const auto& servers = OPDS_STORE.getServers();
   // Skip the server picker when there's only one server configured
@@ -363,6 +379,13 @@ void ActivityManager::goToBrowser() {
 void ActivityManager::goToReader(std::string path, const bool allowFastInitialRefresh) {
   if (path.empty()) {
     goToFileBrowser("/");
+    return;
+  }
+  // The AI app's key file (and anything else in "API Keys") is never put on screen: the file
+  // browser stays where it was.
+  if (aitext::isKeyFolderPath(path.c_str())) {
+    LOG_INF("ACT", "A file in API Keys is not opened");
+    goToFileBrowser(std::move(path));
     return;
   }
 

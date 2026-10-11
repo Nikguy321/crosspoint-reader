@@ -464,6 +464,35 @@ bool parseLocPhoneArgs(const char* args, LocPhoneArgs& out) {
   return true;
 }
 
+bool parseAiAskArgs(char* args, bool& newTopic, char*& question) {
+  newTopic = false;
+  question = nullptr;
+  if (args == nullptr) return false;
+  while (isSpace(*args)) ++args;
+  static constexpr char NEW_FLAG[] = "--new";
+  size_t k = 0;
+  while (k < sizeof(NEW_FLAG) - 1) {
+    const char c = (args[k] >= 'A' && args[k] <= 'Z') ? static_cast<char>(args[k] - 'A' + 'a') : args[k];
+    if (c != NEW_FLAG[k]) break;
+    ++k;
+  }
+  if (k == sizeof(NEW_FLAG) - 1 && (args[k] == '\0' || isSpace(args[k]))) {
+    newTopic = true;
+    args += k;
+    while (isSpace(*args)) ++args;
+  }
+  size_t n = std::strlen(args);
+  while (n > 0 && isSpace(args[n - 1])) --n;
+  args[n] = '\0';
+  if (n == 0 || n > AI_QUESTION_MAX) return false;
+  for (size_t i = 0; i < n; ++i) {
+    const auto c = static_cast<unsigned char>(args[i]);
+    if (c < 0x20 || c == 0x7F) return false;
+  }
+  question = args;
+  return true;
+}
+
 bool parseLocTestArgs(const char* args, bool& coords) {
   coords = false;
   if (args == nullptr) args = "";
@@ -515,6 +544,10 @@ bool parseAppArgs(const char* args, AppTarget& out) {
   }
   if (tokenIs(word, "guide")) {
     out = AppTarget::Guide;
+    return true;
+  }
+  if (tokenIs(word, "ai")) {
+    out = AppTarget::Ai;
     return true;
   }
   return false;

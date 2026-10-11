@@ -23,6 +23,10 @@ Usage (auto-detects the reader, Espressif USB Serial/JTAG 303A:1001)
   scripts/x4bench.py weather              # the Weather card's cache (or: weather fetch|clear)
   scripts/x4bench.py locphone 192.0.2.10  # Locate Me reads "phone" NMEA from this computer (or: off)
   scripts/x4bench.py loctest              # the locate pipeline's verdict, nothing saved
+  scripts/x4bench.py aikey                # Apps > AI's key file: found, length, model (never the key)
+  scripts/x4bench.py ai why is the sky blue   # ask Gemini without the keyboard (a station up first)
+  scripts/x4bench.py ai --new and the moon?   # ... starting a new topic first
+  scripts/x4bench.py app ai               # open Apps > AI
   scripts/x4bench.py app wordsearch       # open Word Search (or: app apps / crossword / sudoku / guide)
   scripts/x4bench.py ws                   # dump the puzzle on screen
   scripts/x4bench.py ws new 1234 medium animals   # a deterministic puzzle
@@ -133,10 +137,11 @@ Verbs
                            ERR REDRAW notlive otherwise. The draw lands on a
                            later loop pass: "x4bench.py redraw" waits for
                            STATE redraws= to pass that count.
-  APP apps|wordsearch|crossword|sudoku|guide
+  APP apps|wordsearch|crossword|sudoku|guide|ai
                            open the Apps list or a game the way their rows
-                           do (a replace; guide: its home, GuideHome): OK APP
-                           act=<name> once it is up.
+                           do (a replace; guide: its home, GuideHome; ai: X4
+                           Pro only, Ai - or AiPage, its help, with no key):
+                           OK APP act=<name> once it is up.
   WS                       the Word Search puzzle on screen (ERR WS notopen
                            otherwise): WS state difficulty= size= found=n/m
                            complete= anchor=r,c|- cursor=r,c shown= (the key
@@ -338,6 +343,29 @@ Verbs
                            Nothing is saved. No position (beyond the clock
                            zone) unless "coords" (then " at 48.86,2.29": two
                            decimals).
+  AIASK [--new] <question> dev only: Apps > AI's question without the
+                           keyboard, on the station already up (STATE
+                           wifi=up: the live sleep screen on this cable; it
+                           never starts the radio; else ERR AIASK nowifi), the
+                           key read from /API Keys/gemini.txt (ERR AIASK nokey
+                           without one). The question (1..480 bytes) joins the
+                           app's current topic, as one typed would; --new
+                           starts a new topic first. Streams AIASK asking: ...,
+                           AIASK stage <the ladder's words> | <model>, then
+                           AIASK model= attempts= http= net=<GEM_NET_*> ms=,
+                           AIASK wikipedia pages= ms= [skipped: <why>], the
+                           answer as "AIASK | <text>" lines (180-character
+                           pieces; its "Wikipedia: A; B" line last), and OK
+                           AIASK answered <model> <ms> ms | failed: <why> |
+                           cancelled. Minutes at most (Gemini waits 150 s a
+                           request): x4bench waits 600 s. Never the key.
+  AIKEY                    dev only: what Apps > AI reads in /API Keys/gemini.txt
+                           (read again now): AIKEY path=, AIKEY line <gemini.h's
+                           config line: the key's length, model, thinking,
+                           fallback, lookup, warnings>, AIKEY quota <a daily
+                           limit remembered>, OK AIKEY found= len= model=
+                           fallback= lookup= retry= topic=running|new
+                           questions=. Never the key; CAT refuses the folder.
   PUT <size> <md5> <path>  add-only upload: READY <max>, then per chunk the
                            host sends "<len> <crc32hex>\\n" + raw bytes and gets
                            ACK <total> or NAK <total> <reason> (resend).
@@ -965,10 +993,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("target", nargs="?", default="", metavar="a.b.c.d[:port]|off")
     s = sub.add_parser("loctest", help="dev: run Locate Me's pipeline on the station up and print the verdict (no save)")
     s.add_argument("coords", nargs="?", choices=("coords",), help="also print the position at two decimals")
+    s = sub.add_parser("ai", help="dev: ask Apps > AI a question without the keyboard (a station up first)")
+    s.add_argument("--new", action="store_true", help="start a new topic first")
+    s.add_argument("words", nargs="+", metavar="word")
+    sub.add_parser("aikey", help="dev: what Apps > AI reads in /API Keys/gemini.txt (never the key)")
     s = sub.add_parser("power", help="dev: read external power, or 'fake absent' / 'fake real' (live screen)")
     s.add_argument("words", nargs="*", metavar="fake absent|fake real")
     s = sub.add_parser("app", help="open the Apps list, Word Search, Crossword, Sudoku or the survival guide")
-    s.add_argument("name", choices=("apps", "wordsearch", "crossword", "sudoku", "guide"))
+    s.add_argument("name", choices=("apps", "wordsearch", "crossword", "sudoku", "guide", "ai"))
     s = sub.add_parser("ws", help="Word Search: dump the puzzle, or 'new <seed> [difficulty] [theme key]'")
     s.add_argument("args", nargs=argparse.REMAINDER)
     s = sub.add_parser("cw", help="Crossword: dump, or open/type/cursor/check/reveal/solve/list (see the top)")
@@ -1134,6 +1166,29 @@ def run(args, link: Link, out=sys.stdout) -> int:
         rest, body = link.command(f"LOCTEST {args.coords or ''}".rstrip(), t or 90)
         for line in body:
             print(line[8:] if line.startswith("LOCTEST ") else line, file=out)
+        print(rest, file=out)
+    elif op == "ai":
+        question = check_arg(" ".join(args.words).strip())
+        if not question or len(question.encode("utf-8")) > 480:
+            raise BenchError("AIASK", "the question must be 1-480 bytes")
+
+        def on_line(line):
+            print(line[6:] if line.startswith("AIASK ") else line, file=out, flush=True)
+
+        # The Wikipedia lookup (20 s at most), then up to 150 s a Gemini request, with the ladder's
+        # retries: the reader's loop is blocked meanwhile.
+        try:
+            rest, _ = link.command(f"AIASK {'--new ' if args.new else ''}{question}", t or 600, on_line=on_line)
+        except BenchError as exc:
+            if exc.reason.startswith("nowifi"):
+                print("The reader has no station up: put it on the live sleep screen (x4bench.py sleep, on this "
+                      "cable) and wait for wifi=up in x4bench.py state.", file=sys.stderr)
+            raise
+        print(rest, file=out)
+    elif op == "aikey":
+        rest, body = link.command("AIKEY", t or 15)
+        for line in body:
+            print(line[6:] if line.startswith("AIKEY ") else line, file=out)
         print(rest, file=out)
     elif op == "put":
         data = read_local(args.local)

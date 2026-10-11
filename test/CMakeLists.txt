@@ -97,6 +97,11 @@ add_subdirectory(phone_nmea)
 # Time Zone From Location: the time zone map (lib/TzGrid) and the clock decisions on it.
 add_subdirectory(tz_grid)
 add_subdirectory(weather_protocol)
+# Apps > AI: the pure half shared with the WiPhone firmware (lib/Gemini, lib/WikiLookup), then the
+# app's own pure helpers (the answer page's text, the key file's name, the date's zone word).
+add_subdirectory(gemini)
+add_subdirectory(wiki_lookup)
+add_subdirectory(ai_text)
 # Word Search: the pure half, then its drawing (links SleepCardHost above).
 add_subdirectory(word_search)
 add_subdirectory(word_search_preview)

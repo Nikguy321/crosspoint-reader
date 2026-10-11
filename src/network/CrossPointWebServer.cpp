@@ -16,11 +16,13 @@
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
+#include "KeyFolderGuard.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
 #include "WebDAVHandler.h"
 #include "WifiCredentialStore.h"
+#include "activities/apps/AiText.h"
 #include "html/FilesPageHtml.generated.h"
 #include "html/FontsPageHtml.generated.h"
 #include "html/HomePageHtml.generated.h"
@@ -31,7 +33,8 @@
 
 namespace {
 // Folders/files to hide from the web interface file browser
-// Note: Items starting with "." are automatically hidden
+// Note: Items starting with "." are automatically hidden, and so is Apps > AI's key folder,
+// "API Keys" in any case (KeyFolderGuard: never listed, served, written, moved or deleted here)
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 
 // Formats the library index tracks (LibraryIndex isBookName): an upload of any
@@ -79,7 +82,7 @@ String normalizeWebPath(const String& inputPath) {
 }
 
 bool isProtectedItemName(const String& name) {
-  if (name.startsWith(".")) {
+  if (name.startsWith(".") || aitext::pathHasKeyDir(name.c_str())) {
     return true;
   }
   for (const auto* item : HIDDEN_ITEMS) {
@@ -486,6 +489,11 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
       }
     }
 
+    // The AI app's key folder, even with hidden files shown
+    if (!shouldHide && aitext::pathHasKeyDir(fileName.c_str())) {
+      shouldHide = true;
+    }
+
     if (!shouldHide) {
       FileInfo info;
       info.name = fileName;
@@ -521,6 +529,10 @@ void CrossPointWebServer::handleFileListData() const {
   String currentPath = "/";
   if (server->hasArg("path")) {
     currentPath = normalizeWebPath(server->arg("path"));
+  }
+  if (isKeyFolderWebPath(currentPath)) {
+    server->send(403, "text/plain", "Cannot access protected items");
+    return;
   }
 
   server->setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -580,6 +592,10 @@ void CrossPointWebServer::handleDownload() const {
       server->send(403, "text/plain", "Cannot access protected items");
       return;
     }
+  }
+  if (isKeyFolderWebPath(itemPath)) {
+    server->send(403, "text/plain", "Cannot access protected items");
+    return;
   }
 
   if (!Storage.exists(itemPath.c_str())) {
@@ -710,6 +726,13 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     String filePath = state.path;
     if (!filePath.endsWith("/")) filePath += "/";
     filePath += state.fileName;
+
+    // Never into the AI app's key folder: a key goes onto the card with a computer
+    if (isKeyFolderWebPath(filePath)) {
+      state.error = "Cannot write to a protected folder";
+      LOG_DBG("WEB", "[UPLOAD] Rejected protected path: %s", filePath.c_str());
+      return;
+    }
 
     // Check if file already exists - SD operations can be slow
     resetTaskWatchdogIfSubscribed();
@@ -851,6 +874,10 @@ void CrossPointWebServer::handleCreateFolder() const {
   String folderPath = parentPath;
   if (!folderPath.endsWith("/")) folderPath += "/";
   folderPath += folderName;
+  if (isKeyFolderWebPath(folderPath)) {
+    server->send(403, "text/plain", "Cannot create protected item");
+    return;
+  }
 
   LOG_DBG("WEB", "Creating folder: %s", folderPath.c_str());
 
@@ -898,7 +925,7 @@ void CrossPointWebServer::handleRename() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedItemName(itemName) || isKeyFolderWebPath(itemPath)) {
     server->send(403, "text/plain", "Cannot rename protected item");
     return;
   }
@@ -971,13 +998,13 @@ void CrossPointWebServer::handleMove() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName)) {
+  if (isProtectedItemName(itemName) || isKeyFolderWebPath(itemPath)) {
     server->send(403, "text/plain", "Cannot move protected item");
     return;
   }
   if (destPath != "/") {
     const String destName = destPath.substring(destPath.lastIndexOf('/') + 1);
-    if (isProtectedItemName(destName)) {
+    if (isProtectedItemName(destName) || isKeyFolderWebPath(destPath)) {
       server->send(403, "text/plain", "Cannot move into protected folder");
       return;
     }
@@ -1114,7 +1141,7 @@ void CrossPointWebServer::handleDelete() const {
         break;
       }
     }
-    if (isProtected) {
+    if (isProtected || isKeyFolderWebPath(itemPath)) {
       failedItems += itemPath + " (protected file); ";
       allSuccess = false;
       continue;
@@ -1683,6 +1710,13 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           String filePath = wsUploadPath;
           if (!filePath.endsWith("/")) filePath += "/";
           filePath += wsUploadFileName;
+
+          // Never into the AI app's key folder: a key goes onto the card with a computer
+          if (isKeyFolderWebPath(filePath)) {
+            LOG_DBG("WS", "START rejected: protected path %s", filePath.c_str());
+            wsServer->sendTXT(num, "ERROR:Cannot write to a protected folder");
+            return;
+          }
 
           resetTaskWatchdogIfSubscribed();
           if (Storage.exists(filePath.c_str())) {

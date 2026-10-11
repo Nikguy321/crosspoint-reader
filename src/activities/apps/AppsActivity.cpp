@@ -1,5 +1,6 @@
 #include "AppsActivity.h"
 
+#include <BoardConfig.h>
 #include <I18n.h>
 
 #include "components/UITheme.h"
@@ -42,6 +43,15 @@ AppsActivity::AppsActivity(GfxRenderer& renderer, MappedInputManager& mappedInpu
     apps_[appCount_] = App::Guide;
     rowItems_[appCount_++] = guide;
   }
+  // Gemini over HTTPS: the X4 Pro's network stack (network/AiHttps) and its on-screen keyboard.
+  if (BoardConfig::isX4Pro()) {
+    fui::ListItem ai;
+    ai.label = tr(STR_AI);
+    ai.subtitle = tr(STR_AI_DESC);
+    ai.icon = fui::bitmapFromIcon(icon_ai_32);
+    apps_[appCount_] = App::Ai;
+    rowItems_[appCount_++] = ai;
+  }
   for (int i = 0; i < appCount_; i++) rowItems_[i].actionValue = static_cast<int16_t>(i);
 }
 
@@ -82,6 +92,9 @@ void AppsActivity::activateIndex(const int index) {
       return;
     case App::Guide:
       activityManager.goToGuide();
+      return;
+    case App::Ai:
+      activityManager.goToAi();
       return;
   }
 }

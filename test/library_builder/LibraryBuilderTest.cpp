@@ -111,6 +111,26 @@ TEST_F(LibraryBuilderTest, FirmwareDataFilesAreNotBooks) {
   EXPECT_EQ(paths, want);
 }
 
+// The AI app's key folder is never walked: its gemini.txt (the owner's Gemini key) would otherwise be
+// a text book anyone could open, and not even an EPUB filed there is listed. Only the root's.
+TEST_F(LibraryBuilderTest, KeyFolderIsNeverListed) {
+  fake::add("/API Keys/gemini.txt");
+  fake::add("/api keys/Gemini.TXT");
+  fake::add("/API Keys/sub/notes.txt");
+  fake::add("/API Keys/book.epub");
+  fake::add("/Books/API Keys/story.txt");
+
+  ASSERT_TRUE(buildLibraryIndex("/", stats, false));
+
+  LibraryIndexFile index;
+  ASSERT_TRUE(index.open(INDEX));
+  std::vector<std::string> paths;
+  for (uint16_t row = 0; row < index.bookCount(); row++) paths.push_back(pathAt(index, SortOrder::TitleAsc, row));
+  std::sort(paths.begin(), paths.end());
+  const std::vector<std::string> want = {"/Books/API Keys/story.txt", "/a.epub", "/b.epub"};
+  EXPECT_EQ(paths, want);
+}
+
 TEST_F(LibraryBuilderTest, DirectoryEntriesAreEnumeratedOnce) {
   fake::add("/folder/c.txt");
 

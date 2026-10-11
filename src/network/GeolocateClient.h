@@ -61,7 +61,8 @@ size_t scanAccessPoints(geolocate::AccessPoint* out, size_t cap, int16_t& found)
 // The host's address into lwIP's cache within timeoutMs, so the request's own lookup finds it
 // there: the one step that is not otherwise bounded (the resolver retries for many seconds on a
 // network that does not reach the internet). False when it is not known in time. Loop task only.
-bool resolveWithin(const char* host, uint32_t timeoutMs);
+// tick (Apps > AI): called every ~20 ms of the wait; false gives up at once (a Cancel).
+bool resolveWithin(const char* host, uint32_t timeoutMs, bool (*tick)(void* ctx) = nullptr, void* ctx = nullptr);
 
 // Enough internal heap for one request (the check request() starts with): a caller can test it
 // before the work that leads up to a request (AutoLocate's scan).

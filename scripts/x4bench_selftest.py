@@ -58,6 +58,7 @@ class FakeDevice(threading.Thread):
         self.sleeps = []
         self.wifi_last = None
         self.loc_phone = "off"
+        self.ai_questions = []
         self.loc_tests = []
         self.weather_ops = []
         self.power_ops = []
@@ -243,7 +244,7 @@ class FakeDevice(threading.Thread):
                 self.redraws += 1
         elif verb == "APP":
             names = {"apps": "Apps", "wordsearch": "WordSearch", "crossword": "Crossword", "sudoku": "Sudoku",
-                     "guide": "GuideHome"}
+                     "guide": "GuideHome", "ai": "Ai"}
             if rest.lower() not in names:
                 self.emit("ERR APP usage")
                 return
@@ -452,6 +453,33 @@ class FakeDevice(threading.Thread):
                 self.emit("LOCTEST phone port=10110 why=ok lines=36 bad=0 malformed=0 settling=30 stale=0 "
                           "nofix=0 weak=0 gga=2 rmc=2 disagree=0 skew_s=5")
                 self.emit("OK LOCTEST phone ok \u00b15m" + (" at 48.86,2.29" if arg else ""), noise=True)
+        elif verb == "AIASK":
+            question = rest.strip()
+            fresh = question.lower().startswith("--new ")
+            if fresh:
+                question = question[6:].strip()
+            if not question or len(question.encode()) > 480:
+                self.emit("ERR AIASK usage")
+                return
+            if not self.live:
+                self.emit("ERR AIASK nowifi")
+                return
+            self.ai_questions.append((fresh, question))
+            self.emit(f"AIASK asking: {len(question)} chars, {'a new topic' if fresh else 'with the topic'}, retry on")
+            self.emit("AIASK stage Looking up Wikipedia...", noise=True)
+            self.emit("AIASK stage Asking Gemini... | Flash")
+            self.emit("AIASK model=Flash attempts=1 http=200 net=0 ms=41234")
+            self.emit("AIASK wikipedia pages=1 ms=812")
+            self.emit("AIASK | Not yet: it is due in 2027.")
+            self.emit("AIASK |")
+            self.emit("AIASK | Wikipedia: Tomb Raider: Legacy of Atlantis", noise=True)
+            self.emit("OK AIASK answered Flash 41234 ms")
+        elif verb == "AIKEY":
+            self.emit("AIKEY path=/API Keys/gemini.txt")
+            self.emit("AIKEY line key: set (53 chars), model gemini-flash-latest, thinking 1024, fallback "
+                      "gemini-flash-lite-latest")
+            self.emit("OK AIKEY found=1 len=53 model=gemini-flash-latest fallback=gemini-flash-lite-latest "
+                      "lookup=on retry=on topic=new questions=0", noise=True)
         elif verb == "WIFILAST":
             if not rest or len(rest.encode()) > 32:
                 self.emit("ERR WIFILAST usage")
@@ -857,6 +885,34 @@ class BenchSelfTest(unittest.TestCase):
         self.assertEqual(self.dev.loc_tests, ["", "coords", ""])
         with self.assertRaises(SystemExit):  # argparse refuses anything but "coords"
             x4bench.main(["--port", self.dev.url, "loctest", "now"], out=io.StringIO())
+
+    def test_ai_and_aikey(self):
+        self.ser.close()
+        code, out = self.cli("aikey")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(out.splitlines()[0], "path=/API Keys/gemini.txt")
+        self.assertTrue(out.splitlines()[-1].startswith("found=1 len=53 "))
+        # AIASK needs a station up: the live sleep screen on this cable.
+        code, _ = self.cli("ai", "has", "the", "new", "tomb", "raider", "come", "out")
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.cli("sleep")
+        code, out = self.cli("ai", "has", "the", "new", "tomb", "raider", "come", "out")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "asking: 32 chars, with the topic, retry on")
+        self.assertIn("stage Asking Gemini... | Flash", lines)
+        self.assertIn("| Wikipedia: Tomb Raider: Legacy of Atlantis", lines)
+        self.assertEqual(lines[-1], "answered Flash 41234 ms")
+        code, out = self.cli("ai", "--new", "and", "when?")
+        self.assertEqual(code, x4bench.EXIT_OK)
+        self.assertEqual(self.dev.ai_questions,
+                         [(False, "has the new tomb raider come out"), (True, "and when?")])
+        # Too long for the console's line: refused before it is sent.
+        code, _ = self.cli("ai", "x" * 481)
+        self.assertEqual(code, x4bench.EXIT_ERR)
+        self.assertEqual(len(self.dev.ai_questions), 2)
+        code, out = self.cli("app", "ai")
+        self.assertEqual((code, out), (x4bench.EXIT_OK, "act=Ai\n"))
 
     def test_wifilast_sets_the_last_network(self):
         self.ser.close()

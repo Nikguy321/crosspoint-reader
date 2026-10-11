@@ -458,6 +458,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t cardCycleWhenCharging = 0;
   // How often the live sleep screen redraws: a live_sleep::INTERVAL_MINUTES index (1 = 2 min).
   uint8_t chargingUpdateInterval = 1;
+  // Apps > AI, "Retry if it times out" (the app's own menu, network/AiRun): when Gemini sends nothing
+  // in time or the connection drops, ask once more, then the fallback model once. On unless set off.
+  uint8_t aiRetryTimeouts = 1;
 
   static constexpr uint8_t MIN_SLEEP_TIMEOUT_MINUTES = 1;
   static constexpr uint8_t SLEEP_TIMEOUT_NEVER_MINUTES = 31;
