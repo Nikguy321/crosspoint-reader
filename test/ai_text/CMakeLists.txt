@@ -2,7 +2,8 @@
 # page format - checked by parsing and laying it out with lib/Guide over the guide's fake font - the
 # key file's names and folder, the date's zone word and the clock's UTC offset.
 file(GLOB AI_TEXT_GUIDE_SOURCES CONFIGURE_DEPENDS ${REPO_ROOT}/lib/Guide/*.cpp)
-add_executable(AiTextTest AiTextTest.cpp ${REPO_ROOT}/src/activities/apps/AiText.cpp ${AI_TEXT_GUIDE_SOURCES})
+add_executable(AiTextTest AiTextTest.cpp ${REPO_ROOT}/src/activities/apps/AiText.cpp ${REPO_ROOT}/src/util/CardPath.cpp
+  ${AI_TEXT_GUIDE_SOURCES})
 target_include_directories(AiTextTest PRIVATE ${REPO_ROOT}/src ${REPO_ROOT}/lib/Guide ${REPO_ROOT}/test/guide)
 target_link_libraries(AiTextTest PRIVATE GeminiHost crosspoint_test_common GTest::gtest_main)
 gtest_discover_tests(AiTextTest)
@@ -12,6 +13,7 @@ gtest_discover_tests(AiTextTest)
 add_executable(AiPreviewTest
   AiPreviewTest.cpp
   ${REPO_ROOT}/src/activities/apps/AiText.cpp
+  ${REPO_ROOT}/src/util/CardPath.cpp
   ${REPO_ROOT}/src/activities/apps/GuideDraw.cpp
   ${REPO_ROOT}/src/activities/apps/GuideMetrics.cpp
   ${AI_TEXT_GUIDE_SOURCES}

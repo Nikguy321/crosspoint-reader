@@ -78,8 +78,19 @@ Response:
 ]
 ```
 
-Hidden dotfiles are omitted unless the device setting `showHiddenFiles` is
-enabled. `System Volume Information` and `XTCache` are always hidden/protected.
+Hidden dotfiles are always omitted here (the device setting `showHiddenFiles`
+applies to the reader's own file browser only). `System Volume Information` and
+`XTCache` are always hidden/protected.
+
+A path with a hidden name anywhere in it - `/.crosspoint`, which holds the
+reader's settings, saved Wi-Fi networks and KOSync login, or any other folder or
+file whose name starts with `.` - or with Apps > AI's key folder `API Keys` in
+it, is refused with 403 by every endpoint below and by WebDAV: listing,
+download, upload (HTTP and WebSocket), mkdir, rename, move and delete. That
+holds for every spelling the card opens it by: any case, leading spaces,
+trailing dots and spaces, and the folder's FAT 8.3 alias (`/CROSSP~1`) - each
+existing part of the path is checked by the long name the card stored for it
+(`src/network/WebPathGuard`).
 
 ### `GET /download`
 
@@ -95,8 +106,8 @@ Query parameters:
 |-----------|----------|-------------|
 | `path` | Yes | File path to download |
 
-Protected dotfiles, `System Volume Information`, and `XTCache` cannot be
-downloaded. EPUB files are served as `application/epub+zip`; other files use
+Dotfiles, anything inside a hidden folder or the `API Keys` folder (see above),
+`System Volume Information`, and `XTCache` cannot be downloaded. EPUB files are served as `application/epub+zip`; other files use
 `application/octet-stream`.
 
 ### `POST /upload`
@@ -232,9 +243,12 @@ Types:
 | `toggle` | `value` (`0` or `1`) |
 | `enum` | `value`, `options` |
 | `value` | `value`, `min`, `max`, `step` |
-| `string` | `value` |
+| `string` | `value`; for a password (`koPassword`) `value` is always `""` and `hasValue` says whether one is saved |
 
 The font-family setting includes SD-card font families when they are installed.
+
+A password is never returned: the settings page shows its field empty, and a
+value posted for it replaces the saved one (leaving it out keeps it).
 
 ### `POST /api/settings`
 

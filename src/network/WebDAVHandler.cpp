@@ -4,14 +4,15 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
-#include "KeyFolderGuard.h"
+#include "WebPathGuard.h"
 #include "activities/apps/AiText.h"
 #include "util/BookCacheUtils.h"
 #include "util/TaskWatchdog.h"
 
 namespace {
-// Never listed, and protected below (isProtectedPath); so is Apps > AI's key folder, "API Keys" in
-// any case (KeyFolderGuard): never listed, read, written, moved, copied or deleted over WebDAV.
+// Never listed, and protected below (isProtectedPath); so is every hidden name (starting with ".")
+// and Apps > AI's key folder, "API Keys" in any case, each by any spelling the card opens it by
+// (WebPathGuard): never listed, read, written, moved, copied or deleted over WebDAV.
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 
 // RFC 1123 date format helper: "Sun, 06 Nov 1994 08:49:37 GMT"
@@ -180,8 +181,8 @@ void WebDAVHandler::handlePropfind(WebServer& s) {
 
   LOG_DBG("DAV", "PROPFIND %s depth=%d", path.c_str(), depth);
 
-  // The AI app's key folder is not even listed (403 whether it exists or not)
-  if (isKeyFolderWebPath(path)) {
+  // A hidden folder or the AI app's key folder is not even listed (403 whether it exists or not)
+  if (isProtectedWebPath(path)) {
     s.send(403, "text/plain", "Forbidden");
     return;
   }
@@ -791,8 +792,8 @@ bool WebDAVHandler::isProtectedPath(const String& path) const {
     start = end + 1;
   }
 
-  // The AI app's key folder, any spelling the card opens it by
-  return isKeyFolderWebPath(path);
+  // Hidden names and the AI app's key folder, by any spelling the card opens them by
+  return isProtectedWebPath(path);
 }
 
 int WebDAVHandler::getDepth(WebServer& s) const {

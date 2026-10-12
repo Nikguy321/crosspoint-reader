@@ -52,6 +52,9 @@ struct SettingInfo {
   StrId category = StrId::STR_NONE_OPT;  // Category for web UI grouping
   bool obfuscated = false;               // Save/load via base64 obfuscation (passwords)
   bool inTextSettings = false;           // Surfaced in the Text Settings screen; hidden from the flat Reader list
+  // A secret (a password): the web settings API never sends its value back, only whether one is set
+  // ("hasValue"), and the page shows the field empty - what is typed there still replaces it.
+  bool writeOnly = false;
 
   // Direct char[] string fields (for settings stored in CrossPointSettings)
   size_t stringOffset = 0;
@@ -67,6 +70,11 @@ struct SettingInfo {
 
   SettingInfo& withObfuscated() {
     obfuscated = true;
+    return *this;
+  }
+
+  SettingInfo& withWriteOnly() {
+    writeOnly = true;
     return *this;
   }
 

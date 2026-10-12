@@ -4,6 +4,8 @@
 
 #include <cstring>
 
+#include "util/CardPath.h"
+
 namespace aitext {
 
 namespace {
@@ -133,28 +135,6 @@ bool isKeyFileName(const char* name) { return name != nullptr && strcasecmp(name
 
 namespace {
 
-// The next name of the path at p, as the card reads it: SdFat skips a name's leading spaces and
-// drops its trailing dots and spaces, so " API Keys", "API Keys." and "API Keys " all open the folder
-// "API Keys". A name with nothing left ("", ".", " ") is skipped - SdFat skips the spaces between
-// names, and a "." it cannot open - so a guard reads past it too. [name, name + len) is the name;
-// false at the end of the path.
-bool nextCardName(const char*& p, const char*& name, size_t& len) {
-  while (*p) {
-    while (*p == '/') p++;
-    const char* s = p;
-    while (*p && *p != '/') p++;
-    const char* e = p;
-    while (s < e && *s == ' ') s++;
-    while (e > s && (e[-1] == '.' || e[-1] == ' ')) e--;
-    if (e > s) {
-      name = s;
-      len = static_cast<size_t>(e - s);
-      return true;
-    }
-  }
-  return false;
-}
-
 bool isKeyDirSpan(const char* name, const size_t len) {
   return len == sizeof(KEY_DIR) - 1 && strncasecmp(name, KEY_DIR, len) == 0;
 }
@@ -165,14 +145,14 @@ bool isKeyFolderPath(const char* path) {
   if (path == nullptr) return false;
   const char* name = nullptr;
   size_t len = 0;
-  return nextCardName(path, name, len) && isKeyDirSpan(name, len);
+  return cardpath::nextName(path, name, len) && isKeyDirSpan(name, len);
 }
 
 bool pathHasKeyDir(const char* path) {
   if (path == nullptr) return false;
   const char* name = nullptr;
   size_t len = 0;
-  while (nextCardName(path, name, len)) {
+  while (cardpath::nextName(path, name, len)) {
     if (isKeyDirSpan(name, len)) return true;
   }
   return false;

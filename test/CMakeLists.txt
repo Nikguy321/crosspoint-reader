@@ -102,6 +102,10 @@ add_subdirectory(weather_protocol)
 add_subdirectory(gemini)
 add_subdirectory(wiki_lookup)
 add_subdirectory(ai_text)
+# The web File Transfer server and WebDAV: card names read as SdFat reads them, and the guard that
+# keeps hidden folders (/.crosspoint) and the AI key folder off the network, over a fake card.
+add_subdirectory(card_path)
+add_subdirectory(web_path_guard)
 # Word Search: the pure half, then its drawing (links SleepCardHost above).
 add_subdirectory(word_search)
 add_subdirectory(word_search_preview)

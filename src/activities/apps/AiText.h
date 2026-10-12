@@ -17,12 +17,12 @@ bool isKeyDirName(const char* name);
 bool isKeyFileName(const char* name);
 // A card path inside that folder ("/API Keys", "/api keys/gemini.txt", "/API Keys/sub/x"): the key
 // file is never opened as a book or printed by the bench console. Each name is read as the card
-// reads it: SdFat ignores a name's leading spaces and trailing dots and spaces, so "/API Keys./x"
-// and "/ API Keys /x" are inside it too.
+// reads it (util/CardPath): SdFat ignores a name's leading spaces and trailing dots and spaces, so
+// "/API Keys./x" and "/ API Keys /x" are inside it too.
 bool isKeyFolderPath(const char* path);
 // A path with a folder or file named "API Keys" ANYWHERE in it, each name read as above: the web
 // File Transfer server and WebDAV never list, serve, write, move, rename or delete one
-// (network/KeyFolderGuard, which also catches the folder's FAT 8.3 alias, "APIKEY~1").
+// (network/WebPathGuard, which also catches the folder's FAT 8.3 alias, "API_KE~1" or "APIKEY~1").
 bool pathHasKeyDir(const char* path);
 
 // The answer page in the survival guide's page format (lib/Guide/GdPage.h), so the guide's layout

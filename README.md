@@ -213,7 +213,9 @@ Check [our Devices page](https://crosspointreader.com/devices) for the full list
 
 - **Wireless workflows**:
   
-  - File transfer web UI
+  - File transfer web UI (it and WebDAV never list, serve, write, move or delete anything in a hidden folder such as
+    `/.crosspoint`, which holds the reader's settings, saved Wi-Fi networks and KOSync login, by any spelling of the
+    path the card would open, its short DOS name included; Show Hidden Files applies to the reader's own file browser)
   - EPUB Optimizer
   - Web settings UI/API (edit many device settings from browser)
   - WebSocket fast uploads

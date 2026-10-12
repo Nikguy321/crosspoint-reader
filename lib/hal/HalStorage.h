@@ -65,6 +65,13 @@ class HalStorage {
   bool openFileForWrite(const char* moduleName, const std::string& path, HalFile& file);
   bool openFileForWrite(const char* moduleName, const String& path, HalFile& file);
   bool removeDir(const char* path);
+  // The name the card stored for the file or folder at `path` (which ends in a name), as UTF-8: its
+  // long name even when `path` reached it by its FAT 8.3 alias - "/CROSSP~1" opens "/.crosspoint",
+  // and a file opened so gives back "CROSSP~1". The parent folder is read entry by entry, which
+  // loads each long name, up to the entry `path` opened. Returns the name's length; 0 when nothing
+  // opens at `path`; -1 when something does but its name cannot be read (a damaged entry, or no room
+  // in `len`: 766 bytes take any name).
+  int storedName(const char* path, char* name, size_t len);
 
 #if CROSSPOINT_BENCH_CONSOLE
   // Card capacity and used space for the bench console. Used space is cached by

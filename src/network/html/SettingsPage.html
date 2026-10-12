@@ -364,7 +364,9 @@
     if (setting.type === 'string') {
       const inputType = setting.name.toLowerCase().includes('password') ? 'password' : 'text';
       const val = setting.value || '';
-      return '<input type="' + inputType + '" id="' + id + '" value="' + escapeHtml(val) + '"' +
+      // A saved password is never sent back: the field stays empty, and typing replaces it
+      const hint = setting.hasValue ? ' placeholder="Saved - type to replace"' : '';
+      return '<input type="' + inputType + '" id="' + id + '" value="' + escapeHtml(val) + '"' + hint +
         ' oninput="handleSettingChanged(\'' + setting.key + '\')">';
     }
 

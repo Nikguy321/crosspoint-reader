@@ -8,6 +8,7 @@
 #endif
 
 #include <cassert>
+#include <cstring>
 
 #define SDCard SDCardManager::getInstance()
 
@@ -229,6 +230,28 @@ bool HalStorage::openFileForWrite(const char* moduleName, const String& path, Ha
 }
 
 bool HalStorage::removeDir(const char* path) { HAL_STORAGE_WRAPPED_CALL(removeDir, path); }
+
+int HalStorage::storedName(const char* path, char* name, const size_t len) {
+  StorageLock lock;
+  if (len > 0) name[0] = '\0';
+  const char* slash = strrchr(path, '/');
+  if (slash != nullptr && slash[1] == '\0') return -1;  // no name at the end
+  FsFile entry = SDCard.open(path, O_RDONLY);
+  if (!entry) return 0;
+  const uint32_t index = entry.dirIndex();
+  entry.close();
+  const std::string parentPath = (slash == nullptr || slash == path) ? "/" : std::string(path, slash - path);
+  FsFile parent = SDCard.open(parentPath.c_str(), O_RDONLY);
+  if (!parent || !parent.isDir()) return -1;
+  FsFile child;
+  while (child.openNext(&parent, O_RDONLY)) {
+    const bool same = child.dirIndex() == index;
+    const size_t n = same ? child.getName(name, len) : 0;
+    child.close();
+    if (same) return n > 0 ? static_cast<int>(n) : -1;
+  }
+  return -1;
+}
 
 // HalFile implementation
 // Allow doing file operations while ensuring thread safety via HalStorage's mutex.

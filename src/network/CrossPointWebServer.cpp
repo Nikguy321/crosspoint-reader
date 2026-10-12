@@ -16,7 +16,7 @@
 
 #include "CrossPointSettings.h"
 #include "FontInstaller.h"
-#include "KeyFolderGuard.h"
+#include "WebPathGuard.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
@@ -33,8 +33,9 @@
 
 namespace {
 // Folders/files to hide from the web interface file browser
-// Note: Items starting with "." are automatically hidden, and so is Apps > AI's key folder,
-// "API Keys" in any case (KeyFolderGuard: never listed, served, written, moved or deleted here)
+// Note: Items starting with "." are always hidden here (the reader's own /.crosspoint holds its
+// settings, Wi-Fi and KOSync logins), and so is Apps > AI's key folder, "API Keys" in any case -
+// WebPathGuard: never listed, served, written, moved or deleted here, nor anything inside them
 constexpr const char* HIDDEN_ITEMS[] = {"System Volume Information", "XTCache"};
 
 // Formats the library index tracks (LibraryIndex isBookName): an upload of any
@@ -476,8 +477,9 @@ void CrossPointWebServer::scanFiles(const char* path, const std::function<void(F
     file.getName(name, sizeof(name));
     auto fileName = String(name);
 
-    // Skip hidden items (starting with ".")
-    bool shouldHide = !SETTINGS.showHiddenFiles && fileName.startsWith(".");
+    // Skip hidden items (starting with "."), even with Show Hidden Files on: on the web they are
+    // never opened (WebPathGuard), so they are not offered either
+    bool shouldHide = fileName.startsWith(".");
 
     // Check against explicitly hidden items list
     if (!shouldHide) {
@@ -530,7 +532,7 @@ void CrossPointWebServer::handleFileListData() const {
   if (server->hasArg("path")) {
     currentPath = normalizeWebPath(server->arg("path"));
   }
-  if (isKeyFolderWebPath(currentPath)) {
+  if (isProtectedWebPath(currentPath)) {
     server->send(403, "text/plain", "Cannot access protected items");
     return;
   }
@@ -593,7 +595,7 @@ void CrossPointWebServer::handleDownload() const {
       return;
     }
   }
-  if (isKeyFolderWebPath(itemPath)) {
+  if (isProtectedWebPath(itemPath)) {
     server->send(403, "text/plain", "Cannot access protected items");
     return;
   }
@@ -727,8 +729,8 @@ void CrossPointWebServer::handleUpload(UploadState& state) const {
     if (!filePath.endsWith("/")) filePath += "/";
     filePath += state.fileName;
 
-    // Never into the AI app's key folder: a key goes onto the card with a computer
-    if (isKeyFolderWebPath(filePath)) {
+    // Never into a hidden folder or the AI app's key folder (a key goes onto the card with a computer)
+    if (isProtectedWebPath(filePath)) {
       state.error = "Cannot write to a protected folder";
       LOG_DBG("WEB", "[UPLOAD] Rejected protected path: %s", filePath.c_str());
       return;
@@ -874,7 +876,7 @@ void CrossPointWebServer::handleCreateFolder() const {
   String folderPath = parentPath;
   if (!folderPath.endsWith("/")) folderPath += "/";
   folderPath += folderName;
-  if (isKeyFolderWebPath(folderPath)) {
+  if (isProtectedWebPath(folderPath)) {
     server->send(403, "text/plain", "Cannot create protected item");
     return;
   }
@@ -925,7 +927,7 @@ void CrossPointWebServer::handleRename() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName) || isKeyFolderWebPath(itemPath)) {
+  if (isProtectedItemName(itemName) || isProtectedWebPath(itemPath)) {
     server->send(403, "text/plain", "Cannot rename protected item");
     return;
   }
@@ -959,6 +961,11 @@ void CrossPointWebServer::handleRename() const {
     newPath += "/";
   }
   newPath += newName;
+  if (isProtectedWebPath(newPath)) {
+    file.close();
+    server->send(403, "text/plain", "Cannot rename to protected name");
+    return;
+  }
 
   if (Storage.exists(newPath.c_str())) {
     file.close();
@@ -998,13 +1005,13 @@ void CrossPointWebServer::handleMove() const {
   }
 
   const String itemName = itemPath.substring(itemPath.lastIndexOf('/') + 1);
-  if (isProtectedItemName(itemName) || isKeyFolderWebPath(itemPath)) {
+  if (isProtectedItemName(itemName) || isProtectedWebPath(itemPath)) {
     server->send(403, "text/plain", "Cannot move protected item");
     return;
   }
   if (destPath != "/") {
     const String destName = destPath.substring(destPath.lastIndexOf('/') + 1);
-    if (isProtectedItemName(destName) || isKeyFolderWebPath(destPath)) {
+    if (isProtectedItemName(destName) || isProtectedWebPath(destPath)) {
       server->send(403, "text/plain", "Cannot move into protected folder");
       return;
     }
@@ -1141,7 +1148,7 @@ void CrossPointWebServer::handleDelete() const {
         break;
       }
     }
-    if (isProtected || isKeyFolderWebPath(itemPath)) {
+    if (isProtected || isProtectedWebPath(itemPath)) {
       failedItems += itemPath + " (protected file); ";
       allSuccess = false;
       continue;
@@ -1256,7 +1263,17 @@ void CrossPointWebServer::handleGetSettings() const {
       }
       case SettingType::STRING: {
         doc["type"] = "string";
-        if (s.stringGetter) {
+        if (s.writeOnly || s.obfuscated) {
+          // A password never leaves the reader: anyone on the network can read this page
+          std::string value;
+          if (s.stringGetter) {
+            value = s.stringGetter();
+          } else if (s.stringMaxLen > 0) {
+            value = reinterpret_cast<const char*>(&SETTINGS) + s.stringOffset;
+          }
+          doc["value"] = "";
+          doc["hasValue"] = !value.empty();
+        } else if (s.stringGetter) {
           doc["value"] = s.stringGetter();
         } else if (s.stringMaxLen > 0) {
           doc["value"] = reinterpret_cast<const char*>(&SETTINGS) + s.stringOffset;
@@ -1711,8 +1728,8 @@ void CrossPointWebServer::onWebSocketEvent(uint8_t num, WStype_t type, uint8_t* 
           if (!filePath.endsWith("/")) filePath += "/";
           filePath += wsUploadFileName;
 
-          // Never into the AI app's key folder: a key goes onto the card with a computer
-          if (isKeyFolderWebPath(filePath)) {
+          // Never into a hidden folder or the AI app's key folder (a key goes onto the card with a computer)
+          if (isProtectedWebPath(filePath)) {
             LOG_DBG("WS", "START rejected: protected path %s", filePath.c_str());
             wsServer->sendTXT(num, "ERROR:Cannot write to a protected folder");
             return;
